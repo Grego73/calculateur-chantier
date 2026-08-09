@@ -27,11 +27,36 @@ with onglet1:
         jours_totaux = st.number_input("Durée totale du chantier (jours) :", value=15)
         cout_location = st.number_input("Coût de location matériel / jour (€) :", value=1200)
 
-        st.markdown("### --- MATÉRIAUX ---")
-        tonnes_enrobe = st.number_input("Tonnes d'enrobé nécessaires :", value=618)
-        prix_enrobe = st.number_input("Prix de la tonne d'enrobé (€) :", value=42)
-        tonnes_sable = st.number_input("Tonnes de sable nécessaires :", value=488)
-        prix_sable = st.number_input("Prix de la tonne de sable (€) :", value=12)
+        st.markdown("### --- MATÉRIAUX principaux ---")
+        c1, c2 = st.columns(2)
+        with c1:
+            tonnes_enrobe = st.number_input("Tonnes d'enrobé :", value=618)
+            tonnes_sable = st.number_input("Tonnes de sable :", value=488)
+        with c2:
+            prix_enrobe = st.number_input("Prix Enrobé (€/t) :", value=42)
+            prix_sable = st.number_input("Prix Sable (€/t) :", value=12)
+
+        # Volet déroulant pour inclure le reste de votre catalogue de matériaux
+        with st.expander("📦 Autres matériaux du catalogue (Prix mini par défaut)"):
+            c_qte, c_px = st.columns(2)
+            with c_qte:
+                qte_terre = st.number_input("Tonnes de Terre :", value=0)
+                qte_armature = st.number_input("Unités d'Armature métallique :", value=0)
+                qte_tole = st.number_input("Unités de Plaque de tôle ondulée :", value=0)
+                qte_beton = st.number_input("Tonnes de Béton :", value=0)
+                qte_panneaux = st.number_input("Unités de Panneaux signalisation :", value=0)
+                qte_tuyaux = st.number_input("Unités de Tuyaux d'eau standards :", value=0)
+                qte_eaux_usees = st.number_input("Unités de Canalisations eaux usées :", value=0)
+                qte_poutres = st.number_input("Unités de Poutres en acier :", value=0)
+            with c_px:
+                prix_terre = st.number_input("Prix Terre (€/t) :", value=16)
+                prix_armature = st.number_input("Prix Armature (€/u) :", value=70)
+                prix_tole = st.number_input("Prix Tôle (€/u) :", value=55)
+                prix_beton = st.number_input("Prix Béton (€/t) :", value=45)
+                prix_panneaux = st.number_input("Prix Panneaux (€/u) :", value=90)
+                prix_tuyaux = st.number_input("Prix Tuyaux d'eau (€/u) :", value=32)
+                prix_eaux_usees = st.number_input("Prix Canalisations (€/u) :", value=35)
+                prix_poutres = st.number_input("Prix Poutres acier (€/u) :", value=70)
 
     with col2:
         st.markdown("### --- GRILLE SALARIALE & HEURES ---")
@@ -55,8 +80,20 @@ with onglet1:
         elif doublon_existe:
             st.error(f"Impossible d'enregistrer : Une version du chantier '{nom_chantier}' avec un montant de {revenus:,.2f} € existe déjà.")
         else:
-            # Procédure de calcul normale si pas de doublon identique
-            total_mats = (tonnes_enrobe * prix_enrobe) + (tonnes_sable * prix_sable)
+            # Calcul du coût cumulé de absolument tous les matériaux activés
+            total_mats = (
+                (tonnes_enrobe * prix_enrobe) +
+                (tonnes_sable * prix_sable) +
+                (qte_terre * prix_terre) +
+                (qte_armature * prix_armature) +
+                (qte_tole * prix_tole) +
+                (qte_beton * prix_beton) +
+                (qte_panneaux * prix_panneaux) +
+                (qte_tuyaux * prix_tuyaux) +
+                (qte_eaux_usees * prix_eaux_usees) +
+                (qte_poutres * prix_poutres)
+            )
+            
             total_location = jours_totaux * cout_location
             total_salaires = (
                 (jh_chef * (chef_mensuel / 30)) +
@@ -70,7 +107,7 @@ with onglet1:
 
             # Affichage immédiat des résultats
             st.markdown("---")
-            st.write(f"**Coût Matériaux** : {total_mats:,.2f} €")
+            st.write(f"**Coût Matériaux globaux** : {total_mats:,.2f} €")
             st.write(f"**Coût Location** : {total_location:,.2f} €")
             st.write(f"**Coût Salaires** : {total_salaires:,.2f} €")
             
@@ -123,4 +160,3 @@ with onglet2:
             file_name="base_donnies_chantiers.csv",
             mime="text/csv"
         )
-
