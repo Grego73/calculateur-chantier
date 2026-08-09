@@ -12,8 +12,6 @@ if "bdd_chantiers" not in st.session_state:
     ])
 
 # --- DICTIONNAIRE DE TOUS LES CHANTIERS POSSIBLES ---
-# Tous vos chantiers ont été ajoutés avec leurs revenus exacts.
-# Remplacez les 0 par les vraies valeurs dès que vous les aurez !
 CATALOGUE_CHANTIERS = {
     "Choisir un chantier pré-configuré...": {
         "revenus": 0, "jours": 0, "location": 0,
@@ -175,8 +173,7 @@ with onglet1:
         cond_mensuel = st.number_input("Salaire mensuel Conducteur (€) :", value=1571)
         jh_cond = st.number_input("Total Jours-Homme Conducteur :", value=donnees_modele["jh_cond"])
 
-       if st.button("LANCER LE CALCUL & ENREGISTRER", type="primary"):
-        # --- VERIFICATION ANTI-DOUBLON COMPLÈTE (NOM + REVENUS) ---
+    if st.button("LANCER LE CALCUL & ENREGISTRER", type="primary"):
         df_actuel = st.session_state.bdd_chantiers
         doublon_existe = not df_actuel[
             (df_actuel["Nom du Chantier"] == nom_chantier) & 
@@ -186,46 +183,3 @@ with onglet1:
         if not nom_chantier:
             st.error("Veuillez donner un nom ou un numéro valide à votre chantier.")
         elif doublon_existe:
-            st.error(f"Impossible d'enregistrer : Une version du chantier '{nom_chantier}' avec un montant de {revenus:,.2f} € existe déjà.")
-        else:
-            total_mats = (
-                (qte_sable * prix_sable) + (qte_terre * prix_terre) + (qte_enrobe * prix_enrobe) +
-                (qte_armature * prix_armature) + (qte_tole * prix_tole) + (qte_beton * prix_beton) +
-                (qte_panneaux * prix_panneaux) + (qte_tuyaux * prix_tuyaux) + 
-                (qte_eaux_usees * prix_eaux_usees) + (qte_poutres * prix_poutres)
-            )
-            
-            total_location = jours_totaux * cout_location
-            total_salaires = (
-                (jh_chef * (chef_mensuel / 30)) +
-                (jh_ouvrier * (ouvrier_mensuel / 30)) +
-                (jh_cond * (cond_mensuel / 30))
-            )
-
-            total_depenses = total_mats + total_location + total_salaires
-            benefice_net = revenus - total_depenses
-            roi = (benefice_net / total_depenses) * 100 if total_depenses > 0 else 0
-
-            st.markdown("---")
-            st.write(f"**Coût Matériaux globaux** : {total_mats:,.2f} €")
-            st.write(f"**Coût Location** : {total_location:,.2f} €")
-            st.write(f"**Coût Salaires** : {total_salaires:,.2f} €")
-            
-            if benefice_net >= 0:
-                st.success(f"Bénéfice Net : {benefice_net:,.2f} € (ROI : {roi:.2f} %)")
-            else:
-                st.error(f"Bénéfice Net : {benefice_net:,.2f} € (ROI : {roi:.2f} %)")
-
-            nouvel_enregistrement = pd.DataFrame([{
-                "Nom du Chantier": nom_chantier,
-                "Revenus (€)": revenus,
-                "Dépenses (€)": total_depenses,
-                "Bénéfice Net (€)": benefice_net,
-                "ROI (%)": round(roi, 2)
-            }])
-            
-            st.session_state.bdd_chantiers = pd.concat(
-                [st.session_state.bdd_chantiers, nouvel_enregistrement], 
-                ignore_index=True
-            )
-            st.toast("Chantier enregistré avec succès dans l'historique !")
