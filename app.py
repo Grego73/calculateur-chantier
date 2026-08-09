@@ -185,7 +185,7 @@ with onglet1:
 
     if st.button("LANCER LE CALCUL & ENREGISTRER", type="primary"):
         df_actuel = st.session_state.bdd_chantiers
-                doublon_existe = not df_actuel[(df_actuel["Nom du Chantier"] == nom_chantier) & (df_actuel["Revenus (€)"] == revenus)].empty
+        doublon_existe = not df_actuel[(df_actuel["Nom du Chantier"] == nom_chantier) & (df_actuel["Revenus (€)"] == revenus)].empty
         
         if not nom_chantier:
             st.error("Veuillez donner un nom ou un numéro valide à votre chantier.")
@@ -265,4 +265,3 @@ with onglet2:
             file_name="base_donnies_chantiers.csv",
             mime="text/csv"
         )
-
