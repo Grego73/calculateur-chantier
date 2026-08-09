@@ -117,11 +117,10 @@ CATALOGUE_CHANTIERS = {
     }
 }
 
-# --- LOGIQUE DE TRI ALPHABÉTIQUE POUR LE MENU DEROULANT ---
+# --- LOGIQUE DE TRI ALPHABÉTIQUE ---
 liste_complete = list(CATALOGUE_CHANTIERS.keys())
 element_defaut = "Choisir un chantier pré-configuré..."
 
-# On retire l'élément par défaut, on trie le reste de A à Z, puis on le remet en premier
 if element_defaut in liste_complete:
     liste_complete.remove(element_defaut)
 liste_triee = [element_defaut] + sorted(liste_complete)
@@ -131,13 +130,11 @@ onglet1, onglet2 = st.tabs(["➕ Ajouter un Chantier", "📊 Historique & Classe
 with onglet1:
     st.subheader("Formulaire de saisie")
     
-    # Affichage du menu déroulant trié par ordre alphabétique
     chantier_selectionne = st.selectbox(
         "🚀 Optionnel - Pré-remplir avec un modèle de chantier :",
         liste_triee
     )
     
-    # EXTRACTION DES DONNÉES DEPUIS LE CATALOGUE BASE
     donnees_modele = CATALOGUE_CHANTIERS[chantier_selectionne]
     valeur_nom_defaut = "" if chantier_selectionne == element_defaut else chantier_selectionne
     nom_chantier = st.text_input("Nom ou Numéro du chantier :", value=valeur_nom_defaut).strip()
@@ -145,124 +142,98 @@ with onglet1:
     col1, col2 = st.columns(2)
     with col1:
         st.markdown("### --- PARAMÈTRES GÉNÉRAUX ---")
-        revenus = st.number_input("Revenus prévus du chantier (€) :", value=donnees_modele["revenus"])
-        jours_totaux = st.number_input("Durée totale du chantier (jours) :", value=donnees_modele["jours"])
-        cout_location = st.number_input("Coût de location matériel / jour (€) :", value=donnees_modele["location"])
+        revenus = st.number_input("Revenus prévus du chantier (€) :", value=int(donnees_modele["revenus"]), min_value=0)
+        jours_totaux = st.number_input("Durée totale du chantier (jours) :", value=int(donnees_modele["jours"]), min_value=0)
+        cout_location = st.number_input("Coût de location matériel / jour (€) :", value=int(donnees_modele["location"]), min_value=0)
 
         st.markdown("### --- MATÉRIAUX ---")
         c_qte, c_px = st.columns(2)
         with c_qte:
-            qte_sable = st.number_input("Tonnes de Sable :", value=donnees_modele["sable"])
-            qte_terre = st.number_input("Tonnes de Terre :", value=donnees_modele["terre"])
-            qte_enrobe = st.number_input("Tonnes d'Enrobé :", value=donnees_modele["enrobe"])
-            qte_armature = st.number_input("Unités d'Armature métallique :", value=donnees_modele["armature"])
-            qte_tole = st.number_input("Unités de Plaque de tôle ondulée :", value=donnees_modele["tole"])
-            qte_beton = st.number_input("Tonnes de Béton :", value=donnees_modele["beton"])
-            qte_panneaux = st.number_input("Unités de Panneaux signalisation :", value=donnees_modele["panneaux"])
-            qte_tuyaux = st.number_input("Unités de Tuyaux d'eau standards :", value=donnees_modele["tuyaux"])
-            qte_eaux_usees = st.number_input("Unités de Canalisations eaux usées :", value=donnees_modele["canalisations"])
-            qte_poutres = st.number_input("Unités de Poutres en acier :", value=donnees_modele["poutres"])
+            qte_sable = st.number_input("Tonnes de Sable :", value=int(donnees_modele["sable"]), min_value=0)
+            qte_terre = st.number_input("Tonnes de Terre :", value=int(donnees_modele["terre"]), min_value=0)
+            qte_enrobe = st.number_input("Tonnes d'Enrobé :", value=int(donnees_modele["enrobe"]), min_value=0)
+            qte_armature = st.number_input("Unités d'Armature métallique :", value=int(donnees_modele["armature"]), min_value=0)
+            qte_tole = st.number_input("Unités de Plaque de tôle ondulée :", value=int(donnees_modele["tole"]), min_value=0)
+            qte_beton = st.number_input("Tonnes de Béton :", value=int(donnees_modele["beton"]), min_value=0)
+            qte_panneaux = st.number_input("Unités de Panneaux signalisation :", value=int(donnees_modele["panneaux"]), min_value=0)
+            qte_tuyaux = st.number_input("Unités de Tuyaux d'eau standards :", value=int(donnees_modele["tuyaux"]), min_value=0)
+            qte_canalisations = st.number_input("Unités de Canalisations béton :", value=int(donnees_modele.get("canalisations", 0)), min_value=0)
+            qte_poutres = st.number_input("Unités de Poutres IPN :", value=int(donnees_modele.get("poutres", 0)), min_value=0)
+        
         with c_px:
-            prix_sable = st.number_input("Prix Sable (€/t) :", value=12)
-            prix_terre = st.number_input("Prix Terre (€/t) :", value=16)
-            prix_enrobe = st.number_input("Prix Enrobé (€/t) :", value=42)
-            prix_armature = st.number_input("Prix Armature (€/u) :", value=70)
-            prix_tole = st.number_input("Prix Tôle (€/u) :", value=55)
-            prix_beton = st.number_input("Prix Béton (€/t) :", value=45)
-            prix_panneaux = st.number_input("Prix Panneaux (€/u) :", value=90)
-            prix_tuyaux = st.number_input("Prix Tuyaux d'eau (€/u) :", value=32)
-            prix_eaux_usees = st.number_input("Prix Canalisations (€/u) :", value=35)
-            prix_poutres = st.number_input("Prix Poutres acier (€/u) :", value=70)
+            px_sable = st.number_input("Prix unitaire Sable (€) :", value=15, min_value=0)
+            px_terre = st.number_input("Prix unitaire Terre (€) :", value=10, min_value=0)
+            px_enrobe = st.number_input("Prix unitaire Enrobé (€) :", value=45, min_value=0)
+            px_armature = st.number_input("Prix unitaire Armature (€) :", value=35, min_value=0)
+            px_tole = st.number_input("Prix unitaire Tôle (€) :", value=20, min_value=0)
+            px_beton = st.number_input("Prix unitaire Béton (€) :", value=80, min_value=0)
+            px_panneaux = st.number_input("Prix unitaire Panneaux (€) :", value=50, min_value=0)
+            px_tuyaux = st.number_input("Prix unitaire Tuyaux (€) :", value=15, min_value=0)
+            px_canalisations = st.number_input("Prix unitaire Canalisations (€) :", value=60, min_value=0)
+            px_poutres = st.number_input("Prix unitaire Poutres IPN (€) :", value=120, min_value=0)
 
     with col2:
-        st.markdown("### --- GRILLE SALARIALE & HEURES ---")
-        chef_mensuel = st.number_input("Salaire mensuel Chef (€) :", value=1566)
-        jh_chef = st.number_input("Total Jours-Homme Chef :", value=donnees_modele["jh_chef"])
-        ouvrier_mensuel = st.number_input("Salaire mensuel Ouvrier (€) :", value=1616)
-        jh_ouvrier = st.number_input("Total Jours-Homme Ouvrier :", value=donnees_modele["jh_ouvrier"])
-        cond_mensuel = st.number_input("Salaire mensuel Conducteur (€) :", value=1571)
-        jh_cond = st.number_input("Total Jours-Homme Conducteur :", value=donnees_modele["jh_cond"])
-
-    if st.button("LANCER LE CALCUL & ENREGISTRER", type="primary"):
-        df_actuel = st.session_state.bdd_chantiers
-        doublon_existe = not df_actuel[(df_actuel["Nom du Chantier"] == nom_chantier) & (df_actuel["Revenus (€)"] == revenus)].empty
+        st.markdown("### --- MAIN D'ŒUVRE ---")
+        c_jh, c_taux = st.columns(2)
+        with c_jh:
+            jh_chef = st.number_input("Jours-Homme Chef d'équipe :", value=int(donnees_modele["jh_chef"]), min_value=0)
+            jh_ouvrier = st.number_input("Jours-Homme Ouvrier :", value=int(donnees_modele["jh_ouvrier"]), min_value=0)
+            jh_cond = st.number_input("Jours-Homme Conducteur d'engins :", value=int(donnees_modele["jh_cond"]), min_value=0)
         
+        with c_taux:
+        taux_chef = st.number_input("Taux Journalier Chef (€) :", value=250, min_value=0)
+        taux_ouvrier = st.number_input("Taux Journalier Ouvrier (€) :", value=180, min_value=0)
+        taux_cond = st.number_input("Taux Journalier Conducteur (€) :", value=220, min_value=0)
+
+    # --- CALCULS FINANCIERS ---
+    total_materiaux = (
+        (qte_sable * px_sable) + (qte_terre * px_terre) + (qte_enrobe * px_enrobe) +
+        (qte_armature * px_armature) + (qte_tole * px_tole) + (qte_beton * px_beton) +
+        (qte_panneaux * px_panneaux) + (qte_tuyaux * px_tuyaux) +
+        (qte_canalisations * px_canalisations) + (qte_poutres * px_poutres)
+    )
+    
+    total_mo = (jh_chef * taux_chef) + (jh_ouvrier * taux_ouvrier) + (jh_cond * taux_cond)
+    total_location = jours_totaux * cout_location
+    depenses_totales = total_materiaux + total_mo + total_location
+    benefice_net = revenus - depenses_totales
+    roi = (benefice_net / depenses_totales * 100) if depenses_totales > 0 else 0.0
+
+    st.markdown("---")
+    
+    if st.button("💾 Enregistrer le chantier", use_container_width=True):
         if not nom_chantier:
-            st.error("Veuillez donner un nom ou un numéro valide à votre chantier.")
-        elif doublon_existe:
-            st.error(f"Impossible d'enregistrer : Ce chantier au montant de {revenus:,.2f} € existe déjà.")
+            st.error("Veuillez donner un nom au chantier.")
         else:
-            mats_sable = qte_sable * prix_sable
-            mats_terre = qte_terre * prix_terre
-            mats_enrobe = qte_enrobe * prix_enrobe
-            mats_armature = qte_armature * prix_armature
-            mats_tole = qte_tole * prix_tole
-            mats_beton = qte_beton * prix_beton
-            mats_panneaux = qte_panneaux * prix_panneaux
-            mats_tuyaux = qte_tuyaux * prix_tuyaux
-            mats_eaux = qte_eaux_usees * prix_eaux_usees
-            mats_poutres = qte_poutres * prix_poutres
-            
-            total_mats = mats_sable + mats_terre + mats_enrobe + mats_armature + mats_tole + mats_beton + mats_panneaux + mats_tuyaux + mats_eaux + mats_poutres
-            total_location = jours_totaux * cout_location
-            
-            sal_chef = jh_chef * (chef_mensuel / 30)
-            sal_ouvrier = jh_ouvrier * (ouvrier_mensuel / 30)
-            sal_cond = jh_cond * (cond_mensuel / 30)
-            total_salaires = sal_chef + sal_ouvrier + sal_cond
-
-            total_depenses = total_mats + total_location + total_salaires
-            benefice_net = revenus - total_depenses
-            roi = (benefice_net / total_depenses) * 100 if total_depenses > 0 else 0
-
-            st.markdown("---")
-            st.write(f"**Coût Matériaux globaux** : {total_mats:,.2f} €")
-            st.write(f"**Coût Location** : {total_location:,.2f} €")
-            st.write(f"**Coût Salaires** : {total_salaires:,.2f} €")
-            
-            if benefice_net >= 0:
-                st.success(f"Bénéfice Net : {benefice_net:,.2f} € (ROI : {roi:.2f} %)")
-            else:
-                st.error(f"Bénéfice Net : {benefice_net:,.2f} € (ROI : {roi:.2f} %)")
-
             nouvel_enregistrement = pd.DataFrame([{
                 "Nom du Chantier": nom_chantier,
                 "Revenus (€)": revenus,
-                "Dépenses (€)": total_depenses,
+                "Dépenses (€)": depenses_totales,
                 "Bénéfice Net (€)": benefice_net,
                 "ROI (%)": round(roi, 2)
             }])
-            
-            st.session_state.bdd_chantiers = pd.concat([st.session_state.bdd_chantiers, nouvel_enregistrement], ignore_index=True)
-            st.toast("Chantier enregistré avec succès dans l'historique !")
+            st.session_state.bdd_chantiers = pd.concat(
+                [st.session_state.bdd_chantiers, nouvel_enregistrement],
+                ignore_index=True
+            )
+            st.success(f"Chantier '{nom_chantier}' enregistré avec succès !")
 
 with onglet2:
-    st.subheader("Base de données des chantiers enregistrés")
+    st.subheader("Historique des chantiers enregistrés")
     
     if st.session_state.bdd_chantiers.empty:
-        st.info("Aucun chantier n'a encore été enregistré.")
+        st.info("Aucun chantier enregistré pour le moment.")
     else:
-        critere_tri = st.selectbox(
-            "Classer les chantiers par ordre de rentabilité :",
-            ["Plus gros Bénéfice d'abord", "Plus gros ROI d'abord", "Plus de revenus d'abord"]
-        )
-        
-        df_affichage = st.session_state.bdd_chantiers.copy()
-        
-        if critere_tri == "Plus gros Bénéfice d'abord":
-            df_affichage = df_affichage.sort_values(by="Bénéfice Net (€)", ascending=False)
-        elif critere_tri == "Plus gros ROI d'abord":
-            df_affichage = df_affichage.sort_values(by="ROI (%)", ascending=False)
-        elif critere_tri == "Plus de revenus d'abord":
-            df_affichage = df_affichage.sort_values(by="Revenus (€)", ascending=False)
-            
+        # Tri automatique par Bénéfice Net décroissant
+        df_affichage = st.session_state.bdd_chantiers.sort_values(by="Bénéfice Net (€)", ascending=False)
         st.dataframe(df_affichage, use_container_width=True)
         
-        csv = df_affichage.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="📥 Télécharger la base de données (CSV)",
-            data=csv,
-            file_name="base_donnies_chantiers.csv",
-            mime="text/csv"
-        )
+        # Bouton pour réinitialiser l'historique
+        if st.button("🗑️ Effacer l'historique"):
+            st.session_state.bdd_chantiers = pd.DataFrame(columns=[
+                "Nom du Chantier", "Revenus (€)", "Dépenses (€)",
+                "Bénéfice Net (€)", "ROI (%)"
+            ])
+            st.rerun()
 
+            
