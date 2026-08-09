@@ -117,7 +117,7 @@ CATALOGUE_CHANTIERS = {
     }
 }
 
-# Création des deux onglets (Pages)
+# Création des deux onglets
 onglet1, onglet2 = st.tabs(["➕ Ajouter un Chantier", "📊 Historique & Classement"])
 
 with onglet1:
@@ -175,11 +175,11 @@ with onglet1:
 
     if st.button("LANCER LE CALCUL & ENREGISTRER", type="primary"):
         df_actuel = st.session_state.bdd_chantiers
-        doublon_existe = not df_actuel[
-            (df_actuel["Nom du Chantier"] == nom_chantier) & 
-            (df_actuel["Revenus (€)"] == revenus)
-        ].empty
+        doublon_existe = not df_actuel[(df_actuel["Nom du Chantier"] == nom_chantier) & (df_actuel["Revenus (€)"] == revenus)].empty
         
         if not nom_chantier:
             st.error("Veuillez donner un nom ou un numéro valide à votre chantier.")
         elif doublon_existe:
+            st.error(f"Impossible d'enregistrer : Ce chantier au montant de {revenus:,.2f} € existe déjà.")
+        else:
+            total_mats = (
