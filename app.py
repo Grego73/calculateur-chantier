@@ -529,22 +529,29 @@ with onglet2:
         elif critere_tri == "Plus de revenus d'abord":
             df_affichage = df_affichage.sort_values(by="Revenus (€)", ascending=False)
             
-        # --- APPLICATION STRICTE DE L'ESPACE SÉPARATEUR DE MILLIERS ---
-        st.dataframe(
-            df_affichage, use_container_width=True,
-            column_config={
-                "Revenus (€)": st.column_config.NumberColumn(format="%.0f €"),
-                "Durée (Jours)": st.column_config.NumberColumn(format="%d j"),
-                "Coût Matériaux (€)": st.column_config.NumberColumn(format="%.0f €"),
-                "Coût Location Engins (€)": st.column_config.NumberColumn(format="%.0f €"),
-                "Coût Salaires (€)": st.column_config.NumberColumn(format="%.0f €"),
-                "Dépenses Totales (€)": st.column_config.NumberColumn(format="%.0f €"),
-                "Bénéfice Net (€)": st.column_config.NumberColumn(format="%.0f €"),
-                "Gain / Jour (€)": st.column_config.NumberColumn(format="%.0f €/j"),
-                "ROI (%)": st.column_config.NumberColumn(format="%.2f %%"),
-            }
-        )
+        # --- SÉPARATION MANUELLE PAR ESPACES POUR TOUS LES GRANDS NOMBRES ---
+        df_visuel = df_affichage.copy()
         
+        # Colonnes monétaires simples à formater avec un espace tous les 3 chiffres
+        colonnes_monetaires = [
+            "Revenus (€)", "Coût Matériaux (€)", "Coût Location Engins (€)", 
+            "Coût Salaires (€)", "Dépenses Totales (€)", "Bénéfice Net (€)"
+        ]
+        
+        for col in colonnes_monetaires:
+            df_visuel[col] = df_visuel[col].apply(lambda x: f"{float(x):,.0f}".replace(",", " ") + " €" if pd.notnull(x) else "0 €")
+            
+        # Formater spécifiquement la durée et le gain journalier
+        df_visuel["Durée (Jours)"] = df_visuel["Durée (Jours)"].apply(lambda x: f"{int(x)} j" if pd.notnull(x) else "0 j")
+        df_visuel["Gain / Jour (€)"] = df_visuel["Gain / Jour (€)"].apply(lambda x: f"{float(x):,.0f}".replace(",", " ") + " €/j" if pd.notnull(x) else "0 €/j")
+        
+        # Formater le ROI en gardant ses 2 décimales
+        df_visuel["ROI (%)"] = df_visuel["ROI (%)"].apply(lambda x: f"{float(x):.2f} %" if pd.notnull(x) else "0.00 %")
+        
+        # Affichage du tableau formaté sous forme de texte propre
+        st.dataframe(df_visuel, use_container_width=True)
+        
+        # Note : Le bouton de téléchargement exporte le df_affichage d'origine pour garder les vrais chiffres dans Excel/CSV
         csv = df_affichage.to_csv(index=False).encode('utf-8')
         st.download_button(label="📥 Télécharger la base de données (CSV)", data=csv, file_name="base_donnies_chantiers.csv", mime="text/csv")
         st.markdown("---")
