@@ -240,7 +240,7 @@ with onglet1:
     valeur_nom_defaut = "" if chantier_selectionne == element_defaut else chantier_selectionne
     nom_chantier = st.text_input("Nom ou Numéro du chantier :", value=valeur_nom_defaut).strip()
     
-        col1, col2 = st.columns(2)
+    col1, col2 = st.columns(2)
     with col1:
         st.markdown("### --- PARAMÈTRES GÉNÉRAUX ---")
         revenus = st.number_input("Revenus prévus du chantier (€) :", value=donnees_modele["revenus"])
