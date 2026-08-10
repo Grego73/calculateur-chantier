@@ -376,7 +376,7 @@ with onglet1:
 
         # --- TABLE DES ENGINS NÉCESSAIRES ---
         st.markdown("### --- TABLE DES ENGINS NÉCESSAIRES ---")
-        st.caption("📋 Les besoins en machines requis par le chantier s'affichent automatiquement ici. Cochez pour louer (Max 3).")
+        st.caption("📋 Les besoins en machines requis par le chantier s'affichent automatiquement ici. Cochez pour louer.")
         
         engins_bruts_modele = []
         if "engins_requis" in donnees_modele and len(donnees_modele["engins_requis"]) > 0:
@@ -403,47 +403,37 @@ with onglet1:
             }
         )
 
-        # --- LOGIQUE DE TRANSFERT ET COMPTAGE DES CASES COCHÉES ---
+        # --- LOGIQUE DE TRANSFERT SANS AUCUNE LIMITE ---
         engins_transferes_list = []
-        depassement_limite = False
-        
         if not engins_necessaires.empty:
             df_coches = engins_necessaires[engins_necessaires["À louer ?"] == True].dropna(subset=["Type d'engin requis"])
-            nb_coches = len(df_coches)
             
-            # Détection de l'erreur si plus de 3 cases sont cochées
-            if nb_coches > 3:
-                depassement_limite = True
-                st.error(f"🚨 **Erreur : Vous avez coché {nb_coches} cases.** La sélection est strictement limitée à 3 engins maximum pour ce chantier. Veuillez en décocher.")
-            else:
-                for _, row in df_coches.iterrows():
-                    type_demande = row["Type d'engin requis"]
-                    niveau_demande = row["Niveau requis"]
-                    duree_etape = int(row["Durée Étape (jours)"])
-                    modele_trouve, prix_trouve = None, 380
-                    cle_1 = f"{type_demande[:-1] if type_demande.endswith('s') else type_demande} {niveau_demande}"
-                    cle_2 = f"{type_demande} {niveau_demande}"
+            for _, row in df_coches.iterrows():
+                type_demande = row["Type d'engin requis"]
+                niveau_demande = row["Niveau requis"]
+                duree_etape = int(row["Durée Étape (jours)"])
+                modele_trouve, prix_trouve = None, 380
+                cle_1 = f"{type_demande[:-1] if type_demande.endswith('s') else type_demande} {niveau_demande}"
+                cle_2 = f"{type_demande} {niveau_demande}"
+                for engin_nom, prix in CATALOGUE_ENGINS.items():
+                    if (cle_1.lower() in engin_nom.lower()) or (cle_2.lower() in engin_nom.lower()):
+                        modele_trouve, prix_trouve = engin_nom, prix
+                        break
+                if not modele_trouve:
                     for engin_nom, prix in CATALOGUE_ENGINS.items():
-                        if (cle_1.lower() in engin_nom.lower()) or (cle_2.lower() in engin_nom.lower()):
+                        if type_demande.lower() in engin_nom.lower() or type_demande[:-1].lower() in engin_nom.lower():
                             modele_trouve, prix_trouve = engin_nom, prix
                             break
-                    if not modele_trouve:
-                        for engin_nom, prix in CATALOGUE_ENGINS.items():
-                            if type_demande.lower() in engin_nom.lower() or type_demande[:-1].lower() in engin_nom.lower():
-                                modele_trouve, prix_trouve = engin_nom, prix
-                                break
-                    if modele_trouve:
-                        engins_transferes_list.append({
-                            "Sélection de l'engin / Modèle": modele_trouve, "Quantité": 1,
-                            "Prix Location (€/jour)": prix_trouve, "Jours de Location": duree_etape
-                        })
+                if modele_trouve:
+                    engins_transferes_list.append({
+                        "Sélection de l'engin / Modèle": modele_trouve, "Quantité": 1,
+                        "Prix Location (€/jour)": prix_trouve, "Jours de Location": duree_etape
+                    })
 
         # --- TABLE DES ENGINS À LOUER ---
-        st.markdown("### --- TABLE DES ENGINS À LOUER (MAX 3) ---")
+        st.markdown("### --- TABLE DES ENGINS À LOUER ---")
         df_engins_init = pd.DataFrame(columns=["Sélection de l'engin / Modèle", "Quantité", "Prix Location (€/jour)", "Jours de Location"])
-        
-        # Si on dépasse la limite, on force le tableau du bas à rester vide
-        if len(engins_transferes_list) > 0 and not depassement_limite:
+        if len(engins_transferes_list) > 0:
             df_engins_init = pd.DataFrame(engins_transferes_list)
         
         engins_edites = st.data_editor(
@@ -457,7 +447,7 @@ with onglet1:
         )
 
         total_loc_engins_direct = 0.0
-        if engins_edites is not None and not engins_edites.empty and not depassement_limite:
+        if engins_edites is not None and not engins_edites.empty:
             df_propres_direct = engins_edites.dropna(subset=["Sélection de l'engin / Modèle"])
             df_propres_direct["Jours de Location"] = pd.to_numeric(df_propres_direct["Jours de Location"]).fillna(1).astype(int)
             total_loc_engins_direct = (df_propres_direct["Quantité"] * df_propres_direct["Prix Location (€/jour)"] * df_propres_direct["Jours de Location"]).sum()
