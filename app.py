@@ -63,72 +63,180 @@ def reinitialiser_db():
 
 init_db()
 
-# --- DICTIONNAIRE DE TOUS LES CHANTIERS POSSIBLES ---
+# --- DICTIONNAIRE DE TOUS LES CHANTIERS POSSIBLES AVEC TOUTES LEURS ÉTAPES ---
 CATALOGUE_CHANTIERS = {
     "Choisir un chantier pré-configuré...": {
         "revenus": 0, "jours": 0, "location": 0,
         "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0,
         "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0,
-        "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0, "engins_requis": []
+        "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0,
+        "engins_requis": []
+    },
+    "Goudronnage d'une route (112 629 €)": {
+        "revenus": 112629, "jours": 10, "location": 0,
+        "sable": 200, "terre": 0, "enrobe": 300, "armature": 0, "tole": 0,
+        "beton": 0, "panneaux": 4, "tuyaux": 0, "canalisations": 0, "poutres": 0,
+        "jh_chef": 10, "jh_ouvrier": 30, "jh_cond": 15,
+        "engins_requis": [
+            {"Type d'engin requis": "Pelleteuses", "Usage / Spécification attendue": "Étape 1 : Décaissement de la chaussée", "Statut Validation": "🔴 À louer"},
+            {"Type d'engin requis": "Camions Benne", "Usage / Spécification attendue": "Étape 1 : Évacuation des remblais", "Statut Validation": "🟢 Validé / Dispo"},
+            {"Type d'engin requis": "Finisseur", "Usage / Spécification attendue": "Étape 2 : Application de l'enrobé routier", "Statut Validation": "🔴 À louer"},
+            {"Type d'engin requis": "Compacteur pour enrobé", "Usage / Spécification attendue": "Étape 3 : Compactage final de la couche", "Statut Validation": "🔴 À louer"}
+        ]
+    },
+    "Déblayer - Niveau 2 (6 596 €)": {
+        "revenus": 6596, "jours": 3, "location": 0,
+        "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0,
+        "beton": 0, "panneaux": 2, "tuyaux": 0, "canalisations": 0, "poutres": 0,
+        "jh_chef": 3, "jh_ouvrier": 6, "jh_cond": 6,
+        "engins_requis": [
+            {"Type d'engin requis": "Pelleteuses", "Usage / Spécification attendue": "Étape 1 : Extraction et tri des gravats", "Statut Validation": "🟢 Validé / Dispo"},
+            {"Type d'engin requis": "Camions Benne", "Usage / Spécification attendue": "Étape 2 : Chargement et acheminement décharge", "Statut Validation": "🟢 Validé / Dispo"}
+        ]
+    },
+    "Exhausser un terrain (10 336 €)": {
+        "revenus": 10336, "jours": 5, "location": 0,
+        "sable": 20, "terre": 80, "enrobe": 0, "armature": 0, "tole": 0,
+        "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0,
+        "jh_chef": 5, "jh_ouvrier": 10, "jh_cond": 10,
+        "engins_requis": [
+            {"Type d'engin requis": "Chargeuse", "Usage / Spécification attendue": "Étape 1 : Réception et étalement des terres", "Statut Validation": "🔴 À louer"},
+            {"Type d'engin requis": "Compacteurs de Sol", "Usage / Spécification attendue": "Étape 2 : Mise à niveau et stabilisation", "Statut Validation": "🔴 À louer"}
+        ]
+    },
+    "Exhausser un terrain (8 908 €)": {
+        "revenus": 8908, "jours": 4, "location": 0,
+        "sable": 15, "terre": 60, "enrobe": 0, "armature": 0, "tole": 0,
+        "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0,
+        "jh_chef": 4, "jh_ouvrier": 8, "jh_cond": 8,
+        "engins_requis": [
+            {"Type d'engin requis": "Chargeuse Compacte", "Usage / Spécification attendue": "Étape 1 : Répartition fine des remblais", "Statut Validation": "🟢 Validé / Dispo"},
+            {"Type d'engin requis": "Compacteurs de Sol", "Usage / Spécification attendue": "Étape 2 : Lissage et tassement", "Statut Validation": "🔴 À louer"}
+        ]
+    },
+    "Construction d'un hangar (129 306 €)": {
+        "revenus": 129306, "jours": 20, "location": 0,
+        "sable": 40, "terre": 0, "enrobe": 0, "armature": 50, "tole": 100,
+        "beton": 80, "panneaux": 0, "tuyaux": 12, "canalisations": 10, "poutres": 25,
+        "jh_chef": 20, "jh_ouvrier": 80, "jh_cond": 20,
+        "engins_requis": [
+            {"Type d'engin requis": "Pelleteuses", "Usage / Spécification attendue": "Étape 1 : Terrassement et fouilles", "Statut Validation": "🟢 Validé / Dispo"},
+            {"Type d'engin requis": "Camion Béton Malaxeur", "Usage / Spécification attendue": "Étape 2 : Coulage des fondations et dalle", "Statut Validation": "🔴 À louer"},
+            {"Type d'engin requis": "Chargeur Téléscopique", "Usage / Spécification attendue": "Étape 3 : Montage structure et bardage", "Statut Validation": "🔴 À louer"}
+        ]
+    },
+    "Suppression d'un espace vert (18 786 €)": {
+        "revenus": 18786, "jours": 6, "location": 0,
+        "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0,
+        "beton": 0, "panneaux": 2, "tuyaux": 0, "canalisations": 0, "poutres": 0,
+        "jh_chef": 6, "jh_ouvrier": 18, "jh_cond": 6,
+        "engins_requis": [
+            {"Type d'engin requis": "Pelleteuses", "Usage / Spécification attendue": "Étape 1 : Dessouchage et défrichage", "Statut Validation": "🟢 Validé / Dispo"},
+            {"Type d'engin requis": "Camions Benne", "Usage / Spécification attendue": "Étape 2 : Évacuation des déchets végétaux", "Statut Validation": "🟢 Validé / Dispo"}
+        ]
+    },
+    "Compacter - Niveau 2 (3 699 €)": {
+        "revenus": 3699, "jours": 2, "location": 0,
+        "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0,
+        "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0,
+        "jh_chef": 2, "jh_ouvrier": 2, "jh_cond": 4,
+        "engins_requis": [
+            {"Type d'engin requis": "Compacteurs de Sol", "Usage / Spécification attendue": "Étape 1 : Traitement de plateforme", "Statut Validation": "🔴 À louer"}
+        ]
+    },
+    "Goudronnage d'un chemin (34 960 €)": {
+        "revenus": 34960, "jours": 5, "location": 0,
+        "sable": 50, "terre": 0, "enrobe": 90, "armature": 0, "tole": 0,
+        "beton": 0, "panneaux": 2, "tuyaux": 0, "canalisations": 0, "poutres": 0,
+        "jh_chef": 5, "jh_ouvrier": 15, "jh_cond": 10,
+        "engins_requis": [
+            {"Type d'engin requis": "Fraiseuse", "Usage / Spécification attendue": "Étape 1 : Rabotage de la surface existante", "Statut Validation": "🔴 À louer"},
+            {"Type d'engin requis": "Finisseur", "Usage / Spécification attendue": "Étape 2 : Application de l'enrobé mécanique", "Statut Validation": "🔴 À louer"},
+            {"Type d'engin requis": "Compacteur pour enrobé", "Usage / Spécification attendue": "Étape 3 : Finition au rouleau compacteur", "Statut Validation": "🔴 À louer"}
+        ]
+    },
+    "Exhausser un terrain (6 664 €)": {
+        "revenus": 6664, "jours": 3, "location": 0,
+        "sable": 10, "terre": 40, "enrobe": 0, "armature": 0, "tole": 0,
+        "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0,
+        "jh_chef": 3, "jh_ouvrier": 6, "jh_cond": 6,
+        "engins_requis": [
+            {"Type d'engin requis": "Chargeuse", "Usage / Spécification attendue": "Étape 1 : Remblayage et mise en forme", "Statut Validation": "🔴 À louer"}
+        ]
+    },
+    "Déblayer - Niveau 3 (21 528 €)": {
+        "revenus": 21528, "jours": 7, "location": 0,
+        "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0,
+        "beton": 0, "panneaux": 4, "tuyaux": 0, "canalisations": 0, "poutres": 0,
+        "jh_chef": 7, "jh_ouvrier": 21, "jh_cond": 14,
+        "engins_requis": [
+            {"Type d'engin requis": "Pelleteuses", "Usage / Spécification attendue": "Étape 1 : Évacuation massive de remblais", "Statut Validation": "🟢 Validé / Dispo"},
+            {"Type d'engin requis": "Camions Benne", "Usage / Spécification attendue": "Étape 2 : Logistique d'évacuation", "Statut Validation": "🟢 Validé / Dispo"}
+        ]
+    },
+    "Assainissement de lit (Petit cours d'eau) (12 180 €)": {
+        "revenus": 12180, "jours": 4, "location": 0,
+        "sable": 10, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0,
+        "beton": 15, "panneaux": 2, "tuyaux": 0, "canalisations": 8, "poutres": 0,
+        "jh_chef": 4, "jh_ouvrier": 12, "jh_cond": 4,
+        "engins_requis": [
+            {"Type d'engin requis": "Pelleteuses", "Usage / Spécification attendue": "Étape 1 : Curage et reprofilage du lit", "Statut Validation": "🟢 Validé / Dispo"},
+            {"Type d'engin requis": "Chargeur Téléscopique", "Usage / Spécification attendue": "Étape 2 : Enrochement et pose d'ouvrages hydrauliques", "Statut Validation": "🔴 À louer"}
+        ]
+    },
+    "Assainissement de lit (Cours d'eau) (10 450 €)": {
+        "revenus": 10450, "jours": 4, "location": 0,
+        "sable": 8, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0,
+        "beton": 10, "panneaux": 2, "tuyaux": 0, "canalisations": 6, "poutres": 0,
+        "jh_chef": 4, "jh_ouvrier": 12, "jh_cond": 4,
+        "engins_requis": [
+            {"Type d'engin requis": "Pelleteuses", "Usage / Spécification attendue": "Étape 1 : Curage environnemental des fonds", "Statut Validation": "🟢 Validé / Dispo"}
+        ]
     },
     "Goudronnage d'une route (Grande surface) (214 599 €)": {
         "revenus": 214599, "jours": 16, "location": 0,
         "sable": 488, "terre": 0, "enrobe": 618, "armature": 0, "tole": 0,
-        "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0,
+        "beton": 0, "panneaux": 6, "tuyaux": 0, "canalisations": 0, "poutres": 0,
         "jh_chef": 16, "jh_ouvrier": 48, "jh_cond": 28,
         "engins_requis": [
-            {"Type d'engin requis": "Pelleteuse N2 - Takeuchi TB2150 (85.0 kW)", "Usage / Spécification attendue": "Étape 1 (Terrassement) : Requis (CAT 350 occupé)", "Statut Validation": "🟢 Validé / Dispo"},
-            {"Type d'engin requis": "Camion Benne N3 - Renault Trucks K 430 (430 cv)", "Usage / Spécification attendue": "Étape 1 & 3 : Requis (x2 autres occupés)", "Statut Validation": "🟢 Validé / Dispo"},
-            {"Type d'engin requis": "Fraiseuse N2 - CAT PM312 (256 kW)", "Usage / Spécification attendue": "Étape 1 (Terrassement) : Occupé actuellement !", "Statut Validation": "🔴 À louer"},
-            {"Type d'engin requis": "Niveleuse N2 - CAT 14 (178 kW)", "Usage / Spécification attendue": "Étape 2 (Nivellement) : Non possédé !", "Statut Validation": "🔴 À louer"},
-            {"Type d'engin requis": "Finisseur N3 - Dynapac SD2500CS (142 kW)", "Usage / Spécification attendue": "Étape 3 (Pose enrobé) : Non possédé !", "Statut Validation": "🔴 À louer"},
-            {"Type d'engin requis": "Compacteur Enrobé N3 - CAT CB8 (N/A)", "Usage / Spécification attendue": "Étape 4 (Compactage) : Non possédé !", "Statut Validation": "🔴 À louer"}
+            {"Type d'engin requis": "Pelleteuses", "Usage / Spécification attendue": "Étape 1 (Terrassement) : x1 Takeuchi TB2150 (N2)", "Statut Validation": "🟢 Validé / Dispo"},
+            {"Type d'engin requis": "Camions Benne", "Usage / Spécification attendue": "Étape 1 (Terrassement) : x1 Renault Trucks K 430 (N3)", "Statut Validation": "🟢 Validé / Dispo"},
+            {"Type d'engin requis": "Fraiseuse", "Usage / Spécification attendue": "Étape 1 (Terrassement) : x1 Fraiseuse de niveau 1+", "Statut Validation": "🔴 À louer"},
+            {"Type d'engin requis": "Niveleuse", "Usage / Spécification attendue": "Étape 2 (Nivellement) : x1 Niveleuse de niveau 2", "Statut Validation": "🔴 À louer"},
+            {"Type d'engin requis": "Camions Benne", "Usage / Spécification attendue": "Étape 3 (Pose Enrobé) : x1 Renault Trucks K 430 (N3)", "Statut Validation": "🟢 Validé / Dispo"},
+            {"Type d'engin requis": "Finisseur", "Usage / Spécification attendue": "Étape 3 (Pose Enrobé) : x1 Finisseur de niveau 3", "Statut Validation": "🔴 À louer"},
+            {"Type d'engin requis": "Compacteur pour enrobé", "Usage / Spécification attendue": "Étape 4 (Compactage) : x1 Compacteur pour enrobé N3", "Statut Validation": "🔴 À louer"}
         ]
     },
-    "Goudronnage d'une route (112 629 €)": {
-        "revenus": 112629, "jours": 0, "location": 0, "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0, "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0, "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0, "engins_requis": []
-    },
-    "Déblayer - Niveau 2 (6 596 €)": {
-        "revenus": 6596, "jours": 0, "location": 0, "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0, "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0, "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0, "engins_requis": []
-    },
-    "Exhausser un terrain (10 336 €)": {
-        "revenus": 10336, "jours": 0, "location": 0, "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0, "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0, "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0, "engins_requis": []
-    },
-    "Exhausser un terrain (8 908 €)": {
-        "revenus": 8908, "jours": 0, "location": 0, "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0, "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0, "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0, "engins_requis": []
-    },
-    "Construction d'un hangar (129 306 €)": {
-        "revenus": 129306, "jours": 0, "location": 0, "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0, "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0, "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0, "engins_requis": []
-    },
-    "Suppression d'un espace vert (18 786 €)": {
-        "revenus": 18786, "jours": 0, "location": 0, "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0, "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0, "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0, "engins_requis": []
-    },
-    "Compacter - Niveau 2 (3 699 €)": {
-        "revenus": 3699, "jours": 0, "location": 0, "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0, "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0, "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0, "engins_requis": []
-    },
-    "Goudronnage d'un chemin (34 960 €)": {
-        "revenus": 34960, "jours": 0, "location": 0, "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0, "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0, "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0, "engins_requis": []
-    },
-    "Exhausser un terrain (6 664 €)": {
-        "revenus": 6664, "jours": 0, "location": 0, "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0, "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0, "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0, "engins_requis": []
-    },
-    "Déblayer - Niveau 3 (21 528 €)": {
-        "revenus": 21528, "jours": 0, "location": 0, "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0, "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0, "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0, "engins_requis": []
-    },
-    "Assainissement de lit (Petit cours d'eau) (12 180 €)": {
-        "revenus": 12180, "jours": 0, "location": 0, "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0, "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0, "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0, "engins_requis": []
-    },
-    "Assainissement de lit (Cours d'eau) (10 450 €)": {
-        "revenus": 10450, "jours": 0, "location": 0, "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0, "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0, "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0, "engins_requis": []
-    },
     "Construction d'un hangar (139 104 €)": {
-        "revenus": 139104, "jours": 0, "location": 0, "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0, "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0, "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0, "engins_requis": []
+        "revenus": 139104, "jours": 22, "location": 0,
+        "sable": 45, "terre": 0, "enrobe": 0, "armature": 60, "tole": 120,
+        "beton": 90, "panneaux": 0, "tuyaux": 16, "canalisations": 12, "poutres": 30,
+        "jh_chef": 22, "jh_ouvrier": 90, "jh_cond": 22,
+        "engins_requis": [
+            {"Type d'engin requis": "Pelleteuses", "Usage / Spécification attendue": "Étape 1 : Fondations et longrines", "Statut Validation": "🟢 Validé / Dispo"},
+            {"Type d'engin requis": "Camion Béton Malaxeur", "Usage / Spécification attendue": "Étape 2 : Dallage béton industriel", "Statut Validation": "🔴 À louer"},
+            {"Type d'engin requis": "Chargeur Téléscopique", "Usage / Spécification attendue": "Étape 3 : Pose charpente lourde", "Statut Validation": "🔴 À louer"}
+        ]
     },
     "Compacter - Niveau 2 (4 617 €)": {
-        "revenus": 4617, "jours": 0, "location": 0, "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0, "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0, "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0, "engins_requis": []
+        "revenus": 4617, "jours": 3, "location": 0,
+        "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0,
+        "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0,
+        "jh_chef": 3, "jh_ouvrier": 3, "jh_cond": 6,
+        "engins_requis": [
+            {"Type d'engin requis": "Compacteurs de Sol", "Usage / Spécification attendue": "Étape 1 : Compactage de voiries", "Statut Validation": "🔴 À louer"}
+        ]
     },
     "Remblayer - Niveau 3 (13 674 €)": {
-        "revenus": 13674, "jours": 0, "location": 0, "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0, "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0, "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0, "engins_requis": []
+        "revenus": 13674, "jours": 5, "location": 0,
+        "sable": 10, "terre": 120, "enrobe": 0, "armature": 0, "tole": 0,
+        "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0,
+        "jh_chef": 5, "jh_ouvrier": 15, "jh_cond": 10,
+        "engins_requis": [
+            {"Type d'engin requis": "Chargeuse", "Usage / Spécification attendue": "Étape 1 : Remblayage technique des fouilles", "Statut Validation": "🔴 À louer"},
+            {"Type d'engin requis": "Compacteurs de Sol", "Usage / Spécification attendue": "Étape 2 : Recompactage par couches successives", "Statut Validation": "🔴 À louer"}
+        ]
     }
 }
 
@@ -184,6 +292,8 @@ CATALOGUE_ENGINS = {
     "Fraiseuse N4 - CAT PM825 (601 kW)": 580
 }
 
+TYPES_ENGINS_BRUTS = ["Camions Benne", "Pelleteuses", "Compacteurs de Sol", "Compacteur pour enrobé", "Finisseur", "Camion Béton Malaxeur", "Chargeuse Compacte", "Chargeuse", "Chargeur Téléscopique", "Niveleuse", "Fraiseuse"]
+
 liste_complete = list(CATALOGUE_CHANTIERS.keys())
 element_defaut = "Choisir un chantier pré-configuré..."
 
@@ -217,7 +327,7 @@ with onglet1:
             qte_armature = st.number_input("Unités d'Armature métallique :", value=donnees_modele["armature"])
             qte_tole = st.number_input("Unités de Plaque de tôle ondulée :", value=donnees_modele["tole"])
             qte_beton = st.number_input("Tonnes de Béton :", value=donnees_modele["beton"])
-            qte_panneaux = st.number_input("Unités de Panneaux signalisation :", value=donnees_modele["panneaux"])
+            qte_panneaux = st.number_input("Unités de Panneaux signalisation :", value=donnees_panneaux["panneaux"])
             qte_tuyaux = st.number_input("Unités de Tuyaux d'eau standards :", value=donnees_modele["tuyaux"])
             qte_eaux_usees = st.number_input("Unités de Canalisations eaux usées :", value=donnees_modele["canalisations"])
             qte_poutres = st.number_input("Unités de Poutres en acier :", value=donnees_modele["poutres"])
@@ -242,18 +352,13 @@ with onglet1:
         cond_mensuel = st.number_input("Salaire mensuel Conducteur (€) :", value=1571)
         jh_cond = st.number_input("Total Jours-Homme Conducteur :", value=donnees_modele["jh_cond"])
 
-        # --- NOUVELLE TABLE : ENGINS NÉCESSAIRES ---
+        # --- RE-PREMPLISSAGE AUTOMATIQUE DE LA TABLE DES ENGINS NÉCESSAIRES ---
         st.markdown("### --- TABLE DES ENGINS NÉCESSAIRES ---")
-        st.caption("📋 Listez ici les engins théoriquement indispensables ou planifiés pour valider le cahier des charges.")
+        st.caption("📋 Les besoins en machines requis par le chantier s'affichent automatiquement ici.")
         
-        df_besoins_init = pd.DataFrame(columns=[
-            "Type d'engin requis", 
-            "Usage / Spécification attendue", 
-            "Statut Validation"
-        ])
-        
-        # Extraction de la liste propre des types pour le menu déroulant de cette table
-        types_bruts = sorted(list(set([k.split(" - ")[0].split(" N")[0].strip() for k in CATALOGUE_ENGINS.keys()])))
+        df_besoins_init = pd.DataFrame(donnees_modele["engins_requis"])
+        if df_besoins_init.empty:
+            df_besoins_init = pd.DataFrame(columns=["Type d'engin requis", "Usage / Spécification attendue", "Statut Validation"])
         
         engins_necessaires = st.data_editor(
             df_besoins_init,
@@ -261,33 +366,17 @@ with onglet1:
             use_container_width=True,
             key="table_engins_necessaires",
             column_config={
-                "Type d'engin requis": st.column_config.SelectboxColumn(
-                    "Catégorie d'engin",
-                    options=types_bruts,
-                    required=True,
-                ),
-                "Usage / Spécification attendue": st.column_config.TextColumn(
-                    "Notes techniques / Phase", 
-                    default="Recommandé pour ce type de travaux"
-                ),
-                "Statut Validation": st.column_config.SelectboxColumn(
-                    "Disponibilité",
-                    options=["🔴 À louer", "🟡 En attente de devis", "🟢 Validé / Dispo"],
-                    default="🔴 À louer"
-                )
+                "Type d'engin requis": st.column_config.SelectboxColumn("Catégorie d'engin", options=TYPES_ENGINS_BRUTS, required=True),
+                "Usage / Spécification attendue": st.column_config.TextColumn("Notes techniques / Phase"),
+                "Statut Validation": st.column_config.SelectboxColumn("Disponibilité", options=["🔴 À louer", "🟡 En attente de devis", "🟢 Validé / Dispo"])
             }
         )
 
         # --- TABLE DES ENGINS À LOUER ---
         st.markdown("### --- TABLE DES ENGINS À LOUER ---")
-        st.caption("🔗 Ajoutez les lignes ci-dessous pour intégrer les coûts réels de location au calcul financier du chantier.")
+        st.caption("🔗 Ajoutez les lignes ci-dessous pour intégrer les coûts réels de location.")
         
-        df_engins_init = pd.DataFrame(columns=[
-            "Sélection de l'engin / Modèle", 
-            "Quantité", 
-            "Prix Location (€/jour)", 
-            "Jours de Location"
-        ])
+        df_engins_init = pd.DataFrame(columns=["Sélection de l'engin / Modèle", "Quantité", "Prix Location (€/jour)", "Jours de Location"])
         
         engins_edites = st.data_editor(
             df_engins_init,
@@ -295,25 +384,13 @@ with onglet1:
             use_container_width=True,
             key="table_engins_a_louer",
             column_config={
-                "Sélection de l'engin / Modèle": st.column_config.SelectboxColumn(
-                    "Engin & Modèle",
-                    options=list(CATALOGUE_ENGINS.keys()),
-                    required=True,
-                ),
+                "Sélection de l'engin / Modèle": st.column_config.SelectboxColumn("Engin & Modèle", options=list(CATALOGUE_ENGINS.keys()), required=True),
                 "Quantité": st.column_config.NumberColumn("Quantité", min_value=1, default=1, step=1),
                 "Prix Location (€/jour)": st.column_config.NumberColumn("Prix / Jour (€)", min_value=0, default=380, step=10),
-                "Jours de Location": st.column_config.NumberColumn(
-                    "Jours à louer", 
-                    min_value=1, 
-                    max_value=365, 
-                    default=int(jours_totaux) if jours_totaux > 0 else 1, 
-                    step=1,
-                    help="Durée spécifique de location de cet engin."
-                ),
+                "Jours de Location": st.column_config.NumberColumn("Jours à louer", min_value=1, max_value=365, default=int(jours_totaux) if jours_totaux > 0 else 1, step=1)
             }
         )
 
-        # Calcul automatique du total des engins en direct
         total_loc_engins_direct = 0.0
         if not engins_edites.empty:
             df_propres_direct = engins_edites.dropna(subset=["Sélection de l'engin / Modèle"])
@@ -330,20 +407,14 @@ with onglet1:
         elif doublon_existe:
             st.error(f"Impossible d'enregistrer : Ce chantier au montant de {revenus:,.2f} € existe déjà.")
         else:
-            # 1. Calcul Matériaux
             total_mats = (qte_sable*prix_sable) + (qte_terre*prix_terre) + (qte_enrobe*prix_enrobe) + (qte_armature*prix_armature) + (qte_tole*prix_tole) + (qte_beton*prix_beton) + (qte_panneaux*prix_panneaux) + (qte_tuyaux*prix_tuyaux) + (qte_eaux_usees*prix_eaux_usees) + (qte_poutres*prix_poutres)
             
-            # 2. CORRECTION DU CALCUL DES ENGINS À LOUER
             total_location = 0.0
             if not engins_edites.empty:
                 df_propres = engins_edites.dropna(subset=["Sélection de l'engin / Modèle"])
-                # Prise en compte exacte de : Quantité * Prix Journalier * Jours de Location propres à l'engin
                 total_location = (df_propres["Quantité"] * df_propres["Prix Location (€/jour)"] * df_propres["Jours de Location"]).sum()
                 
-            # 3. Calcul Salaires
             total_salaires = (jh_chef * (chef_mensuel / 30)) + (jh_ouvrier * (ouvrier_mensuel / 30)) + (jh_cond * (cond_mensuel / 30))
-            
-            # 4. Totaux Généraux
             total_depenses = total_mats + total_location + total_salaires
             benefice_net = revenus - total_depenses
             roi = (benefice_net / total_depenses) * 100 if total_depenses > 0 else 0
@@ -358,25 +429,17 @@ with onglet1:
             else:
                 st.error(f"Bénéfice Net : {benefice_net:,.2f} € (ROI : {roi:.2f} %)")
 
-            # Écriture définitive dans SQLite
             inserer_chantier(nom_chantier, revenus, total_mats, total_location, total_salaires, total_depenses, benefice_net, round(roi, 2))
             st.toast("Chantier enregistré avec succès dans la base SQLite !")
 
-
 with onglet2:
     st.subheader("Base de données des chantiers enregistrés")
-    
-    # Lecture directe depuis le fichier SQLite
     df_affichage = charger_donnees()
     
     if df_affichage.empty:
         st.info("Aucun chantier n'a encore été enregistré.")
     else:
-        critere_tri = st.selectbox(
-            "Classer les chantiers par ordre de rentabilité :",
-            ["Plus gros Bénéfice d'abord", "Plus gros ROI d'abord", "Plus de revenus d'abord"]
-        )
-        
+        critere_tri = st.selectbox("Classer les chantiers par ordre de rentabilité :", ["Plus gros Bénéfice d'abord", "Plus gros ROI d'abord", "Plus de revenus d'abord"])
         if critere_tri == "Plus gros Bénéfice d'abord":
             df_affichage = df_affichage.sort_values(by="Bénéfice Net (€)", ascending=False)
         elif critere_tri == "Plus gros ROI d'abord":
@@ -386,15 +449,8 @@ with onglet2:
             
         st.dataframe(df_affichage, use_container_width=True)
         
-        # Exportation au format CSV
         csv = df_affichage.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="📥 Télécharger la base de données (CSV)",
-            data=csv,
-            file_name="base_donnies_chantiers.csv",
-            mime="text/csv"
-        )
-        
+        st.download_button(label="📥 Télécharger la base de données (CSV)", data=csv, file_name="base_donnies_chantiers.csv", mime="text/csv")
         st.markdown("---")
         if st.button("🗑️ Vider définitivement la base de données SQLITE", type="secondary"):
             reinitialiser_db()
