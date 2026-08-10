@@ -457,7 +457,8 @@ with onglet3:
         sub_tab1, sub_tab2, sub_tab3, sub_tab4 = st.tabs([
             "🏗️ Ajouter un Modèle de Chantier", "👥 Éditer Grille Salariale", "🧱 Éditer Prix Matériaux", "🚜 Éditer Catalogue Engins"
         ])
-        
+
+        # 4.1 FORMULAIRE SECRETS : AJOUTER UN MODÈLE DE CHANTIER COMPLET
         with sub_tab1:
             st.write("Créez ici un chantier type. Il apparaîtra instantanément dans le menu déroulant de l'Onglet 1.")
             with st.form("form_nouveau_modele", clear_on_submit=True):
@@ -490,7 +491,7 @@ with onglet3:
                     if not m_nom: 
                         st.error("Donnez un nom au modèle.")
                     else:
-                        try: # Le mot-clé try indispensable ici
+                        try:
                             json.loads(m_engins_json)
                             conn = sqlite3.connect(DB_NAME)
                             cursor = conn.cursor()
@@ -501,8 +502,10 @@ with onglet3:
                             conn.close()
                             st.success(f"Modèle '{m_nom}' ajouté ! Rafraîchissement...")
                             st.rerun()
-                        except ValueError: 
+                        except ValueError:
                             st.error("Le format des étapes JSON est invalide.")
+
+
         with sub_tab2:
             st.write("Modifiez le coût d'une journée de travail.")
             conn = sqlite3.connect(DB_NAME)
