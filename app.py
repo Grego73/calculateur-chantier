@@ -487,9 +487,10 @@ with onglet3:
                 m_engins_json = st.text_area("Étapes d'Engins requis (JSON) :", value="[]")
                 
                 if st.form_submit_button("SAUVEGARDER LE MODÈLE"):
-                    if not m_nom: st.error("Donnez un nom au modèle.")
+                    if not m_nom: 
+                        st.error("Donnez un nom au modèle.")
                     else:
-                        try:
+                        try: # Le mot-clé try indispensable ici
                             json.loads(m_engins_json)
                             conn = sqlite3.connect(DB_NAME)
                             cursor = conn.cursor()
@@ -500,8 +501,8 @@ with onglet3:
                             conn.close()
                             st.success(f"Modèle '{m_nom}' ajouté ! Rafraîchissement...")
                             st.rerun()
-                        except ValueError: st.error("Le format des étapes JSON is invalide.")
-
+                        except ValueError: 
+                            st.error("Le format des étapes JSON est invalide.")
         with sub_tab2:
             st.write("Modifiez le coût d'une journée de travail.")
             conn = sqlite3.connect(DB_NAME)
