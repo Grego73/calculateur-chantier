@@ -525,7 +525,9 @@ with onglet2:
                 "ROI (%)": st.column_config.NumberColumn(format="%.2f %%"),
             }
         )
-            st.download_button(
+        
+        csv = df_affichage.to_csv(index=False).encode('utf-8')
+        st.download_button(
             label="📥 Télécharger la base de données (CSV)", 
             data=csv, 
             file_name="base_donnies_chantiers.csv", 
@@ -536,7 +538,4 @@ with onglet2:
         if st.button("🗑️ Vider définitivement la base de données SQLITE", type="secondary"):
             reinitialiser_db()
             st.rerun()
-
-        
-        csv = df_affichage.to_csv(index=False).encode('utf-8')
 
