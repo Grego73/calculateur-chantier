@@ -403,36 +403,45 @@ with onglet1:
             }
         )
 
-        # --- LOGIQUE DE TRANSFERT CORRIGÉE (SANS BUG DE PLURIEL) ---
+        # --- LOGIQUE DE TRANSFERT ULTRA-SÉCURISÉE (CORRECTION COMPACTEUR & PLURIELS) ---
         engins_transferes_list = []
         if not engins_necessaires.empty:
-            df_coches = engins_necessaires[engins_necessaires["À louer ?"] == True].dropna(subset=["Type d'engin requis"])
+            df_coches = engins_necessaires[engins_necessaires["À l'ouer ?"] == True if "À l'ouer ?" in engins_necessaires.columns else engins_necessaires["À louer ?"] == True].dropna(subset=["Type d'engin requis"])
             
             for _, row in df_coches.iterrows():
                 type_demande = str(row["Type d'engin requis"]).strip()
                 niveau_demande = str(row["Niveau requis"]).strip()
                 duree_etape = int(row["Durée Étape (jours)"])
                 
-                # Nettoyage pour la recherche (ex: "Camions Benne" -> "Camion Benne")
-                type_clean = type_demande
-                if type_clean.lower().startswith("camions"):
-                    type_clean = type_clean.replace("Camions", "Camion").replace("camions", "camion")
-                if type_clean.endswith("s") and not type_clean.lower().endswith("sol"):
+                # 1. Nettoyage de base (Pluriels et minuscules)
+                type_clean = type_demande.lower()
+                if type_clean.startswith("camions"):
+                    type_clean = type_clean.replace("camions", "camion")
+                if type_clean.endswith("s") and not type_clean.endswith("sol"):
                     type_clean = type_clean[:-1]
+                
+                # Supprimer les accents pour éviter les erreurs de frappe (é -> e)
+                type_clean = type_clean.replace("é", "e").replace("è", "e").replace("à", "a")
+                
+                # 2. Découpage en mots-clés essentiels (on ignore "pour", "d'", "un")
+                mots_ignores = ["pour", "d", "un", "une", "la", "le"]
+                mots_cles = [mot for mot in type_clean.split() if mot not in mots_ignores]
                 
                 modele_trouve, prix_trouve = None, 380
                 
-                # 1ère tentative : Recherche du Type épuré + Niveau (ex: "Camion Benne N3")
-                cle_1 = f"{type_clean} {niveau_demande}"
+                # Tentative 1 : Recherche stricte avec tous les mots-clés + le niveau (ex: "compacteur", "enrobe", "n3")
                 for engin_nom, prix in CATALOGUE_ENGINS.items():
-                    if cle_1.lower() in engin_nom.lower():
+                    engin_nom_clean = engin_nom.lower().replace("é", "e").replace("è", "e")
+                    # On vérifie si TOUS nos mots clés ET le niveau sont dans le nom de la machine
+                    if all(mot in engin_nom_clean for mot in mots_cles) and (niveau_demande.lower() in engin_nom_clean):
                         modele_trouve, prix_trouve = engin_nom, prix
                         break
                         
-                # 2ème tentative : Si non trouvé, recherche globale sur le type épuré seul
+                # Tentative 2 : Recherche élargie sans le niveau si la première échoue
                 if not modele_trouve:
                     for engin_nom, prix in CATALOGUE_ENGINS.items():
-                        if type_clean.lower() in engin_nom.lower():
+                        engin_nom_clean = engin_nom.lower().replace("é", "e").replace("è", "e")
+                        if all(mot in engin_nom_clean for mot in mots_cles):
                             modele_trouve, prix_trouve = engin_nom, prix
                             break
                 
@@ -443,7 +452,6 @@ with onglet1:
                         "Prix Location (€/jour)": prix_trouve, 
                         "Jours de Location": duree_etape
                     })
-
 
         # --- TABLE DES ENGINS À LOUER ---
         st.markdown("### --- TABLE DES ENGINS À LOUER ---")
