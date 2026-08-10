@@ -547,18 +547,42 @@ with onglet2:
     if df_affichage.empty:
         st.info("Aucun chantier n'a encore été enregistré.")
     else:
-        critere_tri = st.selectbox("Classer les chantiers par ordre de rentabilité :", ["Plus gros Bénéfice d'abord", "Plus gros ROI d'abord", "Plus de revenus d'abord"])
+        critere_tri = st.selectbox(
+            "Classer les chantiers par ordre de rentabilité :", 
+            ["Plus gros Bénéfice d'abord", "Plus gros ROI d'abord", "Plus de revenus d'abord"]
+        )
+        
         if critere_tri == "Plus gros Bénéfice d'abord":
             df_affichage = df_affichage.sort_values(by="Bénéfice Net (€)", ascending=False)
         elif critere_tri == "Plus gros ROI d'abord":
             df_affichage = df_affichage.sort_values(by="ROI (%)", ascending=False)
         elif critere_tri == "Plus de revenus d'abord":
             df_affichage = df_affichage.sort_values(by="Revenus (€)", ascending=False)
-            
-        st.dataframe(df_affichage, use_container_width=True)
+        
+        # --- CONFIGURATION DU FORMAT DES COLONNES POUR MASQUER LES DÉCIMALES ---
+        # On définit un format d'affichage propre colonne par colonne sans toucher aux données de calcul
+        st.dataframe(
+            df_affichage, 
+            use_container_width=True,
+            column_config={
+                "Revenus (€)": st.column_config.NumberColumn(format="%d €"),
+                "Coût Matériaux (€)": st.column_config.NumberColumn(format="%d €"),
+                "Coût Location Engins (€)": st.column_config.NumberColumn(format="%d €"),
+                "Coût Salaires (€)": st.column_config.NumberColumn(format="%d €"),
+                "Dépenses Totales (€)": st.column_config.NumberColumn(format="%d €"),
+                "Bénéfice Net (€)": st.column_config.NumberColumn(format="%d €"),
+                "ROI (%)": st.column_config.NumberColumn(format="%.2f %%"), # Conserve 2 décimales pour le ROI
+            }
+        )
         
         csv = df_affichage.to_csv(index=False).encode('utf-8')
-        st.download_button(label="📥 Télécharger la base de données (CSV)", data=csv, file_name="base_donnies_chantiers.csv", mime="text/csv")
+        st.download_button(
+            label="📥 Télécharger la base de données (CSV)", 
+            data=csv, 
+            file_name="base_donnies_chantiers.csv", 
+            mime="text/csv"
+        )
+        
         st.markdown("---")
         if st.button("🗑️ Vider définitivement la base de données SQLITE", type="secondary"):
             reinitialiser_db()
