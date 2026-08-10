@@ -555,6 +555,140 @@ with onglet3:
                         st.rerun()
                     else:
                         st.warning("⚠️ Aucun chantier valide n'a pu être extrait. Vérifiez le format du texte.")
+            st.markdown("---")
+            st.markdown("### 📂 2. Importation Avancée (Copier / Coller des Descriptifs Détaillés d'Étapes)")
+            st.caption("Collez ici vos fiches descriptives détaillées. Le robot va lire le texte, associer le budget, la durée globale et préparer la structure du chantier.")
+            
+            # Zone de texte libre dédiée aux fiches descriptives d'étapes
+            texte_detaille_colle = st.text_area(
+                "Collez vos fiches de chantiers détaillées ici :",
+                value="",
+                height=300,
+                key="zone_texte_import_avance",
+                placeholder="Pose de panneaux de signalisation\t5 700 euros\nNombre d'étapes : 1 étape(s)\nRevenus : 5 700 euros\nDurée du chantier : 1 jour(s)"
+            )
+            
+            if st.button("🚜 ANALYSER ET STRUCTURER LES ÉTAPES COLLÉES", type="primary"):
+                if not texte_detaille_colle.strip():
+                    st.error("❌ La zone de texte est vide. Veuillez y coller vos fiches descriptives.")
+                else:
+                    conn = sqlite3.connect(DB_NAME)
+                    cursor = conn.cursor()
+                    
+                    # Découpage du bloc de texte par ligne
+                    lignes_brutes = texte_detaille_colle.split("\n")
+                    
+                    chantiers_detectes = {}
+                    nom_courant = None
+                    
+                    for ligne in lignes_brutes:
+                        l_clean = ligne.strip()
+                        if not l_clean:
+                            continue
+                        
+                        # 1. Détection de la ligne de titre + prix (ex: "Pose de panneaux...  5 700 euros")
+                        if "euros" in l_clean.lower() and not l_clean.lower().startswith("revenus"):
+                            mots = l_clean.split()
+                            mots_sans_euro = [m for m in mots if m.lower() not in ["euros", "euro", "€"]]
+                            
+                            if len(mots_sans_euro) >= 2:
+                                p1 = "".join(c for c in mots_sans_euro[-1] if c.isdigit())
+                                p2 = "".join(c for c in mots_sans_euro[-2] if c.isdigit()) if len(mots_sans_euro) > 2 else ""
+                                
+                                try:
+                                    if p2 and p1 and len(p1) == 3:
+                                        prix_ch = float(p2 + p1)
+                                        nom_ch = " ".join(mots_sans_euro[:-2])
+                                    else:
+                                        prix_ch = float(p1)
+                                        nom_ch = " ".join(mots_sans_euro[:-1])
+                                except ValueError:
+                                    prix_ch = 0.0
+                                    nom_ch = l_clean
+                                
+                                nom_courant = nom_ch.strip()
+                                if nom_courant not in chantiers_detectes:
+                                    chantiers_detectes[nom_courant] = {
+                                        "revenus": prix_ch, "jours": 1,
+                                        "sable": 0.0, "terre": 0.0, "enrobe": 0.0, "armature": 0.0, "tole": 0.0,
+                                        "beton": 0.0, "panneaux": 0.0, "tuyaux": 0.0, "canalisations": 0.0, "poutres": 0.0,
+                                        "jh_chef": 0.0, "jh_ouvrier": 0.0, "jh_cond": 0.0, "engins_requis": []
+                                    }
+                        
+                        # Si aucun chantier n'est actif, on ne peut pas lier les lignes suivantes
+                        if not nom_courant:
+                            continue
+                            
+                        # 2. Extraction des Revenus explicites (sécurité)
+                        if l_clean.lower().startswith("revenus"):
+                            num_part = "".join(c for c in l_clean if c.isdigit())
+                            if num_part:
+                                chantiers_detectes[nom_courant]["revenus"] = float(num_part)
+                                
+                        # 3. Extraction de la Durée globale (ex: "Durée du chantier : 1 jour(s)")
+                        if "durée du chantier" in l_clean.lower():
+                            # Extraction du premier nombre trouvé après les deux-points
+                            partie_droite = l_clean.split(":")[-1]
+                            num_jours = "".join(c for c in partie_droite.split()[0] if c.isdigit())
+                            if num_jours:
+                                chantiers_detectes[nom_courant]["jours"] = int(num_jours)
+                                
+                        # 4. Extraction des volumes de matériaux (ex: "Surface du chantier : 6 panneaux")
+                        if "surface du chantier" in l_clean.lower() or "matériaux" in l_clean.lower():
+                            partie_mats = l_clean.split(":")[-1].lower()
+                            mots_mats = partie_mats.split()
+                            if len(mots_mats) >= 2:
+                                qte_txt = "".join(c for c in mots_mats[0] if c.isdigit())
+                                if qte_txt:
+                                    qte_val = float(qte_txt)
+                                    type_mat = " ".join(mots_mats[1:])
+                                    
+                                    # Indexation automatique au bon matériau selon le mot-clé détecté
+                                    if "panneau" in type_mat: chantiers_detectes[nom_courant]["panneaux"] = qte_val
+                                    elif "sable" in type_mat: chantiers_detectes[nom_courant]["sable"] = qte_val
+                                    elif "terre" in type_mat: chantiers_detectes[nom_courant]["terre"] = qte_val
+                                    elif "enrob" in type_mat: chantiers_detectes[nom_courant]["enrobe"] = qte_val
+                                    elif "armat" in type_mat: chantiers_detectes[nom_courant]["armature"] = qte_val
+                                    elif "tôle" in type_mat or "tole" in type_mat: chantiers_detectes[nom_courant]["tole"] = qte_val
+                                    elif "béton" in type_mat or "beton" in type_mat: chantiers_detectes[nom_courant]["beton"] = qte_val
+                                    elif "tuyau" in type_mat: chantiers_detectes[nom_courant]["tuyaux"] = qte_val
+                                    elif "canal" in type_mat: chantiers_detectes[nom_courant]["canalisations"] = qte_val
+                                    elif "poutre" in type_mat: chantiers_detectes[nom_courant]["poutres"] = qte_val
+
+                    # --- ENREGISTREMENT DES DONNÉES STRUCTURÉES EN BASE ---
+                    compteur_avanced = 0
+                    for name, data in chantiers_detectes.items():
+                        # Attribution par défaut des Jours-Homme (JH) calqués sur la durée si aucun employé n'est encore spécifié textuellement
+                        if data["jh_chef"] == 0 and data["jh_ouvrier"] == 0:
+                            data["jh_chef"] = float(data["jours"])
+                            data["jh_ouvrier"] = float(data["jours"] * 2) # Exemple par défaut : 2 ouvriers/jour
+                        
+                        # Configuration de sécurité de la table des engins requise par défaut s'il y a 1 étape
+                        if not data["engins_requis"]:
+                            data["engins_requis"].append({
+                                "N° Étape": 1, "Durée Étape (jours)": data["jours"],
+                                "Type d'engin requis": "Camions Benne", "Niveau requis": "N1"
+                            })
+                            
+                        cursor.execute("""
+                            INSERT OR REPLACE INTO modeles_chantiers VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (
+                            name, data["revenus"], data["jours"],
+                            data["sable"], data["terre"], data["enrobe"], data["armature"], data["tole"],
+                            data["beton"], data["panneaux"], data["tuyaux"], data["canalisations"], data["poutres"],
+                            data["jh_chef"], data["jh_ouvrier"], data["jh_cond"],
+                            json.dumps(data["engins_requis"])
+                        ))
+                        compteur_avanced += 1
+                        
+                    conn.commit()
+                    conn.close()
+                    
+                    if compteur_avanced > 0:
+                        st.success(f"🟢 Analyse avancée réussie ! {compteur_avanced} fiche(s) de chantier ont été lues, converties et indexées avec succès ! Rechargement...")
+                        st.rerun()
+                    else:
+                        st.error("❌ Impossible d'extraire des données valides. Vérifiez la présence du nom et des mots-clés.")
 
         # --- 4.2 CONFIGURATION GRILLE SALARIALE ---
         with sub_tab2:
