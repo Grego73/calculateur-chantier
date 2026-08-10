@@ -246,17 +246,7 @@ with onglet1:
         revenus = st.number_input("Revenus prévus du chantier (€) :", value=donnees_modele["revenus"])
         jours_totaux = st.number_input("Durée totale du chantier (jours) :", value=donnees_modele["jours"])
         
-        # --- CALCUL DYNAMIQUE DU COÛT DES ENGINS DU MODÈLE SÉLECTIONNÉ ---
-        # Si le modèle pré-configuré contient déjà un coût global estimé (ex: 1200€) et que des engins y sont rattachés,
-        # ou si vous souhaitez directement injecter le coût journalier calculé :
-        cout_engins_defaut = float(donnees_modele["location"])
         
-        # Affichage du coût mis à jour automatiquement selon le chantier sélectionné
-        cout_location_general = st.number_input(
-            "Frais de location engins pré-configurés / jour (€) :", 
-            value=cout_engins_defaut,
-            help="Ce montant est extrait automatiquement des spécifications techniques du modèle de chantier sélectionné."
-        )
 
         st.markdown("### --- MATÉRIAUX ---")
         c_qte, c_px = st.columns(2)
