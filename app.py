@@ -403,45 +403,71 @@ with onglet1:
             }
         )
 
-        # --- LOGIQUE DE TRANSFERT ULTRA-SÉCURISÉE (CORRECTION COMPACTEUR & PLURIELS) ---
+        # --- LOGIQUE DE TRANSFERT UNIVERSELLE (ZÉRO BUG DE CASSE, ACCENT, PLURIEL OU LIAISON) ---
         engins_transferes_list = []
         if not engins_necessaires.empty:
-            df_coches = engins_necessaires[engins_necessaires["À l'ouer ?"] == True if "À l'ouer ?" in engins_necessaires.columns else engins_necessaires["À louer ?"] == True].dropna(subset=["Type d'engin requis"])
+            # Sécurité pour cibler la bonne colonne de case à cocher
+            col_cocher = "À louer ?" if "À louer ?" in engins_necessaires.columns else "À l'ouer ?"
+            df_coches = engins_necessaires[engins_necessaires[col_cocher] == True].dropna(subset=["Type d'engin requis"])
             
             for _, row in df_coches.iterrows():
                 type_demande = str(row["Type d'engin requis"]).strip()
                 niveau_demande = str(row["Niveau requis"]).strip()
                 duree_etape = int(row["Durée Étape (jours)"])
                 
-                # 1. Nettoyage de base (Pluriels et minuscules)
-                type_clean = type_demande.lower()
-                if type_clean.startswith("camions"):
-                    type_clean = type_clean.replace("camions", "camion")
-                if type_clean.endswith("s") and not type_clean.endswith("sol"):
-                    type_clean = type_clean[:-1]
-                
-                # Supprimer les accents pour éviter les erreurs de frappe (é -> e)
-                type_clean = type_clean.replace("é", "e").replace("è", "e").replace("à", "a")
-                
-                # 2. Découpage en mots-clés essentiels (on ignore "pour", "d'", "un")
-                mots_ignores = ["pour", "d", "un", "une", "la", "le"]
-                mots_cles = [mot for mot in type_clean.split() if mot not in mots_ignores]
+                # --- FONCTION INTERNE DE NETTOYAGE CHIRURGICAL ---
+                def nettoyer_mots(texte):
+                    texte = texte.lower()
+                    # Retrait des accents courants
+                    texte = texte.replace("é", "e").replace("è", "e").replace("ê", "e")
+                    texte = texte.replace("à", "a").replace("â", "a")
+                    # Remplacement des caractères de liaison par des espaces
+                    for char in ["'", "-", "/", "’"]:
+                        texte = texte.replace(char, " ")
+                    
+                    mots = texte.split()
+                    mots_propres = []
+                    mots_utiles_uniquement = ["pour", "de", "d", "un", "une", "le", "la", "les", "sur"]
+                    
+                    for m in mots:
+                        if m in mots_utiles_uniquement:
+                            continue
+                        # Passage au singulier basique pour l'alignement
+                        if m.endswith("s") and m != "tapis" and m != "fraiseuse" and m != "niveleuse" and m != "sol":
+                            m = m[:-1]
+                        mots_propres.append(m)
+                    return mots_propres
+
+                # Extraction des mots-clés de la ligne cochée
+                mots_cles_recherche = nettoyer_mots(type_demande)
                 
                 modele_trouve, prix_trouve = None, 380
                 
-                # Tentative 1 : Recherche stricte avec tous les mots-clés + le niveau (ex: "compacteur", "enrobe", "n3")
+                # --- STRATÉGIE 1 : RECHERCHE STRICTE (MOTS-CLÉS + NIVEAU SPECIFIQUE) ---
                 for engin_nom, prix in CATALOGUE_ENGINS.items():
-                    engin_nom_clean = engin_nom.lower().replace("é", "e").replace("è", "e")
-                    # On vérifie si TOUS nos mots clés ET le niveau sont dans le nom de la machine
-                    if all(mot in engin_nom_clean for mot in mots_cles) and (niveau_demande.lower() in engin_nom_clean):
-                        modele_trouve, prix_trouve = engin_nom, prix
-                        break
-                        
-                # Tentative 2 : Recherche élargie sans le niveau si la première échoue
+                    engin_nom_clean = engin_nom.lower()
+                    # On vérifie si le niveau exact (ex: "n2") est présent dans la clé du catalogue
+                    if niveau_demande.lower() in engin_nom_clean:
+                        mots_catalogue = nettoyer_mots(engin_nom)
+                        # On vérifie si TOUS nos mots-clés de la table supérieure sont présents dans cette clé catalogue
+                        if all(mot in mots_catalogue for mot in mots_cles_recherche):
+                            modele_trouve, prix_trouve = engin_nom, prix
+                            break
+                
+                # --- STRATÉGIE 2 : RECHERCHE ÉLARGIE (SI LE NIVEAU N'EST PAS TROUVÉ) ---
                 if not modele_trouve:
                     for engin_nom, prix in CATALOGUE_ENGINS.items():
-                        engin_nom_clean = engin_nom.lower().replace("é", "e").replace("è", "e")
-                        if all(mot in engin_nom_clean for mot in mots_cles):
+                        mots_catalogue = nettoyer_mots(engin_nom)
+                        if all(mot in mots_catalogue for mot in mots_cles_recherche):
+                            modele_trouve, prix_trouve = engin_nom, prix
+                            break
+                            
+                # --- STRATÉGIE 3 : RECHERCHE DE SECOURS PAR CORRESPONDANCE PARTIELLE ---
+                if not modele_trouve:
+                    for engin_nom, prix in CATALOGUE_ENGINS.items():
+                        engin_nom_clean = engin_nom.lower()
+                        # Si au moins le premier mot racine correspond (ex: "chargeuse")
+                        if len(mots_cles_recherche) > 0 and mots_cles_recherche[0] in engin_nom_clean:
                             modele_trouve, prix_trouve = engin_nom, prix
                             break
                 
