@@ -283,7 +283,7 @@ with onglet1:
         jh_cond = st.number_input("Total Jours-Homme Conducteur :", value=donnees_modele["jh_cond"])
         
         st.caption("⚙️ Options intérimaires externes")
-        px_interim = st.number_input("Coût journalier moyen d'un Intérimaire (€/jour) :", value=220)
+        px_interim = st.number_input("Coût journalier moyen d'un Intérimaire (€/jour) :", value=230)
         jh_interim = st.number_input("Total Jours-Homme requis en Intérim :", value=0)
 
         # Nouvelle formule simplifiée : JH * Tarif Journalier direct
