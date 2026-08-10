@@ -359,7 +359,6 @@ with onglet1:
         
         st.info(f"💰 **Total des engins loués (Calcul personnalisé) :** {total_loc_engins_direct:,.2f} €")
 
-
     if st.button("LANCER LE CALCUL & ENREGISTRER", type="primary"):
         df_actuel = charger_donnees()
         doublon_existe = not df_actuel[(df_actuel["Nom du Chantier"] == nom_chantier) & (df_actuel["Revenus (€)"] == revenus)].empty
@@ -372,10 +371,11 @@ with onglet1:
             # 1. Calcul Matériaux
             total_mats = (qte_sable*prix_sable) + (qte_terre*prix_terre) + (qte_enrobe*prix_enrobe) + (qte_armature*prix_armature) + (qte_tole*prix_tole) + (qte_beton*prix_beton) + (qte_panneaux*prix_panneaux) + (qte_tuyaux*prix_tuyaux) + (qte_eaux_usees*prix_eaux_usees) + (qte_poutres*prix_poutres)
             
-            # 2. Calcul Location Engins (Prise en compte de la colonne "Jours de Location")
+            # 2. CORRECTION DU CALCUL DES ENGINS À LOUER
             total_location = 0.0
             if not engins_edites.empty:
                 df_propres = engins_edites.dropna(subset=["Sélection de l'engin / Modèle"])
+                # Prise en compte exacte de : Quantité * Prix Journalier * Jours de Location propres à l'engin
                 total_location = (df_propres["Quantité"] * df_propres["Prix Location (€/jour)"] * df_propres["Jours de Location"]).sum()
                 
             # 3. Calcul Salaires
