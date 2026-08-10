@@ -63,7 +63,7 @@ def reinitialiser_db():
 
 init_db()
 
-# --- DICTIONNAIRE DE TOUS LES CHANTIERS POSSIBLES AVEC TOUTES LEURS ÉTAPES ---
+# --- DICTIONNAIRE DE TOUS LES CHANTIERS AVEC ÉTAPES DÉTAILLÉES ---
 CATALOGUE_CHANTIERS = {
     "Choisir un chantier pré-configuré...": {
         "revenus": 0, "jours": 0, "location": 0,
@@ -78,10 +78,10 @@ CATALOGUE_CHANTIERS = {
         "beton": 0, "panneaux": 4, "tuyaux": 0, "canalisations": 0, "poutres": 0,
         "jh_chef": 10, "jh_ouvrier": 30, "jh_cond": 15,
         "engins_requis": [
-            {"Type d'engin requis": "Pelleteuses", "Usage / Spécification attendue": "Étape 1 : Décaissement de la chaussée", "Statut Validation": "🔴 À louer"},
-            {"Type d'engin requis": "Camions Benne", "Usage / Spécification attendue": "Étape 1 : Évacuation des remblais", "Statut Validation": "🟢 Validé / Dispo"},
-            {"Type d'engin requis": "Finisseur", "Usage / Spécification attendue": "Étape 2 : Application de l'enrobé routier", "Statut Validation": "🔴 À louer"},
-            {"Type d'engin requis": "Compacteur pour enrobé", "Usage / Spécification attendue": "Étape 3 : Compactage final de la couche", "Statut Validation": "🔴 À louer"}
+            {"N° Étape": 1, "Durée Étape (jours)": 4, "Type d'engin requis": "Pelleteuses", "Niveau requis": "N1"},
+            {"N° Étape": 1, "Durée Étape (jours)": 4, "Type d'engin requis": "Camions Benne", "Niveau requis": "N1"},
+            {"N° Étape": 2, "Durée Étape (jours)": 3, "Type d'engin requis": "Finisseur", "Niveau requis": "N2"},
+            {"N° Étape": 3, "Durée Étape (jours)": 3, "Type d'engin requis": "Compacteur pour enrobé", "Niveau requis": "N1"}
         ]
     },
     "Déblayer - Niveau 2 (6 596 €)": {
@@ -90,8 +90,8 @@ CATALOGUE_CHANTIERS = {
         "beton": 0, "panneaux": 2, "tuyaux": 0, "canalisations": 0, "poutres": 0,
         "jh_chef": 3, "jh_ouvrier": 6, "jh_cond": 6,
         "engins_requis": [
-            {"Type d'engin requis": "Pelleteuses", "Usage / Spécification attendue": "Étape 1 : Extraction et tri des gravats", "Statut Validation": "🟢 Validé / Dispo"},
-            {"Type d'engin requis": "Camions Benne", "Usage / Spécification attendue": "Étape 2 : Chargement et acheminement décharge", "Statut Validation": "🟢 Validé / Dispo"}
+            {"N° Étape": 1, "Durée Étape (jours)": 2, "Type d'engin requis": "Pelleteuses", "Niveau requis": "N2"},
+            {"N° Étape": 2, "Durée Étape (jours)": 1, "Type d'engin requis": "Camions Benne", "Niveau requis": "N1"}
         ]
     },
     "Exhausser un terrain (10 336 €)": {
@@ -100,8 +100,8 @@ CATALOGUE_CHANTIERS = {
         "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0,
         "jh_chef": 5, "jh_ouvrier": 10, "jh_cond": 10,
         "engins_requis": [
-            {"Type d'engin requis": "Chargeuse", "Usage / Spécification attendue": "Étape 1 : Réception et étalement des terres", "Statut Validation": "🔴 À louer"},
-            {"Type d'engin requis": "Compacteurs de Sol", "Usage / Spécification attendue": "Étape 2 : Mise à niveau et stabilisation", "Statut Validation": "🔴 À louer"}
+            {"N° Étape": 1, "Durée Étape (jours)": 3, "Type d'engin requis": "Chargeuse", "Niveau requis": "N2"},
+            {"N° Étape": 2, "Durée Étape (jours)": 2, "Type d'engin requis": "Compacteurs de Sol", "Niveau requis": "N2"}
         ]
     },
     "Exhausser un terrain (8 908 €)": {
@@ -110,8 +110,8 @@ CATALOGUE_CHANTIERS = {
         "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0,
         "jh_chef": 4, "jh_ouvrier": 8, "jh_cond": 8,
         "engins_requis": [
-            {"Type d'engin requis": "Chargeuse Compacte", "Usage / Spécification attendue": "Étape 1 : Répartition fine des remblais", "Statut Validation": "🟢 Validé / Dispo"},
-            {"Type d'engin requis": "Compacteurs de Sol", "Usage / Spécification attendue": "Étape 2 : Lissage et tassement", "Statut Validation": "🔴 À louer"}
+            {"N° Étape": 1, "Durée Étape (jours)": 2, "Type d'engin requis": "Chargeuse Compacte", "Niveau requis": "N2"},
+            {"N° Étape": 2, "Durée Étape (jours)": 2, "Type d'engin requis": "Compacteurs de Sol", "Niveau requis": "N2"}
         ]
     },
     "Construction d'un hangar (129 306 €)": {
@@ -120,9 +120,9 @@ CATALOGUE_CHANTIERS = {
         "beton": 80, "panneaux": 0, "tuyaux": 12, "canalisations": 10, "poutres": 25,
         "jh_chef": 20, "jh_ouvrier": 80, "jh_cond": 20,
         "engins_requis": [
-            {"Type d'engin requis": "Pelleteuses", "Usage / Spécification attendue": "Étape 1 : Terrassement et fouilles", "Statut Validation": "🟢 Validé / Dispo"},
-            {"Type d'engin requis": "Camion Béton Malaxeur", "Usage / Spécification attendue": "Étape 2 : Coulage des fondations et dalle", "Statut Validation": "🔴 À louer"},
-            {"Type d'engin requis": "Chargeur Téléscopique", "Usage / Spécification attendue": "Étape 3 : Montage structure et bardage", "Statut Validation": "🔴 À louer"}
+            {"N° Étape": 1, "Durée Étape (jours)": 5, "Type d'engin requis": "Pelleteuses", "Niveau requis": "N2"},
+            {"N° Étape": 2, "Durée Étape (jours)": 5, "Type d'engin requis": "Camion Béton Malaxeur", "Niveau requis": "N3"},
+            {"N° Étape": 3, "Durée Étape (jours)": 10, "Type d'engin requis": "Chargeur Téléscopique", "Niveau requis": "N2"}
         ]
     },
     "Suppression d'un espace vert (18 786 €)": {
@@ -131,8 +131,8 @@ CATALOGUE_CHANTIERS = {
         "beton": 0, "panneaux": 2, "tuyaux": 0, "canalisations": 0, "poutres": 0,
         "jh_chef": 6, "jh_ouvrier": 18, "jh_cond": 6,
         "engins_requis": [
-            {"Type d'engin requis": "Pelleteuses", "Usage / Spécification attendue": "Étape 1 : Dessouchage et défrichage", "Statut Validation": "🟢 Validé / Dispo"},
-            {"Type d'engin requis": "Camions Benne", "Usage / Spécification attendue": "Étape 2 : Évacuation des déchets végétaux", "Statut Validation": "🟢 Validé / Dispo"}
+            {"N° Étape": 1, "Durée Étape (jours)": 3, "Type d'engin requis": "Pelleteuses", "Niveau requis": "N2"},
+            {"N° Étape": 2, "Durée Étape (jours)": 3, "Type d'engin requis": "Camions Benne", "Niveau requis": "N1"}
         ]
     },
     "Compacter - Niveau 2 (3 699 €)": {
@@ -141,7 +141,7 @@ CATALOGUE_CHANTIERS = {
         "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0,
         "jh_chef": 2, "jh_ouvrier": 2, "jh_cond": 4,
         "engins_requis": [
-            {"Type d'engin requis": "Compacteurs de Sol", "Usage / Spécification attendue": "Étape 1 : Traitement de plateforme", "Statut Validation": "🔴 À louer"}
+            {"N° Étape": 1, "Durée Étape (jours)": 2, "Type d'engin requis": "Compacteurs de Sol", "Niveau requis": "N2"}
         ]
     },
     "Goudronnage d'un chemin (34 960 €)": {
@@ -150,9 +150,9 @@ CATALOGUE_CHANTIERS = {
         "beton": 0, "panneaux": 2, "tuyaux": 0, "canalisations": 0, "poutres": 0,
         "jh_chef": 5, "jh_ouvrier": 15, "jh_cond": 10,
         "engins_requis": [
-            {"Type d'engin requis": "Fraiseuse", "Usage / Spécification attendue": "Étape 1 : Rabotage de la surface existante", "Statut Validation": "🔴 À louer"},
-            {"Type d'engin requis": "Finisseur", "Usage / Spécification attendue": "Étape 2 : Application de l'enrobé mécanique", "Statut Validation": "🔴 À louer"},
-            {"Type d'engin requis": "Compacteur pour enrobé", "Usage / Spécification attendue": "Étape 3 : Finition au rouleau compacteur", "Statut Validation": "🔴 À louer"}
+            {"N° Étape": 1, "Durée Étape (jours)": 1, "Type d'engin requis": "Fraiseuse", "Niveau requis": "N2"},
+            {"N° Étape": 2, "Durée Étape (jours)": 2, "Type d'engin requis": "Finisseur", "Niveau requis": "N2"},
+            {"N° Étape": 3, "Durée Étape (jours)": 2, "Type d'engin requis": "Compacteur pour enrobé", "Niveau requis": "N1"}
         ]
     },
     "Exhausser un terrain (6 664 €)": {
@@ -161,7 +161,7 @@ CATALOGUE_CHANTIERS = {
         "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0,
         "jh_chef": 3, "jh_ouvrier": 6, "jh_cond": 6,
         "engins_requis": [
-            {"Type d'engin requis": "Chargeuse", "Usage / Spécification attendue": "Étape 1 : Remblayage et mise en forme", "Statut Validation": "🔴 À louer"}
+            {"N° Étape": 1, "Durée Étape (jours)": 3, "Type d'engin requis": "Chargeuse", "Niveau requis": "N2"}
         ]
     },
     "Déblayer - Niveau 3 (21 528 €)": {
@@ -170,8 +170,8 @@ CATALOGUE_CHANTIERS = {
         "beton": 0, "panneaux": 4, "tuyaux": 0, "canalisations": 0, "poutres": 0,
         "jh_chef": 7, "jh_ouvrier": 21, "jh_cond": 14,
         "engins_requis": [
-            {"Type d'engin requis": "Pelleteuses", "Usage / Spécification attendue": "Étape 1 : Évacuation massive de remblais", "Statut Validation": "🟢 Validé / Dispo"},
-            {"Type d'engin requis": "Camions Benne", "Usage / Spécification attendue": "Étape 2 : Logistique d'évacuation", "Statut Validation": "🟢 Validé / Dispo"}
+            {"N° Étape": 1, "Durée Étape (jours)": 4, "Type d'engin requis": "Pelleteuses", "Niveau requis": "N3"},
+            {"N° Étape": 2, "Durée Étape (jours)": 3, "Type d'engin requis": "Camions Benne", "Niveau requis": "N3"}
         ]
     },
     "Assainissement de lit (Petit cours d'eau) (12 180 €)": {
@@ -180,8 +180,8 @@ CATALOGUE_CHANTIERS = {
         "beton": 15, "panneaux": 2, "tuyaux": 0, "canalisations": 8, "poutres": 0,
         "jh_chef": 4, "jh_ouvrier": 12, "jh_cond": 4,
         "engins_requis": [
-            {"Type d'engin requis": "Pelleteuses", "Usage / Spécification attendue": "Étape 1 : Curage et reprofilage du lit", "Statut Validation": "🟢 Validé / Dispo"},
-            {"Type d'engin requis": "Chargeur Téléscopique", "Usage / Spécification attendue": "Étape 2 : Enrochement et pose d'ouvrages hydrauliques", "Statut Validation": "🔴 À louer"}
+            {"N° Étape": 1, "Durée Étape (jours)": 2, "Type d'engin requis": "Pelleteuses", "Niveau requis": "N2"},
+            {"N° Étape": 2, "Durée Étape (jours)": 2, "Type d'engin requis": "Chargeur Téléscopique", "Niveau requis": "N2"}
         ]
     },
     "Assainissement de lit (Cours d'eau) (10 450 €)": {
@@ -190,7 +190,7 @@ CATALOGUE_CHANTIERS = {
         "beton": 10, "panneaux": 2, "tuyaux": 0, "canalisations": 6, "poutres": 0,
         "jh_chef": 4, "jh_ouvrier": 12, "jh_cond": 4,
         "engins_requis": [
-            {"Type d'engin requis": "Pelleteuses", "Usage / Spécification attendue": "Étape 1 : Curage environnemental des fonds", "Statut Validation": "🟢 Validé / Dispo"}
+            {"N° Étape": 1, "Durée Étape (jours)": 4, "Type d'engin requis": "Pelleteuses", "Niveau requis": "N2"}
         ]
     },
     "Goudronnage d'une route (Grande surface) (214 599 €)": {
@@ -198,14 +198,15 @@ CATALOGUE_CHANTIERS = {
         "sable": 488, "terre": 0, "enrobe": 618, "armature": 0, "tole": 0,
         "beton": 0, "panneaux": 6, "tuyaux": 0, "canalisations": 0, "poutres": 0,
         "jh_chef": 16, "jh_ouvrier": 48, "jh_cond": 28,
+        # Configuration exacte de vos 4 étapes techniques
         "engins_requis": [
-            {"Type d'engin requis": "Pelleteuses", "Usage / Spécification attendue": "Étape 1 (Terrassement) : x1 Takeuchi TB2150 (N2)", "Statut Validation": "🟢 Validé / Dispo"},
-            {"Type d'engin requis": "Camions Benne", "Usage / Spécification attendue": "Étape 1 (Terrassement) : x1 Renault Trucks K 430 (N3)", "Statut Validation": "🟢 Validé / Dispo"},
-            {"Type d'engin requis": "Fraiseuse", "Usage / Spécification attendue": "Étape 1 (Terrassement) : x1 Fraiseuse de niveau 1+", "Statut Validation": "🔴 À louer"},
-            {"Type d'engin requis": "Niveleuse", "Usage / Spécification attendue": "Étape 2 (Nivellement) : x1 Niveleuse de niveau 2", "Statut Validation": "🔴 À louer"},
-            {"Type d'engin requis": "Camions Benne", "Usage / Spécification attendue": "Étape 3 (Pose Enrobé) : x1 Renault Trucks K 430 (N3)", "Statut Validation": "🟢 Validé / Dispo"},
-            {"Type d'engin requis": "Finisseur", "Usage / Spécification attendue": "Étape 3 (Pose Enrobé) : x1 Finisseur de niveau 3", "Statut Validation": "🔴 À louer"},
-            {"Type d'engin requis": "Compacteur pour enrobé", "Usage / Spécification attendue": "Étape 4 (Compactage) : x1 Compacteur pour enrobé N3", "Statut Validation": "🔴 À louer"}
+            {"N° Étape": 1, "Durée Étape (jours)": 4, "Type d'engin requis": "Pelleteuses", "Niveau requis": "N2"},
+            {"N° Étape": 1, "Durée Étape (jours)": 4, "Type d'engin requis": "Camions Benne", "Niveau requis": "N3"},
+            {"N° Étape": 1, "Durée Étape (jours)": 4, "Type d'engin requis": "Fraiseuse", "Niveau requis": "N2"},
+            {"N° Étape": 2, "Durée Étape (jours)": 4, "Type d'engin requis": "Niveleuse", "Niveau requis": "N2"},
+            {"N° Étape": 3, "Durée Étape (jours)": 4, "Type d'engin requis": "Camions Benne", "Niveau requis": "N3"},
+            {"N° Étape": 3, "Durée Étape (jours)": 4, "Type d'engin requis": "Finisseur", "Niveau requis": "N3"},
+            {"N° Étape": 4, "Durée Étape (jours)": 4, "Type d'engin requis": "Compacteur pour enrobé", "Niveau requis": "N3"}
         ]
     },
     "Construction d'un hangar (139 104 €)": {
@@ -214,9 +215,9 @@ CATALOGUE_CHANTIERS = {
         "beton": 90, "panneaux": 0, "tuyaux": 16, "canalisations": 12, "poutres": 30,
         "jh_chef": 22, "jh_ouvrier": 90, "jh_cond": 22,
         "engins_requis": [
-            {"Type d'engin requis": "Pelleteuses", "Usage / Spécification attendue": "Étape 1 : Fondations et longrines", "Statut Validation": "🟢 Validé / Dispo"},
-            {"Type d'engin requis": "Camion Béton Malaxeur", "Usage / Spécification attendue": "Étape 2 : Dallage béton industriel", "Statut Validation": "🔴 À louer"},
-            {"Type d'engin requis": "Chargeur Téléscopique", "Usage / Spécification attendue": "Étape 3 : Pose charpente lourde", "Statut Validation": "🔴 À louer"}
+            {"N° Étape": 1, "Durée Étape (jours)": 6, "Type d'engin requis": "Pelleteuses", "Niveau requis": "N2"},
+            {"N° Étape": 2, "Durée Étape (jours)": 6, "Type d'engin requis": "Camion Béton Malaxeur", "Niveau requis": "N3"},
+            {"N° Étape": 3, "Durée Étape (jours)": 10, "Type d'engin requis": "Chargeur Téléscopique", "Niveau requis": "N3"}
         ]
     },
     "Compacter - Niveau 2 (4 617 €)": {
@@ -225,7 +226,7 @@ CATALOGUE_CHANTIERS = {
         "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0,
         "jh_chef": 3, "jh_ouvrier": 3, "jh_cond": 6,
         "engins_requis": [
-            {"Type d'engin requis": "Compacteurs de Sol", "Usage / Spécification attendue": "Étape 1 : Compactage de voiries", "Statut Validation": "🔴 À louer"}
+            {"N° Étape": 1, "Durée Étape (jours)": 3, "Type d'engin requis": "Compacteurs de Sol", "Niveau requis": "N2"}
         ]
     },
     "Remblayer - Niveau 3 (13 674 €)": {
@@ -234,11 +235,16 @@ CATALOGUE_CHANTIERS = {
         "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0,
         "jh_chef": 5, "jh_ouvrier": 15, "jh_cond": 10,
         "engins_requis": [
-            {"Type d'engin requis": "Chargeuse", "Usage / Spécification attendue": "Étape 1 : Remblayage technique des fouilles", "Statut Validation": "🔴 À louer"},
-            {"Type d'engin requis": "Compacteurs de Sol", "Usage / Spécification attendue": "Étape 2 : Recompactage par couches successives", "Statut Validation": "🔴 À louer"}
+            {"N° Étape": 1, "Durée Étape (jours)": 3, "Type d'engin requis": "Chargeuse", "Niveau requis": "N3"},
+            {"N° Étape": 2, "Durée Étape (jours)": 2, "Type d'engin requis": "Compacteurs de Sol", "Niveau requis": "N3"}
         ]
     }
 }
+
+# S'assurer que chaque chantier contient bien les clés d'étapes de base pour éviter les crashs
+for chantier, data in CATALOGUE_CHANTIERS.items():
+    if "engins_requis" not in data:
+        data["engins_requis"] = []
 
 # --- CATALOGUE COMPLET DES ENGINS DISPONIBLES ET LEURS MODÈLES ---
 CATALOGUE_ENGINS = {
@@ -342,6 +348,7 @@ with onglet1:
             prix_tuyaux = st.number_input("Prix Tuyaux d'eau (€/u) :", value=32)
             prix_eaux_usees = st.number_input("Prix Canalisations (€/u) :", value=35)
             prix_poutres = st.number_input("Prix Poutres acier (€/u) :", value=70)
+
     with col2:
         st.markdown("### --- GRILLE SALARIALE & HEURES ---")
         chef_mensuel = st.number_input("Salaire mensuel Chef (€) :", value=1566)
@@ -351,48 +358,40 @@ with onglet1:
         cond_mensuel = st.number_input("Salaire mensuel Conducteur (€) :", value=1571)
         jh_cond = st.number_input("Total Jours-Homme Conducteur :", value=donnees_modele["jh_cond"])
 
-        # --- TABLE DES ENGINS NÉCESSAIRES (NETTOYÉE ET DÉCOCHÉE PAR DÉFAUT) ---
+        # --- TABLE DES ENGINS NÉCESSAIRES ---
         st.markdown("### --- TABLE DES ENGINS NÉCESSAIRES ---")
-        st.caption("📋 Cochez uniquement les engins que vous devez louer pour ce chantier. Les machines que vous possédez déjà peuvent rester décochées.")
+        st.caption("📋 Cochez les engins à louer pour basculer automatiquement la durée et les tarifs requis.")
         
         engins_bruts_modele = []
         if "engins_requis" in donnees_modele and len(donnees_modele["engins_requis"]) > 0:
             for item in donnees_modele["engins_requis"]:
-                # Extraction du niveau requis (N1, N2, N3, N4)
-                phase_texte = item.get("Usage / Spécification attendue", "")
-                niveau_detecte = "N1"
-                if "N2" in phase_texte or "niveau 2" in phase_texte:
-                    niveau_detecte = "N2"
-                elif "N3" in phase_texte or "niveau 3" in phase_texte:
-                    niveau_detecte = "N3"
-                elif "N4" in phase_texte or "niveau 4" in phase_texte:
-                    niveau_detecte = "N4"
-                
-                # CORRECTION : Strictement TOUTES les cases sont décochées (False) au départ
                 engins_bruts_modele.append({
+                    "N° Étape": item.get("N° Étape", 1),
+                    "Durée Étape (jours)": item.get("Durée Étape (jours)", 1),
                     "Type d'engin requis": item.get("Type d'engin requis", "Pelleteuses"),
-                    "Niveau requis": niveau_detecte,
+                    "Niveau requis": item.get("Niveau requis", "N1"),
                     "À louer ?": False
                 })
         
         df_besoins_init = pd.DataFrame(engins_bruts_modele)
         if df_besoins_init.empty:
-            df_besoins_init = pd.DataFrame(columns=["Type d'engin requis", "Niveau requis", "À louer ?"])
+            df_besoins_init = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "Type d'engin requis", "Niveau requis", "À louer ?"])
         
-        # Affichage de la table des besoins
         engins_necessaires = st.data_editor(
             df_besoins_init,
             num_rows="dynamic",
             use_container_width=True,
             key="table_engins_necessaires",
             column_config={
+                "N° Étape": st.column_config.NumberColumn("N° Étape", min_value=1, step=1, required=True),
+                "Durée Étape (jours)": st.column_config.NumberColumn("Durée (jours)", min_value=1, step=1, required=True),
                 "Type d'engin requis": st.column_config.SelectboxColumn("Type d'engin", options=TYPES_ENGINS_BRUTS, required=True),
                 "Niveau requis": st.column_config.SelectboxColumn("Niveau requis", options=["N1", "N2", "N3", "N4"], required=True),
                 "À louer ?": st.column_config.CheckboxColumn("À louer ?", default=False)
             }
         )
 
-        # --- LOGIQUE DE TRANSFERT VERS LA TABLE DES ENGINS À LOUER ---
+        # --- LOGIQUE DE TRANSFERT ---
         engins_transferes_list = []
         if not engins_necessaires.empty:
             df_coches = engins_necessaires[engins_necessaires["À louer ?"] == True].dropna(subset=["Type d'engin requis"])
@@ -400,6 +399,7 @@ with onglet1:
             for _, row in df_coches.iterrows():
                 type_demande = row["Type d'engin requis"]
                 niveau_demande = row["Niveau requis"]
+                duree_etape = int(row["Durée Étape (jours)"])
                 
                 modele_trouve = None
                 prix_trouve = 380
@@ -425,12 +425,12 @@ with onglet1:
                         "Sélection de l'engin / Modèle": modele_trouve,
                         "Quantité": 1,
                         "Prix Location (€/jour)": prix_trouve,
-                        "Jours de Location": int(jours_totaux) if jours_totaux > 0 else 1
+                        "Jours de Location": duree_etape
                     })
 
         # --- TABLE DES ENGINS À LOUER ---
         st.markdown("### --- TABLE DES ENGINS À LOUER ---")
-        st.caption("🔗 Les machines cochées ci-dessus apparaissent ici avec leur prix. Vous pouvez ajuster les quantités ou les jours.")
+        st.caption("🔗 Les machines cochées ci-dessus se chargent automatiquement ici.")
         
         df_engins_init = pd.DataFrame(engins_transferes_list)
         if df_engins_init.empty:
@@ -445,7 +445,7 @@ with onglet1:
                 "Sélection de l'engin / Modèle": st.column_config.SelectboxColumn("Engin & Modèle", options=list(CATALOGUE_ENGINS.keys()), required=True),
                 "Quantité": st.column_config.NumberColumn("Quantité", min_value=1, default=1, step=1),
                 "Prix Location (€/jour)": st.column_config.NumberColumn("Prix / Jour (€)", min_value=0, step=10),
-                "Jours de Location": st.column_config.NumberColumn("Jours à louer", min_value=1, max_value=365, default=int(jours_totaux) if jours_totaux > 0 else 1, step=1)
+                "Jours de Location": st.column_config.NumberColumn("Jours à louer", min_value=1, max_value=365, step=1)
             }
         )
 
@@ -455,7 +455,6 @@ with onglet1:
             total_loc_engins_direct = (df_propres_direct["Quantité"] * df_propres_direct["Prix Location (€/jour)"] * df_propres_direct["Jours de Location"]).sum()
         
         st.info(f"💰 **Total des engins loués (Calcul personnalisé) :** {total_loc_engins_direct:,.2f} €")
-
 
     if st.button("LANCER LE CALCUL & ENREGISTRER", type="primary"):
         df_actuel = charger_donnees()
