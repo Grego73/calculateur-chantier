@@ -245,8 +245,6 @@ with onglet1:
         st.markdown("### --- PARAMÈTRES GÉNÉRAUX ---")
         revenus = st.number_input("Revenus prévus du chantier (€) :", value=donnees_modele["revenus"])
         jours_totaux = st.number_input("Durée totale du chantier (jours) :", value=donnees_modele["jours"])
-        
-        
 
         st.markdown("### --- MATÉRIAUX ---")
         c_qte, c_px = st.columns(2)
@@ -285,7 +283,13 @@ with onglet1:
         st.markdown("### --- TABLE DES ENGINS EN LOCATION ---")
         st.caption("Cliquez sur ➕ en bas du tableau pour ajouter une ligne d'engin.")
         
-        df_engins_init = pd.DataFrame(columns=["Sélection de l'engin / Modèle", "Quantité", "Prix Location (€/jour)"])
+        # Ajout de la colonne "Jours de Location" dans la structure de base
+        df_engins_init = pd.DataFrame(columns=[
+            "Sélection de l'engin / Modèle", 
+            "Quantité", 
+            "Prix Location (€/jour)", 
+            "Jours de Location"
+        ])
         
         engins_edites = st.data_editor(
             df_engins_init,
@@ -299,19 +303,24 @@ with onglet1:
                 ),
                 "Quantité": st.column_config.NumberColumn("Quantité", min_value=1, default=1, step=1),
                 "Prix Location (€/jour)": st.column_config.NumberColumn("Prix / Jour (€)", min_value=0, default=380, step=10),
+                "Jours de Location": st.column_config.NumberColumn(
+                    "Jours à louer", 
+                    min_value=1, 
+                    max_value=365, 
+                    default=int(jours_totaux) if jours_totaux > 0 else 1, 
+                    step=1,
+                    help="Durée spécifique de location de cet engin."
+                ),
             }
         )
 
-        # --- CALCUL ET AFFICHAGE DU TOTAL EN TEMPS RÉEL ---
+        # --- CALCUL EN TEMPS RÉEL (Quantité * Prix/Jour * Jours à louer) ---
         total_loc_engins_direct = 0.0
         if not engins_edites.empty:
-            # On nettoie les lignes où l'engin n'est pas encore sélectionné pour éviter les erreurs
             df_propres_direct = engins_edites.dropna(subset=["Sélection de l'engin / Modèle"])
-            # Calcul : Quantité * Prix Journalier * Nombre de jours total du chantier
-            total_loc_engins_direct = (df_propres_direct["Quantité"] * df_propres_direct["Prix Location (€/jour)"] * jours_totaux).sum()
+            total_loc_engins_direct = (df_propres_direct["Quantité"] * df_propres_direct["Prix Location (€/jour)"] * df_propres_direct["Jours de Location"]).sum()
         
-        # Affichage du total sous forme de badge d'information
-        st.info(f"💰 **Total des engins loués sur la durée du chantier ({jours_totaux} jours) :** {total_loc_engins_direct:,.2f} €")
+        st.info(f"💰 **Total des engins loués (Calcul personnalisé) :** {total_loc_engins_direct:,.2f} €")
 
     if st.button("LANCER LE CALCUL & ENREGISTRER", type="primary"):
         df_actuel = charger_donnees()
@@ -325,14 +334,12 @@ with onglet1:
             # 1. Calcul Matériaux
             total_mats = (qte_sable*prix_sable) + (qte_terre*prix_terre) + (qte_enrobe*prix_enrobe) + (qte_armature*prix_armature) + (qte_tole*prix_tole) + (qte_beton*prix_beton) + (qte_panneaux*prix_panneaux) + (qte_tuyaux*prix_tuyaux) + (qte_eaux_usees*prix_eaux_usees) + (qte_poutres*prix_poutres)
             
-            # 2. Calcul Location Engins depuis la table dynamique
-            total_loc_engins = 0.0
+            # 2. Calcul Location Engins (Prise en compte de la colonne "Jours de Location")
+            total_location = 0.0
             if not engins_edites.empty:
                 df_propres = engins_edites.dropna(subset=["Sélection de l'engin / Modèle"])
-                total_loc_engins = (df_propres["Quantité"] * df_propres["Prix Location (€/jour)"] * jours_totaux).sum()
+                total_location = (df_propres["Quantité"] * df_propres["Prix Location (€/jour)"] * df_propres["Jours de Location"]).sum()
                 
-            total_location = total_loc_engins + (jours_totaux * cout_location_general)
-            
             # 3. Calcul Salaires
             total_salaires = (jh_chef * (chef_mensuel / 30)) + (jh_ouvrier * (ouvrier_mensuel / 30)) + (jh_cond * (cond_mensuel / 30))
             
@@ -343,7 +350,7 @@ with onglet1:
 
             st.markdown("---")
             st.write(f"**Coût Matériaux globaux** : {total_mats:,.2f} €")
-            st.write(f"**Coût Location Engins & Frais** : {total_location:,.2f} €")
+            st.write(f"**Coût Location Engins** : {total_location:,.2f} €")
             st.write(f"**Coût Salaires** : {total_salaires:,.2f} €")
             
             if benefice_net >= 0:
@@ -351,9 +358,10 @@ with onglet1:
             else:
                 st.error(f"Bénéfice Net : {benefice_net:,.2f} € (ROI : {roi:.2f} %)")
 
-            # Écriture définitive dans la base de données SQLITE locale
+            # Écriture définitive dans SQLite
             inserer_chantier(nom_chantier, revenus, total_mats, total_location, total_salaires, total_depenses, benefice_net, round(roi, 2))
-            st.toast("Chantier enregistré avec succès dans la base SQLite (chantiers.db) !")
+            st.toast("Chantier enregistré avec succès dans la base SQLite !")
+
 
 with onglet2:
     st.subheader("Base de données des chantiers enregistrés")
