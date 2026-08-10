@@ -462,24 +462,25 @@ with onglet1:
     roi_recap = float((benefice_net_recap / total_depenses_recap) * 100 if total_depenses_recap > 0 else 0)
     gain_par_jour_recap = float(benefice_net_recap / jours_totaux if jours_totaux > 0 else benefice_net_recap)
 
+    # Affichage sous forme de 6 colonnes de synthèse
     c_rc1, c_rc2, c_rc3, c_rc4, c_rc5, c_rc6 = st.columns(6)
     with c_rc1:
-        st.metric(label="🧱 Total Matériaux", value=f"{total_mats_recap:,.0f} €")
+        st.metric(label="🧱 Total Matériaux", value=f"{total_mats_recap:,.0f} €".replace(",", " "))
     with c_rc2:
-        st.metric(label="🚜 Total Location", value=f"{total_location_recap:,.0f} €")
+        st.metric(label="🚜 Total Location", value=f"{total_location_recap:,.0f} €".replace(",", " "))
     with c_rc3:
-        st.metric(label="👥 Total Salaires", value=f"{total_salaires_recap:,.0f} €")
+        st.metric(label="👥 Total Salaires", value=f"{total_salaires_recap:,.0f} €".replace(",", " "))
     with c_rc4:
-        st.metric(label="📉 Dépenses Totales", value=f"{total_depenses_recap:,.0f} €")
+        st.metric(label="📉 Dépenses Totales", value=f"{total_depenses_recap:,.0f} €".replace(",", " "))
     with c_rc5:
         st.metric(label="⏱️ Durée", value=f"{int(jours_totaux)} jours")
     with c_rc6:
-        st.metric(label="📈 Gain Net / Jour", value=f"{gain_par_jour_recap:,.0f} €/j")
+        st.metric(label="📈 Gain Net / Jour", value=f"{gain_par_jour_recap:,.0f} €/j".replace(",", " "))
 
     if benefice_net_recap >= 0:
-        st.success(f"🟢 **Rentabilité positive :** Bénéfice de **{benefice_net_recap:,.0f} €** soit **{gain_par_jour_recap:,.0f} € / jour** de travail (ROI : **{roi_recap:.2f} %**)")
+        st.success(f"🟢 **Rentabilité positive :** Bénéfice de **{benefice_net_recap:,.0f} €**.replace(',', ' ') soit **{gain_par_jour_recap:,.0f} € / jour** de travail (ROI : **{roi_recap:.2f} %**)")
     else:
-        st.error(f"🔴 **Chantier déficitaire :** Perte de **{benefice_net_recap:,.0f} €** soit **{gain_par_jour_recap:,.0f} € / jour** de perte (ROI : **{roi_recap:.2f} %**)")
+        st.error(f"🔴 **Chantier déficitaire :** Perte de **{benefice_net_recap:,.0f} €**.replace(',', ' ') soit **{gain_par_jour_recap:,.0f} € / jour** de perte (ROI : **{roi_recap:.2f} %**)")
 
     st.markdown("<br>", unsafe_allow_html=True) 
 
@@ -511,6 +512,7 @@ with onglet2:
         elif critere_tri == "Plus de revenus d'abord":
             df_affichage = df_affichage.sort_values(by="Revenus (€)", ascending=False)
             
+                # Affichage avec masquage des décimales et ajout automatique du séparateur de milliers
         st.dataframe(
             df_affichage, use_container_width=True,
             column_config={
@@ -525,6 +527,7 @@ with onglet2:
                 "ROI (%)": st.column_config.NumberColumn(format="%.2f %%"),
             }
         )
+
         
         csv = df_affichage.to_csv(index=False).encode('utf-8')
         st.download_button(
