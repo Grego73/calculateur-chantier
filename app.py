@@ -450,37 +450,54 @@ with onglet1:
             total_loc_engins_direct = (df_propres_direct["Quantité"] * df_propres_direct["Prix Location (€/jour)"] * df_propres_direct["Jours de Location"]).sum()
         st.info(f"💰 **Total des engins loués (Calcul personnalisé) :** {total_loc_engins_direct:,.0f} €")
 
-    # --- RÉCAPITULATIF TOTAL AVEC LE RAPPORT GAINS / JOUR ---
+    # --- RÉCAPITULATIF TOTAL JUSTE AVANT LA VALIDATION ---
     st.markdown("---")
     st.markdown("### 📊 Récapitulatif Global Estimé")
 
-    total_mats_recap = float(total_mats_direct)
-    total_location_recap = float(total_loc_engins_direct)
-    total_salaires_recap = float(total_salaires_direct)
+    # Recalcul sécurisé de tous les postes en direct avec conversion forcée en float
+    total_mats_recap = float((qte_sable*prix_sable) + (qte_terre*prix_terre) + (qte_enrobe*prix_enrobe) + (qte_armature*prix_armature) + (qte_tole*prix_tole) + (qte_beton*prix_beton) + (qte_panneaux*prix_panneaux) + (qte_tuyaux*prix_tuyaux) + (qte_eaux_usees*prix_eaux_usees) + (qte_poutres*prix_poutres))
+    
+    total_location_recap = 0.0
+    if engins_edites is not None and not engins_edites.empty:
+        df_propres_recap = engins_edites.dropna(subset=["Sélection de l'engin / Modèle"])
+        if not df_propres_recap.empty:
+            total_location_recap = float((df_propres_recap["Quantité"] * df_propres_recap["Prix Location (€/jour)"] * df_propres_recap["Jours de Location"]).sum())
+        
+    total_salaires_recap = float((jh_chef * (chef_mensuel / 30)) + (jh_ouvrier * (ouvrier_mensuel / 30)) + (jh_cond * (cond_mensuel / 30)))
+    
     total_depenses_recap = float(total_mats_recap + total_location_recap + total_salaires_recap)
     benefice_net_recap = float(revenus - total_depenses_recap)
     roi_recap = float((benefice_net_recap / total_depenses_recap) * 100 if total_depenses_recap > 0 else 0)
     gain_par_jour_recap = float(benefice_net_recap / jours_totaux if jours_totaux > 0 else benefice_net_recap)
 
+    # Formatage propre des grands nombres avec des espaces pour les milliers
+    txt_mats = f"{total_mats_recap:,.0f}".replace(",", " ")
+    txt_loc = f"{total_location_recap:,.0f}".replace(",", " ")
+    txt_sal = f"{total_salaires_recap:,.0f}".replace(",", " ")
+    txt_depenses = f"{total_depenses_recap:,.0f}".replace(",", " ")
+    txt_gain_jour = f"{gain_par_jour_recap:,.0f}".replace(",", " ")
+    txt_benefice = f"{abs(benefice_net_recap):,.0f}".replace(",", " ")
+
     # Affichage sous forme de 6 colonnes de synthèse
     c_rc1, c_rc2, c_rc3, c_rc4, c_rc5, c_rc6 = st.columns(6)
     with c_rc1:
-        st.metric(label="🧱 Total Matériaux", value=f"{total_mats_recap:,.0f} €".replace(",", " "))
+        st.metric(label="🧱 Total Matériaux", value=f"{txt_mats} €")
     with c_rc2:
-        st.metric(label="🚜 Total Location", value=f"{total_location_recap:,.0f} €".replace(",", " "))
+        st.metric(label="🚜 Total Location", value=f"{txt_loc} €")
     with c_rc3:
-        st.metric(label="👥 Total Salaires", value=f"{total_salaires_recap:,.0f} €".replace(",", " "))
+        st.metric(label="👥 Total Salaires", value=f"{txt_sal} €")
     with c_rc4:
-        st.metric(label="📉 Dépenses Totales", value=f"{total_depenses_recap:,.0f} €".replace(",", " "))
+        st.metric(label="📉 Dépenses Totales", value=f"{txt_depenses} €")
     with c_rc5:
         st.metric(label="⏱️ Durée", value=f"{int(jours_totaux)} jours")
     with c_rc6:
-        st.metric(label="📈 Gain Net / Jour", value=f"{gain_par_jour_recap:,.0f} €/j".replace(",", " "))
+        st.metric(label="📈 Gain Net / Jour", value=f"{txt_gain_jour} €/j")
 
+    # Message de rentabilité épuré
     if benefice_net_recap >= 0:
-        st.success(f"🟢 **Rentabilité positive :** Bénéfice de **{benefice_net_recap:,.0f} €**.replace(',', ' ') soit **{gain_par_jour_recap:,.0f} € / jour** de travail (ROI : **{roi_recap:.2f} %**)")
+        st.success(f"🟢 **Rentabilité positive :** Bénéfice de **{txt_benefice} €** soit **{txt_gain_jour} € / jour** de travail (ROI : **{roi_recap:.2f} %**)")
     else:
-        st.error(f"🔴 **Chantier déficitaire :** Perte de **{benefice_net_recap:,.0f} €**.replace(',', ' ') soit **{gain_par_jour_recap:,.0f} € / jour** de perte (ROI : **{roi_recap:.2f} %**)")
+        st.error(f"🔴 **Chantier déficitaire :** Perte de **{txt_benefice} €** soit **{txt_gain_jour} € / jour** de perte (ROI : **{roi_recap:.2f} %**)")
 
     st.markdown("<br>", unsafe_allow_html=True) 
 
