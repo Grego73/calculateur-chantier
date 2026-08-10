@@ -11,6 +11,7 @@ DB_NAME = "chantiers.db"
 def init_db():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
+    # Ajout automatique de la colonne jours et gain_par_jour si elles n'existent pas
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS chantiers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -21,9 +22,17 @@ def init_db():
             cout_salaires REAL,
             depenses_totales REAL,
             benefice_net REAL,
-            roi REAL
+            roi REAL,
+            jours INTEGER,
+            gain_par_jour REAL
         )
     """)
+    # Script de secours si la table existait déjà sans ces colonnes
+    try:
+        cursor.execute("ALTER TABLE chantiers ADD COLUMN jours INTEGER DEFAULT 1")
+        cursor.execute("ALTER TABLE chantiers ADD COLUMN gain_par_jour REAL DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass # Les colonnes existent déjà
     conn.commit()
     conn.close()
 
@@ -32,24 +41,26 @@ def charger_donnees():
     df = pd.read_sql_query("""
         SELECT nom_chantier AS 'Nom du Chantier', 
                revenus AS 'Revenus (€)', 
+               jours AS 'Durée (Jours)',
                cout_materiaux AS 'Coût Matériaux (€)', 
                cout_location AS 'Coût Location Engins (€)', 
                cout_salaires AS 'Coût Salaires (€)', 
                depenses_totales AS 'Dépenses Totales (€)', 
                benefice_net AS 'Bénéfice Net (€)', 
+               gain_par_jour AS 'Gain / Jour (€)',
                roi AS 'ROI (%)' 
         FROM chantiers
     """, conn)
     conn.close()
     return df
 
-def inserer_chantier(nom, rev, mats, loc, sal, total, net, roi):
+def inserer_chantier(nom, rev, mats, loc, sal, total, net, roi, jours, gpj):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("""
-        INSERT INTO chantiers (nom_chantier, revenus, cout_materiaux, cout_location, cout_salaires, depenses_totales, benefice_net, roi)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    """, (nom, rev, mats, loc, sal, total, net, roi))
+        INSERT INTO chantiers (nom_chantier, revenus, cout_materiaux, cout_location, cout_salaires, depenses_totales, benefice_net, roi, jours, gain_par_jour)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (nom, rev, mats, loc, sal, total, net, roi, jours, gpj))
     conn.commit()
     conn.close()
 
@@ -198,7 +209,6 @@ CATALOGUE_CHANTIERS = {
         "sable": 488, "terre": 0, "enrobe": 618, "armature": 0, "tole": 0,
         "beton": 0, "panneaux": 6, "tuyaux": 0, "canalisations": 0, "poutres": 0,
         "jh_chef": 16, "jh_ouvrier": 48, "jh_cond": 28,
-        # Configuration exacte de vos 4 étapes techniques
         "engins_requis": [
             {"N° Étape": 1, "Durée Étape (jours)": 4, "Type d'engin requis": "Pelleteuses", "Niveau requis": "N2"},
             {"N° Étape": 1, "Durée Étape (jours)": 4, "Type d'engin requis": "Camions Benne", "Niveau requis": "N3"},
@@ -240,11 +250,6 @@ CATALOGUE_CHANTIERS = {
         ]
     }
 }
-
-# S'assurer que chaque chantier contient bien les clés d'étapes de base pour éviter les crashs
-for chantier, data in CATALOGUE_CHANTIERS.items():
-    if "engins_requis" not in data:
-        data["engins_requis"] = []
 
 # --- CATALOGUE COMPLET DES ENGINS DISPONIBLES ET LEURS MODÈLES ---
 CATALOGUE_ENGINS = {
@@ -349,22 +354,8 @@ with onglet1:
             prix_eaux_usees = st.number_input("Prix Canalisations (€/u) :", value=35)
             prix_poutres = st.number_input("Prix Poutres acier (€/u) :", value=70)
 
-        # --- CALCUL ET AFFICHAGE DU TOTAL DES MATÉRIAUX EN DIRECT ---
-        total_mats_direct = (
-            (qte_sable * prix_sable) + 
-            (qte_terre * prix_terre) + 
-            (qte_enrobe * prix_enrobe) + 
-            (qte_armature * prix_armature) + 
-            (qte_tole * prix_tole) + 
-            (qte_beton * prix_beton) + 
-            (qte_panneaux * prix_panneaux) + 
-            (qte_tuyaux * prix_tuyaux) + 
-            (qte_eaux_usees * prix_eaux_usees) + 
-            (qte_poutres * prix_poutres)
-        )
-        
-        st.info(f"🧱 **Total estimé des matériaux :** {total_mats_direct:,.2f} €")
-
+        total_mats_direct = float((qte_sable*prix_sable) + (qte_terre*prix_terre) + (qte_enrobe*prix_enrobe) + (qte_armature*prix_armature) + (qte_tole*prix_tole) + (qte_beton*prix_beton) + (qte_panneaux*prix_panneaux) + (qte_tuyaux*prix_tuyaux) + (qte_eaux_usees*prix_eaux_usees) + (qte_poutres*prix_poutres))
+        st.info(f"🧱 **Total estimé des matériaux :** {total_mats_direct:,.0f} €")
 
     with col2:
         st.markdown("### --- GRILLE SALARIALE & HEURES ---")
@@ -372,20 +363,20 @@ with onglet1:
         jh_chef = st.number_input("Total Jours-Homme Chef :", value=donnees_modele["jh_chef"])
         ouvrier_mensuel = st.number_input("Salaire mensuel Ouvrier (€) :", value=1616)
         jh_ouvrier = st.number_input("Total Jours-Homme Ouvrier :", value=donnees_modele["jh_ouvrier"])
-        cond_mensuel = st.number_input("Salaire mensuel Conducteur (€) :", value=1571)
+                cond_mensuel = st.number_input("Salaire mensuel Conducteur (€) :", value=1571)
         jh_cond = st.number_input("Total Jours-Homme Conducteur :", value=donnees_modele["jh_cond"])
 
         # --- CALCUL ET AFFICHAGE DU TOTAL DES SALAIRES EN DIRECT ---
         sal_chef_direct = jh_chef * (chef_mensuel / 30)
         sal_ouvrier_direct = jh_ouvrier * (ouvrier_mensuel / 30)
         sal_cond_direct = jh_cond * (cond_mensuel / 30)
-        total_salaires_direct = sal_chef_direct + sal_ouvrier_direct + sal_cond_direct
+        total_salaires_direct = float(sal_chef_direct + sal_ouvrier_direct + sal_cond_direct)
         
-        st.info(f"👥 **Total estimé des salaires pour ce chantier :** {total_salaires_direct:,.2f} €")
+        st.info(f"👥 **Total estimé des salaires pour ce chantier :** {total_salaires_direct:,.0f} €")
 
         # --- TABLE DES ENGINS NÉCESSAIRES ---
         st.markdown("### --- TABLE DES ENGINS NÉCESSAIRES ---")
-        st.caption("📋 Cochez les engins à louer. Les informations de planification (Étape & Durée) sont lues depuis le modèle.")
+        st.caption("📋 Les besoins en machines requis par le chantier s'affichent automatiquement ici. Cochez pour louer.")
         
         engins_bruts_modele = []
         if "engins_requis" in donnees_modele and len(donnees_modele["engins_requis"]) > 0:
@@ -397,16 +388,12 @@ with onglet1:
                     "Niveau requis": item.get("Niveau requis", "N1"),
                     "À louer ?": False
                 })
-        
         df_besoins_init = pd.DataFrame(engins_bruts_modele)
         if df_besoins_init.empty:
             df_besoins_init = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "Type d'engin requis", "Niveau requis", "À louer ?"])
         
         engins_necessaires = st.data_editor(
-            df_besoins_init,
-            num_rows="dynamic",
-            use_container_width=True,
-            key="table_engins_necessaires",
+            df_besoins_init, num_rows="dynamic", use_container_width=True, key="table_engins_necessaires",
             column_config={
                 "N° Étape": st.column_config.NumberColumn("N° Étape", min_value=1, step=1, required=True),
                 "Durée Étape (jours)": st.column_config.NumberColumn("Durée (jours)", min_value=1, step=1, required=True),
@@ -420,52 +407,36 @@ with onglet1:
         engins_transferes_list = []
         if not engins_necessaires.empty:
             df_coches = engins_necessaires[engins_necessaires["À louer ?"] == True].dropna(subset=["Type d'engin requis"])
-            
             for _, row in df_coches.iterrows():
                 type_demande = row["Type d'engin requis"]
                 niveau_demande = row["Niveau requis"]
                 duree_etape = int(row["Durée Étape (jours)"])
-                
-                modele_trouve = None
-                prix_trouve = 380
-                
-                cle_recherche_1 = f"{type_demande[:-1] if type_demande.endswith('s') else type_demande} {niveau_demande}"
-                cle_recherche_2 = f"{type_demande} {niveau_demande}"
-                
+                modele_trouve, prix_trouve = None, 380
+                cle_1 = f"{type_demande[:-1] if type_demande.endswith('s') else type_demande} {niveau_demande}"
+                cle_2 = f"{type_demande} {niveau_demande}"
                 for engin_nom, prix in CATALOGUE_ENGINS.items():
-                    if (cle_recherche_1.lower() in engin_nom.lower()) or (cle_recherche_2.lower() in engin_nom.lower()):
-                        modele_trouve = engin_nom
-                        prix_trouve = prix
+                    if (cle_1.lower() in engin_nom.lower()) or (cle_2.lower() in engin_nom.lower()):
+                        modele_trouve, prix_trouve = engin_nom, prix
                         break
-                
                 if not modele_trouve:
                     for engin_nom, prix in CATALOGUE_ENGINS.items():
                         if type_demande.lower() in engin_nom.lower() or type_demande[:-1].lower() in engin_nom.lower():
-                            modele_trouve = engin_nom
-                            prix_trouve = prix
+                            modele_trouve, prix_trouve = engin_nom, prix
                             break
-                
                 if modele_trouve:
                     engins_transferes_list.append({
-                        "Sélection de l'engin / Modèle": modele_trouve,
-                        "Quantité": 1,
-                        "Prix Location (€/jour)": prix_trouve,
-                        "Jours de Location": duree_etape
+                        "Sélection de l'engin / Modèle": modele_trouve, "Quantité": 1,
+                        "Prix Location (€/jour)": prix_trouve, "Jours de Location": duree_etape
                     })
 
         # --- TABLE DES ENGINS À LOUER ---
         st.markdown("### --- TABLE DES ENGINS À LOUER ---")
-        st.caption("🔗 Les machines cochées ci-dessus se chargent automatiquement ici.")
-        
         df_engins_init = pd.DataFrame(columns=["Sélection de l'engin / Modèle", "Quantité", "Prix Location (€/jour)", "Jours de Location"])
         if len(engins_transferes_list) > 0:
             df_engins_init = pd.DataFrame(engins_transferes_list)
         
         engins_edites = st.data_editor(
-            df_engins_init,
-            num_rows="dynamic",
-            use_container_width=True,
-            key="table_engins_a_louer",
+            df_engins_init, num_rows="dynamic", use_container_width=True, key="table_engins_a_louer",
             column_config={
                 "Sélection de l'engin / Modèle": st.column_config.SelectboxColumn("Engin & Modèle", options=list(CATALOGUE_ENGINS.keys()), required=True),
                 "Quantité": st.column_config.NumberColumn("Quantité", min_value=1, default=1, step=1),
@@ -473,72 +444,55 @@ with onglet1:
                 "Jours de Location": st.column_config.NumberColumn("Jours à louer", min_value=1, max_value=365, step=1)
             }
         )
-
         total_loc_engins_direct = 0.0
         if not engins_edites.empty:
             df_propres_direct = engins_edites.dropna(subset=["Sélection de l'engin / Modèle"])
             total_loc_engins_direct = (df_propres_direct["Quantité"] * df_propres_direct["Prix Location (€/jour)"] * df_propres_direct["Jours de Location"]).sum()
-        
-        st.info(f"💰 **Total des engins loués (Calcul personnalisé) :** {total_loc_engins_direct:,.2f} €")
+        st.info(f"💰 **Total des engins loués (Calcul personnalisé) :** {total_loc_engins_direct:,.0f} €")
 
-    # --- RÉCAPITULATIF TOTAL JUSTE AVANT LA VALIDATION ---
+    # --- RÉCAPITULATIF TOTAL AVEC LE RAPPORT GAINS / JOUR ---
     st.markdown("---")
     st.markdown("### 📊 Récapitulatif Global Estimé")
 
-    # Recalcul sécurisé de tous les postes en direct avec conversion forcée en float
-    total_mats_recap = float((qte_sable*prix_sable) + (qte_terre*prix_terre) + (qte_enrobe*prix_enrobe) + (qte_armature*prix_armature) + (qte_tole*prix_tole) + (qte_beton*prix_beton) + (qte_panneaux*prix_panneaux) + (qte_tuyaux*prix_tuyaux) + (qte_eaux_usees*prix_eaux_usees) + (qte_poutres*prix_poutres))
-    
-    total_location_recap = 0.0
-    if engins_edites is not None and not engins_edites.empty:
-        df_propres_recap = engins_edites.dropna(subset=["Sélection de l'engin / Modèle"])
-        if not df_propres_recap.empty:
-            total_location_recap = float((df_propres_recap["Quantité"] * df_propres_recap["Prix Location (€/jour)"] * df_propres_recap["Jours de Location"]).sum())
-        
-    total_salaires_recap = float((jh_chef * (chef_mensuel / 30)) + (jh_ouvrier * (ouvrier_mensuel / 30)) + (jh_cond * (cond_mensuel / 30)))
-    
+    total_mats_recap = float(total_mats_direct)
+    total_location_recap = float(total_loc_engins_direct)
+    total_salaires_recap = float(total_salaires_direct)
     total_depenses_recap = float(total_mats_recap + total_location_recap + total_salaires_recap)
     benefice_net_recap = float(revenus - total_depenses_recap)
     roi_recap = float((benefice_net_recap / total_depenses_recap) * 100 if total_depenses_recap > 0 else 0)
+    gain_par_jour_recap = float(benefice_net_recap / jours_totaux if jours_totaux > 0 else benefice_net_recap)
 
-    # Affichage sous forme de 5 colonnes de synthèse (Ajout de la durée)
-    c_rc1, c_rc2, c_rc3, c_rc4, c_rc5 = st.columns(5)
+    c_rc1, c_rc2, c_rc3, c_rc4, c_rc5, c_rc6 = st.columns(6)
     with c_rc1:
         st.metric(label="🧱 Total Matériaux", value=f"{total_mats_recap:,.0f} €")
     with c_rc2:
-        st.metric(label="🚜 Total Location Engins", value=f"{total_location_recap:,.0f} €")
+        st.metric(label="🚜 Total Location", value=f"{total_location_recap:,.0f} €")
     with c_rc3:
         st.metric(label="👥 Total Salaires", value=f"{total_salaires_recap:,.0f} €")
     with c_rc4:
         st.metric(label="📉 Dépenses Totales", value=f"{total_depenses_recap:,.0f} €")
     with c_rc5:
-        st.metric(label="⏱️ Durée du Chantier", value=f"{int(jours_totaux)} jours")
+        st.metric(label="⏱️ Durée", value=f"{int(jours_totaux)} jours")
+    with c_rc6:
+        st.metric(label="📈 Gain Net / Jour", value=f"{gain_par_jour_recap:,.0f} €/j")
 
-    # Message de rentabilité direct avant validation
     if benefice_net_recap >= 0:
-        st.success(f"🟢 **Rentabilité estimée positive :** Bénéfice Net de **{benefice_net_recap:,.0f} €** (ROI : **{roi_recap:.2f} %**)")
+        st.success(f"🟢 **Rentabilité positive :** Bénéfice de **{benefice_net_recap:,.0f} €** soit **{gain_par_jour_recap:,.0f} € / jour** de travail (ROI : **{roi_recap:.2f} %**)")
     else:
-        st.error(f"🔴 **Chantier déficitaire :** Perte Net de **{benefice_net_recap:,.0f} €** (ROI : **{roi_recap:.2f} %**)")
+        st.error(f"🔴 **Chantier déficitaire :** Perte de **{benefice_net_recap:,.0f} €** soit **{gain_par_jour_recap:,.0f} € / jour** de perte (ROI : **{roi_recap:.2f} %**)")
 
     st.markdown("<br>", unsafe_allow_html=True) 
 
-
-    # --- BOUTON DE VALIDATION ET ENREGISTREMENT ---
     if st.button("LANCER LE CALCUL & ENREGISTRER", type="primary"):
         df_actuel = charger_donnees()
-        
-        # Sécurité antifuite si la base SQLite renvoie un tableau vide
-        if df_actuel.empty:
-            doublon_existe = False
-        else:
-            doublon_existe = not df_actuel[(df_actuel["Nom du Chantier"] == nom_chantier) & (df_actuel["Revenus (€)"] == revenus)].empty
+        doublon_existe = False if df_actuel.empty else not df_actuel[(df_actuel["Nom du Chantier"] == nom_chantier) & (df_actuel["Revenus (€)"] == revenus)].empty
         
         if not nom_chantier:
-            st.error("Veuillez donner un nom ou un numéro valide à votre chantier.")
+            st.error("Veuillez donner un nom ou un numéro valide.")
         elif doublon_existe:
-            st.error(f"Impossible d'enregistrer : Ce chantier au montant de {revenus:,.2f} € existe déjà.")
+            st.error(f"Impossible d'enregistrer : ce chantier existe déjà.")
         else:
-            # Enregistrement en base de données avec les valeurs déjà calculées
-            inserer_chantier(nom_chantier, revenus, total_mats_recap, total_location_recap, total_salaires_recap, total_depenses_recap, benefice_net_recap, round(roi_recap, 2))
+            inserer_chantier(nom_chantier, revenus, total_mats_recap, total_location_recap, total_salaires_recap, total_depenses_recap, benefice_net_recap, round(roi_recap, 2), int(jours_totaux), round(gain_par_jour_recap, 2))
             st.toast("Chantier enregistré avec succès dans la base SQLite !")
             st.rerun()
 
@@ -549,36 +503,29 @@ with onglet2:
     if df_affichage.empty:
         st.info("Aucun chantier n'a encore été enregistré.")
     else:
-        critere_tri = st.selectbox(
-            "Classer les chantiers par ordre de rentabilité :", 
-            ["Plus gros Bénéfice d'abord", "Plus gros ROI d'abord", "Plus de revenus d'abord"]
-        )
-        
+        critere_tri = st.selectbox("Classer les chantiers par ordre de rentabilité :", ["Plus gros Bénéfice d'abord", "Plus gros ROI d'abord", "Plus de revenus d'abord"])
         if critere_tri == "Plus gros Bénéfice d'abord":
             df_affichage = df_affichage.sort_values(by="Bénéfice Net (€)", ascending=False)
         elif critere_tri == "Plus gros ROI d'abord":
             df_affichage = df_affichage.sort_values(by="ROI (%)", ascending=False)
         elif critere_tri == "Plus de revenus d'abord":
             df_affichage = df_affichage.sort_values(by="Revenus (€)", ascending=False)
-        
-        # --- CONFIGURATION DU FORMAT DES COLONNES POUR MASQUER LES DÉCIMALES ---
-        # On définit un format d'affichage propre colonne par colonne sans toucher aux données de calcul
+            
         st.dataframe(
-            df_affichage, 
-            use_container_width=True,
+            df_affichage, use_container_width=True,
             column_config={
                 "Revenus (€)": st.column_config.NumberColumn(format="%d €"),
+                "Durée (Jours)": st.column_config.NumberColumn(format="%d j"),
                 "Coût Matériaux (€)": st.column_config.NumberColumn(format="%d €"),
                 "Coût Location Engins (€)": st.column_config.NumberColumn(format="%d €"),
                 "Coût Salaires (€)": st.column_config.NumberColumn(format="%d €"),
                 "Dépenses Totales (€)": st.column_config.NumberColumn(format="%d €"),
                 "Bénéfice Net (€)": st.column_config.NumberColumn(format="%d €"),
-                "ROI (%)": st.column_config.NumberColumn(format="%.2f %%"), # Conserve 2 décimales pour le ROI
+                "Gain / Jour (€)": st.column_config.NumberColumn(format="%d €/j"),
+                "ROI (%)": st.column_config.NumberColumn(format="%.2f %%"),
             }
         )
-        
-        csv = df_affichage.to_csv(index=False).encode('utf-8')
-        st.download_button(
+                st.download_button(
             label="📥 Télécharger la base de données (CSV)", 
             data=csv, 
             file_name="base_donnies_chantiers.csv", 
@@ -589,3 +536,7 @@ with onglet2:
         if st.button("🗑️ Vider définitivement la base de données SQLITE", type="secondary"):
             reinitialiser_db()
             st.rerun()
+
+        
+        csv = df_affichage.to_csv(index=False).encode('utf-8')
+
