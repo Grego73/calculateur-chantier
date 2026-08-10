@@ -327,7 +327,7 @@ with onglet1:
             qte_armature = st.number_input("Unités d'Armature métallique :", value=donnees_modele["armature"])
             qte_tole = st.number_input("Unités de Plaque de tôle ondulée :", value=donnees_modele["tole"])
             qte_beton = st.number_input("Tonnes de Béton :", value=donnees_modele["beton"])
-            qte_panneaux = st.number_input("Unités de Panneaux signalisation :", value=donnees_panneaux["panneaux"])
+            qte_panneaux = st.number_input("Unités de Panneaux signalisation :", value=donnees_modele["panneaux"])
             qte_tuyaux = st.number_input("Unités de Tuyaux d'eau standards :", value=donnees_modele["tuyaux"])
             qte_eaux_usees = st.number_input("Unités de Canalisations eaux usées :", value=donnees_modele["canalisations"])
             qte_poutres = st.number_input("Unités de Poutres en acier :", value=donnees_modele["poutres"])
