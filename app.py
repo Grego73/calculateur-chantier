@@ -355,7 +355,9 @@ with onglet1:
             prix_poutres = st.number_input("Prix Poutres acier (€/u) :", value=70)
 
         total_mats_direct = float((qte_sable*prix_sable) + (qte_terre*prix_terre) + (qte_enrobe*prix_enrobe) + (qte_armature*prix_armature) + (qte_tole*prix_tole) + (qte_beton*prix_beton) + (qte_panneaux*prix_panneaux) + (qte_tuyaux*prix_tuyaux) + (qte_eaux_usees*prix_eaux_usees) + (qte_poutres*prix_poutres))
-        st.info(f"🧱 **Total estimé des matériaux :** {total_mats_direct:,.0f} €")
+        total_mats_formatte = f"{total_mats_direct:,.0f}".replace(",", " ")
+        st.info(f"🧱 **Total estimé des matériaux :** {total_mats_formatte} €")
+
 
     with col2:
         st.markdown("### --- GRILLE SALARIALE & HEURES ---")
@@ -372,7 +374,9 @@ with onglet1:
         sal_cond_direct = jh_cond * (cond_mensuel / 30)
         total_salaires_direct = float(sal_chef_direct + sal_ouvrier_direct + sal_cond_direct)
         
-        st.info(f"👥 **Total estimé des salaires pour ce chantier :** {total_salaires_direct:,.0f} €")
+        total_salaires_formatte = f"{total_salaires_direct:,.0f}".replace(",", " ")
+        st.info(f"👥 **Total estimé des salaires pour ce chantier :** {total_salaires_formatte} €")
+
 
         # --- TABLE DES ENGINS NÉCESSAIRES ---
         st.markdown("### --- TABLE DES ENGINS NÉCESSAIRES ---")
@@ -501,7 +505,9 @@ with onglet1:
             df_propres_direct["Jours de Location"] = pd.to_numeric(df_propres_direct["Jours de Location"]).fillna(1).astype(int)
             total_loc_engins_direct = (df_propres_direct["Quantité"] * df_propres_direct["Prix Location (€/jour)"] * df_propres_direct["Jours de Location"]).sum()
             
-        st.info(f"💰 **Total des engins loués (Calcul personnalisé) :** {total_loc_engins_direct:,.0f} €")
+        total_engins_formatte = f"{total_loc_engins_direct:,.0f}".replace(",", " ")
+        st.info(f"💰 **Total des engins loués (Calcul personnalisé) :** {total_engins_formatte} €")
+
 
     # --- RÉCAPITULATIF TOTAL JUSTE AVANT LA VALIDATION ---
     st.markdown("---")
