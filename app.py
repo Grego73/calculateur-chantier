@@ -61,7 +61,6 @@ def reinitialiser_db():
     conn.close()
     init_db()
 
-# Lancement de la configuration de la DB
 init_db()
 
 # --- DICTIONNAIRE DE TOUS LES CHANTIERS POSSIBLES ---
@@ -70,103 +69,66 @@ CATALOGUE_CHANTIERS = {
         "revenus": 0, "jours": 0, "location": 0,
         "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0,
         "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0,
-        "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0
-    },
-    "Goudronnage d'une route (112 629 €)": {
-        "revenus": 112629, "jours": 0, "location": 0,
-        "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0,
-        "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0,
-        "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0
-    },
-    "Déblayer - Niveau 2 (6 596 €)": {
-        "revenus": 6596, "jours": 0, "location": 0,
-        "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0,
-        "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0,
-        "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0
-    },
-    "Exhausser un terrain (10 336 €)": {
-        "revenus": 10336, "jours": 0, "location": 0,
-        "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0,
-        "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0,
-        "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0
-    },
-    "Exhausser un terrain (8 908 €)": {
-        "revenus": 8908, "jours": 0, "location": 0,
-        "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0,
-        "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0,
-        "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0
-    },
-    "Construction d'un hangar (129 306 €)": {
-        "revenus": 129306, "jours": 0, "location": 0,
-        "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0,
-        "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0,
-        "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0
-    },
-    "Suppression d'un espace vert (18 786 €)": {
-        "revenus": 18786, "jours": 0, "location": 0,
-        "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0,
-        "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0,
-        "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0
-    },
-    "Compacter - Niveau 2 (3 699 €)": {
-        "revenus": 3699, "jours": 0, "location": 0,
-        "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0,
-        "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0,
-        "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0
-    },
-    "Goudronnage d'un chemin (34 960 €)": {
-        "revenus": 34960, "jours": 0, "location": 0,
-        "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0,
-        "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0,
-        "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0
-    },
-    "Exhausser un terrain (6 664 €)": {
-        "revenus": 6664, "jours": 0, "location": 0,
-        "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0,
-        "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0,
-        "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0
-    },
-    "Déblayer - Niveau 3 (21 528 €)": {
-        "revenus": 21528, "jours": 0, "location": 0,
-        "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0,
-        "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0,
-        "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0
-    },
-    "Assainissement de lit (Petit cours d'eau) (12 180 €)": {
-        "revenus": 12180, "jours": 0, "location": 0,
-        "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0,
-        "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0,
-        "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0
-    },
-    "Assainissement de lit (Cours d'eau) (10 450 €)": {
-        "revenus": 10450, "jours": 0, "location": 0,
-        "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0,
-        "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0,
-        "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0
+        "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0, "engins_requis": []
     },
     "Goudronnage d'une route (Grande surface) (214 599 €)": {
-        "revenus": 214599, "jours": 15, "location": 1200,
+        "revenus": 214599, "jours": 16, "location": 0,
         "sable": 488, "terre": 0, "enrobe": 618, "armature": 0, "tole": 0,
         "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0,
-        "jh_chef": 16, "jh_ouvrier": 48, "jh_cond": 28
+        "jh_chef": 16, "jh_ouvrier": 48, "jh_cond": 28,
+        "engins_requis": [
+            {"Type d'engin requis": "Pelleteuse N2 - Takeuchi TB2150 (85.0 kW)", "Usage / Spécification attendue": "Étape 1 (Terrassement) : Requis (CAT 350 occupé)", "Statut Validation": "🟢 Validé / Dispo"},
+            {"Type d'engin requis": "Camion Benne N3 - Renault Trucks K 430 (430 cv)", "Usage / Spécification attendue": "Étape 1 & 3 : Requis (x2 autres occupés)", "Statut Validation": "🟢 Validé / Dispo"},
+            {"Type d'engin requis": "Fraiseuse N2 - CAT PM312 (256 kW)", "Usage / Spécification attendue": "Étape 1 (Terrassement) : Occupé actuellement !", "Statut Validation": "🔴 À louer"},
+            {"Type d'engin requis": "Niveleuse N2 - CAT 14 (178 kW)", "Usage / Spécification attendue": "Étape 2 (Nivellement) : Non possédé !", "Statut Validation": "🔴 À louer"},
+            {"Type d'engin requis": "Finisseur N3 - Dynapac SD2500CS (142 kW)", "Usage / Spécification attendue": "Étape 3 (Pose enrobé) : Non possédé !", "Statut Validation": "🔴 À louer"},
+            {"Type d'engin requis": "Compacteur Enrobé N3 - CAT CB8 (N/A)", "Usage / Spécification attendue": "Étape 4 (Compactage) : Non possédé !", "Statut Validation": "🔴 À louer"}
+        ]
+    },
+    "Goudronnage d'une route (112 629 €)": {
+        "revenus": 112629, "jours": 0, "location": 0, "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0, "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0, "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0, "engins_requis": []
+    },
+    "Déblayer - Niveau 2 (6 596 €)": {
+        "revenus": 6596, "jours": 0, "location": 0, "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0, "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0, "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0, "engins_requis": []
+    },
+    "Exhausser un terrain (10 336 €)": {
+        "revenus": 10336, "jours": 0, "location": 0, "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0, "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0, "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0, "engins_requis": []
+    },
+    "Exhausser un terrain (8 908 €)": {
+        "revenus": 8908, "jours": 0, "location": 0, "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0, "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0, "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0, "engins_requis": []
+    },
+    "Construction d'un hangar (129 306 €)": {
+        "revenus": 129306, "jours": 0, "location": 0, "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0, "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0, "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0, "engins_requis": []
+    },
+    "Suppression d'un espace vert (18 786 €)": {
+        "revenus": 18786, "jours": 0, "location": 0, "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0, "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0, "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0, "engins_requis": []
+    },
+    "Compacter - Niveau 2 (3 699 €)": {
+        "revenus": 3699, "jours": 0, "location": 0, "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0, "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0, "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0, "engins_requis": []
+    },
+    "Goudronnage d'un chemin (34 960 €)": {
+        "revenus": 34960, "jours": 0, "location": 0, "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0, "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0, "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0, "engins_requis": []
+    },
+    "Exhausser un terrain (6 664 €)": {
+        "revenus": 6664, "jours": 0, "location": 0, "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0, "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0, "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0, "engins_requis": []
+    },
+    "Déblayer - Niveau 3 (21 528 €)": {
+        "revenus": 21528, "jours": 0, "location": 0, "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0, "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0, "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0, "engins_requis": []
+    },
+    "Assainissement de lit (Petit cours d'eau) (12 180 €)": {
+        "revenus": 12180, "jours": 0, "location": 0, "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0, "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0, "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0, "engins_requis": []
+    },
+    "Assainissement de lit (Cours d'eau) (10 450 €)": {
+        "revenus": 10450, "jours": 0, "location": 0, "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0, "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0, "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0, "engins_requis": []
     },
     "Construction d'un hangar (139 104 €)": {
-        "revenus": 139104, "jours": 0, "location": 0,
-        "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0,
-        "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0,
-        "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0
+        "revenus": 139104, "jours": 0, "location": 0, "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0, "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0, "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0, "engins_requis": []
     },
     "Compacter - Niveau 2 (4 617 €)": {
-        "revenus": 4617, "jours": 0, "location": 0,
-        "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0,
-        "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0,
-        "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0
+        "revenus": 4617, "jours": 0, "location": 0, "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0, "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0, "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0, "engins_requis": []
     },
     "Remblayer - Niveau 3 (13 674 €)": {
-        "revenus": 13674, "jours": 0, "location": 0,
-        "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0,
-        "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0,
-        "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0
+        "revenus": 13674, "jours": 0, "location": 0, "sable": 0, "terre": 0, "enrobe": 0, "armature": 0, "tole": 0, "beton": 0, "panneaux": 0, "tuyaux": 0, "canalisations": 0, "poutres": 0, "jh_chef": 0, "jh_ouvrier": 0, "jh_cond": 0, "engins_requis": []
     }
 }
 
