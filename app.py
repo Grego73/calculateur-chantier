@@ -283,7 +283,7 @@ with onglet1:
             prix_eaux_usees = st.number_input("Prix Canalisations (€/u) :", value=35)
             prix_poutres = st.number_input("Prix Poutres acier (€/u) :", value=70)
 
-        with col2:
+    with col2:
         st.markdown("### --- GRILLE SALARIALE & HEURES ---")
         chef_mensuel = st.number_input("Salaire mensuel Chef (€) :", value=1566)
         jh_chef = st.number_input("Total Jours-Homme Chef :", value=donnees_modele["jh_chef"])
