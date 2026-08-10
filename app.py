@@ -284,7 +284,6 @@ with onglet1:
         st.markdown("### --- TABLE DES ENGINS NÉCESSAIRES ---")
         st.caption("📋 Listez ici les engins théoriquement indispensables ou planifiés pour valider le cahier des charges.")
         
-        # Structure de la table des besoins/engins nécessaires
         df_besoins_init = pd.DataFrame(columns=[
             "Type d'engin requis", 
             "Usage / Spécification attendue", 
@@ -292,7 +291,7 @@ with onglet1:
         ])
         
         # Extraction de la liste propre des types pour le menu déroulant de cette table
-        types_bruts = sorted(list(set([k.split(" - ")[0].split(" N")[0] for k in CATALOGUE_ENGINS.keys()])))
+        types_bruts = sorted(list(set([k.split(" - ")[0].split(" N")[0].strip() for k in CATALOGUE_ENGINS.keys()])))
         
         engins_necessaires = st.data_editor(
             df_besoins_init,
@@ -316,11 +315,11 @@ with onglet1:
                 )
             }
         )
+
+        # --- TABLE DES ENGINS À LOUER ---
+        st.markdown("### --- TABLE DES ENGINS À LOUER ---")
+        st.caption("🔗 Ajoutez les lignes ci-dessous pour intégrer les coûts réels de location au calcul financier du chantier.")
         
-        st.markdown("### --- TABLE DES ENGINS EN LOCATION ---")
-        st.caption("Cliquez sur ➕ en bas du tableau pour ajouter une ligne d'engin.")
-        
-        # Ajout de la colonne "Jours de Location" dans la structure de base
         df_engins_init = pd.DataFrame(columns=[
             "Sélection de l'engin / Modèle", 
             "Quantité", 
@@ -332,6 +331,7 @@ with onglet1:
             df_engins_init,
             num_rows="dynamic",
             use_container_width=True,
+            key="table_engins_a_louer",
             column_config={
                 "Sélection de l'engin / Modèle": st.column_config.SelectboxColumn(
                     "Engin & Modèle",
@@ -351,13 +351,14 @@ with onglet1:
             }
         )
 
-        # --- CALCUL EN TEMPS RÉEL (Quantité * Prix/Jour * Jours à louer) ---
+        # Calcul automatique du total des engins en direct
         total_loc_engins_direct = 0.0
         if not engins_edites.empty:
             df_propres_direct = engins_edites.dropna(subset=["Sélection de l'engin / Modèle"])
             total_loc_engins_direct = (df_propres_direct["Quantité"] * df_propres_direct["Prix Location (€/jour)"] * df_propres_direct["Jours de Location"]).sum()
         
         st.info(f"💰 **Total des engins loués (Calcul personnalisé) :** {total_loc_engins_direct:,.2f} €")
+
 
     if st.button("LANCER LE CALCUL & ENREGISTRER", type="primary"):
         df_actuel = charger_donnees()
