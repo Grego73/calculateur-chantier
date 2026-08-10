@@ -403,32 +403,47 @@ with onglet1:
             }
         )
 
-        # --- LOGIQUE DE TRANSFERT SANS AUCUNE LIMITE ---
+        # --- LOGIQUE DE TRANSFERT CORRIGÉE (SANS BUG DE PLURIEL) ---
         engins_transferes_list = []
         if not engins_necessaires.empty:
             df_coches = engins_necessaires[engins_necessaires["À louer ?"] == True].dropna(subset=["Type d'engin requis"])
             
             for _, row in df_coches.iterrows():
-                type_demande = row["Type d'engin requis"]
-                niveau_demande = row["Niveau requis"]
+                type_demande = str(row["Type d'engin requis"]).strip()
+                niveau_demande = str(row["Niveau requis"]).strip()
                 duree_etape = int(row["Durée Étape (jours)"])
+                
+                # Nettoyage pour la recherche (ex: "Camions Benne" -> "Camion Benne")
+                type_clean = type_demande
+                if type_clean.lower().startswith("camions"):
+                    type_clean = type_clean.replace("Camions", "Camion").replace("camions", "camion")
+                if type_clean.endswith("s") and not type_clean.lower().endswith("sol"):
+                    type_clean = type_clean[:-1]
+                
                 modele_trouve, prix_trouve = None, 380
-                cle_1 = f"{type_demande[:-1] if type_demande.endswith('s') else type_demande} {niveau_demande}"
-                cle_2 = f"{type_demande} {niveau_demande}"
+                
+                # 1ère tentative : Recherche du Type épuré + Niveau (ex: "Camion Benne N3")
+                cle_1 = f"{type_clean} {niveau_demande}"
                 for engin_nom, prix in CATALOGUE_ENGINS.items():
-                    if (cle_1.lower() in engin_nom.lower()) or (cle_2.lower() in engin_nom.lower()):
+                    if cle_1.lower() in engin_nom.lower():
                         modele_trouve, prix_trouve = engin_nom, prix
                         break
+                        
+                # 2ème tentative : Si non trouvé, recherche globale sur le type épuré seul
                 if not modele_trouve:
                     for engin_nom, prix in CATALOGUE_ENGINS.items():
-                        if type_demande.lower() in engin_nom.lower() or type_demande[:-1].lower() in engin_nom.lower():
+                        if type_clean.lower() in engin_nom.lower():
                             modele_trouve, prix_trouve = engin_nom, prix
                             break
+                
                 if modele_trouve:
                     engins_transferes_list.append({
-                        "Sélection de l'engin / Modèle": modele_trouve, "Quantité": 1,
-                        "Prix Location (€/jour)": prix_trouve, "Jours de Location": duree_etape
+                        "Sélection de l'engin / Modèle": modele_trouve, 
+                        "Quantité": 1,
+                        "Prix Location (€/jour)": prix_trouve, 
+                        "Jours de Location": duree_etape
                     })
+
 
         # --- TABLE DES ENGINS À LOUER ---
         st.markdown("### --- TABLE DES ENGINS À LOUER ---")
