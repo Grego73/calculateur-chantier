@@ -500,25 +500,27 @@ with onglet1:
     benefice_net_recap = float(revenus - total_depenses_recap)
     roi_recap = float((benefice_net_recap / total_depenses_recap) * 100 if total_depenses_recap > 0 else 0)
 
-    # Affichage sous forme de colonnes de synthèse
-    c_rc1, c_rc2, c_rc3, c_rc4 = st.columns(4)
+    # Affichage sous forme de 5 colonnes de synthèse (Ajout de la durée)
+    c_rc1, c_rc2, c_rc3, c_rc4, c_rc5 = st.columns(5)
     with c_rc1:
-        st.metric(label="🧱 Total Matériaux", value=f"{total_mats_recap:,.2f} €")
+        st.metric(label="🧱 Total Matériaux", value=f"{total_mats_recap:,.0f} €")
     with c_rc2:
-        st.metric(label="🚜 Total Location Engins", value=f"{total_location_recap:,.2f} €")
+        st.metric(label="🚜 Total Location Engins", value=f"{total_location_recap:,.0f} €")
     with c_rc3:
-        st.metric(label="👥 Total Salaires", value=f"{total_salaires_recap:,.2f} €")
+        st.metric(label="👥 Total Salaires", value=f"{total_salaires_recap:,.0f} €")
     with c_rc4:
-        st.metric(label="📉 Dépenses Totales", value=f"{total_depenses_recap:,.2f} €")
+        st.metric(label="📉 Dépenses Totales", value=f"{total_depenses_recap:,.0f} €")
+    with c_rc5:
+        st.metric(label="⏱️ Durée du Chantier", value=f"{int(jours_totaux)} jours")
 
     # Message de rentabilité direct avant validation
     if benefice_net_recap >= 0:
-        st.success(f"🟢 **Rentabilité estimée positive :** Bénéfice Net de **{benefice_net_recap:,.2f} €** (ROI : **{roi_recap:.2f} %**)")
+        st.success(f"🟢 **Rentabilité estimée positive :** Bénéfice Net de **{benefice_net_recap:,.0f} €** (ROI : **{roi_recap:.2f} %**)")
     else:
-        st.error(f"🔴 **Chantier déficitaire :** Perte Net de **{benefice_net_recap:,.2f} €** (ROI : **{roi_recap:.2f} %**)")
+        st.error(f"🔴 **Chantier déficitaire :** Perte Net de **{benefice_net_recap:,.0f} €** (ROI : **{roi_recap:.2f} %**)")
 
-    # CORRECTION ICI : Remplacement du paramètre erroné unsafe_allow_stdio par unsafe_allow_html
     st.markdown("<br>", unsafe_allow_html=True) 
+
 
     # --- BOUTON DE VALIDATION ET ENREGISTREMENT ---
     if st.button("LANCER LE CALCUL & ENREGISTRER", type="primary"):
