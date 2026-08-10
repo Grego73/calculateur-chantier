@@ -442,8 +442,14 @@ with onglet3:
         if not df_stats.empty:
             st.markdown("### 🏢 Bilan Général de l'Entreprise")
             total_chantiers = len(df_stats)
-            somme_revenus, somme_depenses, somme_benefices = float(df_stats["Revenus (€)"].sum()), float(df_stats["Dépenses Totales (€)"].sum()), float(df_stats["Bénéfice Net (€)"].sum())
-            txt_total_rev, txt_total_dep, txt_total_ben = f"{somme_revenus:,.0f}".replace(",", " "), f"{somme_depenses:,.0f}".replace(",", " "), f"{somme_benefices:,.0f}".replace(",", " ")
+            somme_revenus = float(df_stats["Revenus (€)"].sum())
+            somme_depenses = float(df_stats["Dépenses Totales (€)"].sum())
+            somme_benefices = float(df_stats["Bénéfice Net (€)"].sum())
+            
+            txt_total_rev = f"{somme_revenus:,.0f}".replace(",", " ")
+            txt_total_dep = f"{somme_depenses:,.0f}".replace(",", " ")
+            txt_total_ben = f"{somme_benefices:,.0f}".replace(",", " ")
+            
             roi_global_entreprise = (somme_benefices / somme_depenses) * 100 if somme_depenses > 0 else 0
             
             c_st1, c_st2, c_st3, c_st4 = st.columns(4)
@@ -457,8 +463,7 @@ with onglet3:
         sub_tab1, sub_tab2, sub_tab3, sub_tab4 = st.tabs([
             "🏗️ Ajouter un Modèle de Chantier", "👥 Éditer Grille Salariale", "🧱 Éditer Prix Matériaux", "🚜 Éditer Catalogue Engins"
         ])
-
-        # 4.1 FORMULAIRE SECRETS : AJOUTER UN MODÈLE DE CHANTIER COMPLET
+        
         with sub_tab1:
             st.write("Créez ici un chantier type. Il apparaîtra instantanément dans le menu déroulant de l'Onglet 1.")
             with st.form("form_nouveau_modele", clear_on_submit=True):
@@ -487,48 +492,6 @@ with onglet3:
                     
                 m_engins_json = st.text_area("Étapes d'Engins requis (JSON) :", value="[]")
                 
-                # Alignement strict du bouton de validation à 16 espaces à l'intérieur du formulaire
-                if st.form_submit_button("SAUVEGARDER LE MODÈLE"):
-                    if not m_nom:
-                        st.error("Donnez un nom au modèle.")
-                    else:
-                        try:
-                            json.loads(m_engins_json)
-                            conn = sqlite3.connect(DB_NAME)
-                            cursor = conn.cursor()
-                            cursor.execute("""
-                                INSERT OR REPLACE INTO modeles_chantiers VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                            """, (m_nom, m_rev, m_j, m_sable, m_terre, m_enrobe, m_armature, m_tole, m_beton, m_panneaux, m_tuyaux, m_canal, m_poutres, m_chef, m_ouvrier, m_cond, m_engins_json))
-                            conn.commit()
-                            conn.close()
-                            st.success(f"Modèle '{m_nom}' ajouté ! Rafraîchissement...")
-                            st.rerun()
-                        except ValueError:
-                            st.error("Le format des étapes JSON est invalide.")
-
-
-        with sub_tab2:
-            st.write("Modifiez le coût d'une journée de travail.")
-            conn = sqlite3.connect(DB_NAME)
-            df_salaires = pd.read_sql_query("SELECT * FROM configuration_salaires", conn)
-            conn.close()
-            salaires_edites = st.data_editor(df_salaires, use_container_width=True, key="editeur_salaires_db", num_rows="fixed")
-            if st.button("METTRE À JOUR LA GRILLE SALARIALE"):
-                conn = sqlite3.connect(DB_NAME)
-                cursor = conn.cursor()
-                for _, r in salaires_edites.iterrows():
-                    cursor.execute("UPDATE configuration_salaires SET tarif_jour = ? WHERE poste = ?", (float(r["tarif_jour"]), str(r["poste"])))
-                conn.commit()
-                conn.close()
-                st.success("Grille salariale enregistrée !")
-                st.rerun()
-
-        with sub_tab3:
-            st.write("Ajustez le prix unitaire de vos matières premières.")
-            conn = sqlite3.connect(DB_NAME)
-            df_mats = pd.read_sql_query("SELECT * FROM configuration_materiaux", conn)
-            conn.close()
-            mats_edites = st.data_editor(df_mats, use_container_width=True, key="editeur_mats_db", num_rows="fixed")
                 if st.form_submit_button("SAUVEGARDER LE MODÈLE"):
                     if not m_nom:
                         st.error("Donnez un nom au modèle.")
