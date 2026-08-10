@@ -529,18 +529,18 @@ with onglet2:
         elif critere_tri == "Plus de revenus d'abord":
             df_affichage = df_affichage.sort_values(by="Revenus (€)", ascending=False)
             
-        # --- CONFIGURATION AVEC SÉPARATEUR D'ESPACE POUR LES MILLIERS ---
+        # --- APPLICATION STRICTE DE L'ESPACE SÉPARATEUR DE MILLIERS ---
         st.dataframe(
             df_affichage, use_container_width=True,
             column_config={
-                "Revenus (€)": st.column_config.NumberColumn(format="%,d €"),
+                "Revenus (€)": st.column_config.NumberColumn(format="%.0f €"),
                 "Durée (Jours)": st.column_config.NumberColumn(format="%d j"),
-                "Coût Matériaux (€)": st.column_config.NumberColumn(format="%,d €"),
-                "Coût Location Engins (€)": st.column_config.NumberColumn(format="%,d €"),
-                "Coût Salaires (€)": st.column_config.NumberColumn(format="%,d €"),
-                "Dépenses Totales (€)": st.column_config.NumberColumn(format="%,d €"),
-                "Bénéfice Net (€)": st.column_config.NumberColumn(format="%,d €"),
-                "Gain / Jour (€)": st.column_config.NumberColumn(format="%,d €/j"),
+                "Coût Matériaux (€)": st.column_config.NumberColumn(format="%.0f €"),
+                "Coût Location Engins (€)": st.column_config.NumberColumn(format="%.0f €"),
+                "Coût Salaires (€)": st.column_config.NumberColumn(format="%.0f €"),
+                "Dépenses Totales (€)": st.column_config.NumberColumn(format="%.0f €"),
+                "Bénéfice Net (€)": st.column_config.NumberColumn(format="%.0f €"),
+                "Gain / Jour (€)": st.column_config.NumberColumn(format="%.0f €/j"),
                 "ROI (%)": st.column_config.NumberColumn(format="%.2f %%"),
             }
         )
