@@ -553,7 +553,8 @@ with onglet2:
     if df_affichage.empty:
         st.info("Aucun chantier n'a encore été enregistré.")
     else:
-        critere_tri = st.selectbox("Classer les chantiers par ordre de rentabilité :", ["Plus gros Bénéfice d'abord", "Plus gros ROI d'abord", "Plus de revenus d'abord"])
+        # Menu déroulant de tri par défaut (conservé pour le premier chargement)
+        critere_tri = st.selectbox("Classement initial par défaut :", ["Plus gros Bénéfice d'abord", "Plus gros ROI d'abord", "Plus de revenus d'abord"])
         if critere_tri == "Plus gros Bénéfice d'abord":
             df_affichage = df_affichage.sort_values(by="Bénéfice Net (€)", ascending=False)
         elif critere_tri == "Plus gros ROI d'abord":
@@ -578,31 +579,35 @@ with onglet2:
         df_visuel["Comparaison Moyenne Enterprise"] = df_visuel.apply(calculer_comparaison, axis=1)
         st.info(f"📊 **Moyenne de rentabilité journalière de l'entreprise :** {moyenne_roi_jour:.2f} %/j (Calculée sur {len(df_affichage)} chantier(s))")
 
-        # --- FORMATEUR DE SCANNABILITÉ VISUELLE DES MILLIERS ---
-        colonnes_monetaires = [
-            "Revenus (€)", "Coût Matériaux (€)", "Coût Location Engins (€)", 
-            "Coût Salaires (€)", "Dépenses Totales (€)", "Bénéfice Net (€)"
-        ]
-        
-        for col in colonnes_monetaires:
-            df_visuel[col] = df_visuel[col].apply(lambda x: f"{float(x):,.0f}".replace(",", " ") + " €" if pd.notnull(x) else "0 €")
-            
-        df_visuel["Durée (Jours)"] = df_visuel["Durée (Jours)"].apply(lambda x: f"{int(x)} j" if pd.notnull(x) else "0 j")
-        df_visuel["Gain / Jour (€)"] = df_visuel["Gain / Jour (€)"].apply(lambda x: f"{float(x):,.0f}".replace(",", " ") + " €/j" if pd.notnull(x) else "0 €/j")
-        df_visuel["ROI (%)"] = df_visuel["ROI (%)"].apply(lambda x: f"{float(x):.2f} %" if pd.notnull(x) else "0.00 %")
-        df_visuel["ROI / Jour (%)"] = df_visuel["ROI / Jour (%)"].apply(lambda x: f"{float(x):.2f} %/j" if pd.notnull(x) else "0.00 %/j")
-        
-        # Réorganisation et sélection des colonnes cibles
+        # Réorganisation de l'ordre des colonnes cibles
         cols_ordre = [
-            "Nom du Chantier", "Revenus (€)", "Durée (Jours)", "Dépenses Totales (€)", 
+            "Nom du Chantier", "Revenus (€)", "Durée (Jours)", "Coût Matériaux (€)", 
+            "Coût Location Engins (€)", "Coût Salaires (€)", "Dépenses Totales (€)", 
             "Bénéfice Net (€)", "Gain / Jour (€)", "ROI (%)", "ROI / Jour (%)", "Comparaison Moyenne Enterprise"
         ]
         df_visuel = df_visuel[[c for c in cols_ordre if c in df_visuel.columns]]
 
-        # Rendu de la grille
-        st.dataframe(df_visuel, use_container_width=True)
+        # --- CONFIGURATION DU FORMAT DE COLONNE AVEC TRI CLICQUABLE ACTIVER ---
+        # Le format "%,d" ajoute un espace automatique tous les 3 chiffres selon la langue française locale
+        st.dataframe(
+            df_visuel, 
+            use_container_width=True,
+            column_config={
+                "Nom du Chantier": st.column_config.TextColumn("Nom du Chantier"),
+                "Revenus (€)": st.column_config.NumberColumn("Revenus (€)", format="%,d €"),
+                "Durée (Jours)": st.column_config.NumberColumn("Durée", format="%d j"),
+                "Coût Matériaux (€)": st.column_config.NumberColumn("Matériaux", format="%,d €"),
+                "Coût Location Engins (€)": st.column_config.NumberColumn("Location Engins", format="%,d €"),
+                "Coût Salaires (€)": st.column_config.NumberColumn("Salaires", format="%,d €"),
+                "Dépenses Totales (€)": st.column_config.NumberColumn("Dépenses Totales", format="%,d €"),
+                "Bénéfice Net (€)": st.column_config.NumberColumn("Bénéfice Net (€)", format="%,d €"),
+                "Gain / Jour (€)": st.column_config.NumberColumn("Gain / Jour", format="%,d €/j"),
+                "ROI (%)": st.column_config.NumberColumn("ROI (%)", format="%.2f %%"),
+                "ROI / Jour (%)": st.column_config.NumberColumn("ROI / Jour", format="%.2f %%/j"),
+                "Comparaison Moyenne Enterprise": st.column_config.TextColumn("Comparaison Moyenne")
+            }
+        )
         
-        # Options d'export et d'administration de la BDD
         csv = df_affichage.to_csv(index=False).encode('utf-8')
         st.download_button(label="📥 Télécharger la base de données (CSV)", data=csv, file_name="base_donnies_chantiers.csv", mime="text/csv")
         st.markdown("---")
