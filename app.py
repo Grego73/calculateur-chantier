@@ -351,15 +351,14 @@ with onglet1:
         cond_mensuel = st.number_input("Salaire mensuel Conducteur (€) :", value=1571)
         jh_cond = st.number_input("Total Jours-Homme Conducteur :", value=donnees_modele["jh_cond"])
 
-        # --- TABLE DES ENGINS NÉCESSAIRES (SIMPLIFIÉE) ---
+        # --- TABLE DES ENGINS NÉCESSAIRES (NETTOYÉE ET DÉCOCHÉE PAR DÉFAUT) ---
         st.markdown("### --- TABLE DES ENGINS NÉCESSAIRES ---")
-        st.caption("📋 Cochez les engins à louer pour les transférer automatiquement dans le tableau des coûts réels ci-dessous.")
+        st.caption("📋 Cochez uniquement les engins que vous devez louer pour ce chantier. Les machines que vous possédez déjà peuvent rester décochées.")
         
-        # Nettoyage des données du modèle pour ne garder que Type, Niveau et la case à cocher
         engins_bruts_modele = []
         if "engins_requis" in donnees_modele and len(donnees_modele["engins_requis"]) > 0:
             for item in donnees_modele["engins_requis"]:
-                # On extrait proprement le niveau (ex: N1, N2, N3) depuis le texte original
+                # Extraction du niveau requis (N1, N2, N3, N4)
                 phase_texte = item.get("Usage / Spécification attendue", "")
                 niveau_detecte = "N1"
                 if "N2" in phase_texte or "niveau 2" in phase_texte:
@@ -369,20 +368,18 @@ with onglet1:
                 elif "N4" in phase_texte or "niveau 4" in phase_texte:
                     niveau_detecte = "N4"
                 
-                # Détermination du statut de la case à cocher selon l'ancien statut
-                deja_a_louer = item.get("Statut Validation", "") == "🔴 À louer"
-                
+                # CORRECTION : Strictement TOUTES les cases sont décochées (False) au départ
                 engins_bruts_modele.append({
                     "Type d'engin requis": item.get("Type d'engin requis", "Pelleteuses"),
                     "Niveau requis": niveau_detecte,
-                    "À louer ?": deja_a_louer
+                    "À louer ?": False
                 })
         
         df_besoins_init = pd.DataFrame(engins_bruts_modele)
         if df_besoins_init.empty:
             df_besoins_init = pd.DataFrame(columns=["Type d'engin requis", "Niveau requis", "À louer ?"])
         
-        # Éditeur pour la table des besoins avec case à cocher
+        # Affichage de la table des besoins
         engins_necessaires = st.data_editor(
             df_besoins_init,
             num_rows="dynamic",
@@ -395,21 +392,18 @@ with onglet1:
             }
         )
 
-        # --- LOGIQUE DE TRANSFERT ET ENVOI DANS LA TABLE DES ENGINS À LOUER ---
+        # --- LOGIQUE DE TRANSFERT VERS LA TABLE DES ENGINS À LOUER ---
         engins_transferes_list = []
         if not engins_necessaires.empty:
-            # On filtre uniquement les lignes cochées "À louer ?"
             df_coches = engins_necessaires[engins_necessaires["À louer ?"] == True].dropna(subset=["Type d'engin requis"])
             
             for _, row in df_coches.iterrows():
                 type_demande = row["Type d'engin requis"]
                 niveau_demande = row["Niveau requis"]
                 
-                # Recherche du premier modèle correspondant à ce type et à ce niveau dans notre catalogue d'engins réels
                 modele_trouve = None
-                prix_trouve = 380 # Valeur de secours par défaut si rien n'est trouvé
+                prix_trouve = 380
                 
-                # Dictionnaires de correspondance pour uniformiser les textes du catalogue
                 cle_recherche_1 = f"{type_demande[:-1] if type_demande.endswith('s') else type_demande} {niveau_demande}"
                 cle_recherche_2 = f"{type_demande} {niveau_demande}"
                 
@@ -419,7 +413,6 @@ with onglet1:
                         prix_trouve = prix
                         break
                 
-                # Si aucun modèle spécifique n'est trouvé pour ce niveau, on prend le premier disponible de la catégorie
                 if not modele_trouve:
                     for engin_nom, prix in CATALOGUE_ENGINS.items():
                         if type_demande.lower() in engin_nom.lower() or type_demande[:-1].lower() in engin_nom.lower():
@@ -427,7 +420,6 @@ with onglet1:
                             prix_trouve = prix
                             break
                 
-                # Si on a trouvé une machine, on l'ajoute à la liste de pré-remplissage
                 if modele_trouve:
                     engins_transferes_list.append({
                         "Sélection de l'engin / Modèle": modele_trouve,
@@ -440,7 +432,6 @@ with onglet1:
         st.markdown("### --- TABLE DES ENGINS À LOUER ---")
         st.caption("🔗 Les machines cochées ci-dessus apparaissent ici avec leur prix. Vous pouvez ajuster les quantités ou les jours.")
         
-        # Fusionner les engins transférés automatiquement et les lignes vides éditables
         df_engins_init = pd.DataFrame(engins_transferes_list)
         if df_engins_init.empty:
             df_engins_init = pd.DataFrame(columns=["Sélection de l'engin / Modèle", "Quantité", "Prix Location (€/jour)", "Jours de Location"])
