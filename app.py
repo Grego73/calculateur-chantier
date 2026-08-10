@@ -464,51 +464,70 @@ with onglet3:
             "🏗️ Ajouter un Modèle de Chantier", "👥 Éditer Grille Salariale", "🧱 Éditer Prix Matériaux", "🚜 Éditer Catalogue Engins"
         ])
         
+        # --- 4.1 NOUVELLE GRILLE D'IMPORTATION EN MASSE ---
         with sub_tab1:
-            st.write("Créez ici un chantier type. Il apparaîtra instantanément dans le menu déroulant de l'Onglet 1.")
-            with st.form("form_nouveau_modele", clear_on_submit=True):
-                m_nom = st.text_input("Nom unique du modèle de chantier :", placeholder="ex: Parking public")
-                m_rev = st.number_input("Revenus par défaut (€) :", min_value=0.0, value=50000.0)
-                m_j = st.number_input("Durée totale par défaut (jours) :", min_value=1, value=10)
-                
-                col_m1, col_m2 = st.columns(2)
-                with col_m1:
-                    st.write("**Quantités Matériaux de base :**")
-                    m_sable = st.number_input("T. Sable :", value=0.0)
-                    m_terre = st.number_input("T. Terre :", value=0.0)
-                    m_enrobe = st.number_input("T. Enrobé :", value=0.0)
-                    m_armature = st.number_input("U. Armature :", value=0.0)
-                    m_tole = st.number_input("U. Tôle :", value=0.0)
-                    m_beton = st.number_input("T. Béton :", value=0.0)
-                    m_panneaux = st.number_input("U. Panneaux :", value=0.0)
-                    m_tuyaux = st.number_input("U. Tuyaux :", value=0.0)
-                    m_canal = st.number_input("U. Canalisations :", value=0.0)
-                    m_poutres = st.number_input("U. Poutres :", value=0.0)
-                with col_m2:
-                    st.write("**Besoins en Équipes (Jours-Homme) :**")
-                    m_chef = st.number_input("JH Chef :", value=0.0)
-                    m_ouvrier = st.number_input("JH Ouvrier :", value=0.0)
-                    m_cond = st.number_input("JH Conducteur :", value=0.0)
+            st.markdown("### 📋 Tableau d'importation en masse de modèles")
+            st.write("Ajoutez ou collez autant de lignes que vous le souhaitez dans le tableau ci-dessous pour configurer plusieurs chantiers d'un coup.")
+            
+            # Création de la structure du tableau d'importation par défaut
+            df_import_init = pd.DataFrame([{
+                "Nom Unique Chantier": "Nom du Chantier Exemple",
+                "Revenus (€)": 150000.0, "Durée (jours)": 10,
+                "T. Sable": 0.0, "T. Terre": 0.0, "T. Enrobé": 0.0, "U. Armature": 0.0, "U. Tôle": 0.0,
+                "T. Béton": 0.0, "U. Panneaux": 0.0, "U. Tuyaux": 0.0, "U. Canalisations": 0.0, "U. Poutres": 0.0,
+                "JH Chef": 10.0, "JH Ouvrier": 20.0, "JH Conducteur": 10.0,
+                "Étapes Engins (JSON requis - ex: [])": "[]"
+            }])
+            
+            # Éditeur de données en bloc
+            grille_import = st.data_editor(
+                df_import_init,
+                num_rows="dynamic",
+                use_container_width=True,
+                key="editeur_import_bloc"
+            )
+            
+            if st.button("🚨 ENREGISTRER TOUT LE TABLEAU EN BASE DE DONNÉES", type="primary"):
+                if grille_import.empty:
+                    st.error("Le tableau est vide.")
+                else:
+                    conn = sqlite3.connect(DB_NAME)
+                    cursor = conn.cursor()
+                    compteur_succes = 0
+                    format_erreur = False
                     
-                m_engins_json = st.text_area("Étapes d'Engins requis (JSON) :", value="[]")
-                
-                if st.form_submit_button("SAUVEGARDER LE MODÈLE"):
-                    if not m_nom:
-                        st.error("Donnez un nom au modèle.")
-                    else:
+                    for _, r in grille_import.iterrows():
+                        nom_m = str(r["Nom Unique Chantier"]).strip()
+                        # On passe la ligne d'exemple par défaut
+                        if not nom_m or nom_m == "Nom du Chantier Exemple":
+                            continue
+                            
+                        # Vérification de sécurité du format JSON pour les étapes d'engins
+                        json_txt = str(r["Étapes Engins (JSON requis - ex: [])"]).strip()
                         try:
-                            json.loads(m_engins_json)
-                            conn = sqlite3.connect(DB_NAME)
-                            cursor = conn.cursor()
-                            cursor.execute("""
-                                INSERT OR REPLACE INTO modeles_chantiers VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                            """, (m_nom, m_rev, m_j, m_sable, m_terre, m_enrobe, m_armature, m_tole, m_beton, m_panneaux, m_tuyaux, m_canal, m_poutres, m_chef, m_ouvrier, m_cond, m_engins_json))
-                            conn.commit()
-                            conn.close()
-                            st.success(f"Modèle '{m_nom}' ajouté ! Rafraîchissement...")
-                            st.rerun()
+                            json.loads(json_txt)
                         except ValueError:
-                            st.error("Le format des étapes JSON est invalide.")
+                            format_erreur = True
+                            st.error(f"❌ Erreur de format JSON sur la ligne du chantier '{nom_m}'. Utilisez '[]' si vous n'avez pas d'étapes.")
+                            continue
+                        
+                        # Insertion ou écrasement en BDD
+                        cursor.execute("""
+                            INSERT OR REPLACE INTO modeles_chantiers VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (
+                            nom_m, float(r["Revenus (€)"]), int(r["Durée (jours)"]),
+                            float(r["T. Sable"]), float(r["T. Terre"]), float(r["T. Enrobé"]), float(r["U. Armature"]), float(r["U. Tôle"]),
+                            float(r["T. Béton"]), float(r["U. Panneaux"]), float(r["U. Tuyaux"]), float(r["U. Canalisations"]), float(r["U. Poutres"]),
+                            float(r["JH Chef"]), float(r["JH Ouvrier"]), float(r["JH Conducteur"]), json_txt
+                        ))
+                        compteur_succes += 1
+                        
+                    conn.commit()
+                    conn.close()
+                    
+                    if compteur_succes > 0:
+                        st.success(f"🟢 Fin de l'opération : {compteur_succes} modèle(s) de chantier ont été injectés avec succès !")
+                        st.rerun()
 
         with sub_tab2:
             st.write("Modifiez le coût d'une journée de travail.")
