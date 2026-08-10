@@ -528,17 +528,23 @@ with onglet3:
             df_mats = pd.read_sql_query("SELECT * FROM configuration_materiaux", conn)
             conn.close()
             mats_edites = st.data_editor(df_mats, use_container_width=True, key="editeur_mats_db", num_rows="fixed")
-            if st.button("METTRE À JOUR LE COÛT DES MATÉRIAUX"):
-                conn = sqlite3.connect(DB_NAME)
-                cursor = conn.cursor()
-                for _, r in mats_edites.iterrows():
-                    cursor.execute("UPDATE configuration_materiaux SET prix_unitaire = ? WHERE materiau = ?", (float(r["prix_unitaire"]), str(r["materiau"])))
-                conn.commit()
-                conn.close()
-                st.success(f"Modèle '{m_nom}' ajouté ! Rafraîchissement...")
-                st.rerun()
-            except ValueError: 
-                st.error("Le format des étapes JSON est invalide.")
+                if st.form_submit_button("SAUVEGARDER LE MODÈLE"):
+                    if not m_nom:
+                        st.error("Donnez un nom au modèle.")
+                    else:
+                        try:
+                            json.loads(m_engins_json)
+                            conn = sqlite3.connect(DB_NAME)
+                            cursor = conn.cursor()
+                            cursor.execute("""
+                                INSERT OR REPLACE INTO modeles_chantiers VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            """, (m_nom, m_rev, m_j, m_sable, m_terre, m_enrobe, m_armature, m_tole, m_beton, m_panneaux, m_tuyaux, m_canal, m_poutres, m_chef, m_ouvrier, m_cond, m_engins_json))
+                            conn.commit()
+                            conn.close()
+                            st.success(f"Modèle '{m_nom}' ajouté ! Rafraîchissement...")
+                            st.rerun()
+                        except ValueError:
+                            st.error("Le format des étapes JSON est invalide.")
 
         with sub_tab2:
             st.write("Modifiez le coût d'une journée de travail.")
@@ -592,4 +598,3 @@ with onglet3:
                 
     elif mot_de_passe != "":
         st.error("🔒 Code d'accès incorrect. Les données financières consolidées restent verrouillées.")
-
