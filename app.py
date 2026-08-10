@@ -430,7 +430,7 @@ with onglet2:
             reinitialiser_db()
             st.rerun()
 
-# --- PANNEAU D'ADMINISTRATION CENTRAL ET SUPRÊME ---
+# --- PANNEAU DE CONTRÔLE SUPRÊME (🔒 ESPACE DIRECTION) ---
 with onglet3:
     st.subheader("🔑 Connexion Administrateur Direction")
     mot_de_passe = st.text_input("Veuillez saisir le code d'accès :", type="password")
@@ -460,147 +460,20 @@ with onglet3:
             st.markdown("---")
 
         st.markdown("## ⚙️ Administration Suprême des Bases")
-        sub_tab1, sub_tab2, sub_tab3, sub_tab4 = st.tabs([
-            "🏗️ Ajouter un Modèle de Chantier", "👥 Éditer Grille Salariale", "🧱 Éditer Prix Matériaux", "🚜 Éditer Catalogue Engins"
+        
+        # AJOUT DE LA 5ÈME SECTION DANS LES TABS CI-DESSOUS
+        sub_tab1, sub_tab2, sub_tab3, sub_tab4, sub_tab5 = st.tabs([
+            "🏗️ Saisie Multi-Chantiers en Bloc", 
+            "👥 Éditer Grille Salariale", 
+            "🧱 Éditer Prix Matériaux", 
+            "🚜 Éditer Catalogue Engins",
+            "🗂️ Consulter les Bases Données"
         ])
         
-        # --- 4.1 LES SYSTÈMES D'IMPORTATIONS ---
+        # --- 4.1 GRILLE D'IMPORTATION EN MASSE ---
         with sub_tab1:
-            st.markdown("### 📥 1. Importation Rapide (Copier / Coller du Texte Brut)")
-            st.caption("Collez votre liste de chantiers brute directement ci-dessous. Le système va extraire automatiquement les noms et les prix.")
-            
-            # Zone de texte libre pour coller votre liste directement
-            texte_brut_colle = st.text_area(
-                "Collez votre liste ici (Une ligne par chantier, ex: Nom du chantier   12 500 euros) :",
-                value="",
-                height=300,
-                placeholder="Pose de panneaux de signalisation\t5 700 euros\nCompacter (niveau 2)\t2 916 euros"
-            )
-            
-            if st.button("🚀 ANALYSER ET INJECTER LA LISTE COLLÉE", type="primary"):
-                if not texte_brut_colle.strip():
-                    st.error("❌ La zone de texte est vide. Veuillez y coller vos chantiers.")
-                else:
-                    conn = sqlite3.connect(DB_NAME)
-                    cursor = conn.cursor()
-                    compteur_colle = 0
-                    
-                    # Découpage du texte ligne par ligne
-                    lignes = texte_brut_colle.split("\n")
-                    
-                    for ligne in lignes:
-                        ligne_clean = ligne.strip()
-                        if not ligne_clean:
-                            continue
-                        
-                        # --- ALGORITHME D'EXTRACTION INTELLIGENTE ---
-                        # On cherche le prix à la fin de la ligne en partant de la droite
-                        mots = ligne_clean.split()
-                        
-                        # Nettoyage des mots liés au prix à la fin
-                        mots_propres = []
-                        for m in mots:
-                            m_low = m.lower()
-                            if m_low not in ["euros", "euro", "€"]:
-                                mots_propres.append(m)
-                                
-                        if len(mots_propres) >= 2:
-                            # Tentative de reconstruction du prix (on teste si les derniers éléments forment un nombre)
-                            # Cas où le prix est séparé par un espace (ex: "5" "700")
-                            prix_poten_1 = mots_propres[-1]
-                            prix_poten_2 = mots_propres[-2] if len(mots_propres) > 2 else ""
-                            
-                            # Nettoyage des caractères non numériques
-                            p1_clean = "".join(c for c in prix_poten_1 if c.isdigit() or c == ".")
-                            p2_clean = "".join(c for c in prix_poten_2 if c.isdigit() or c == ".")
-                            
-                            # On teste si les deux derniers blocs forment le prix (ex: 165 et 360)
-                            try:
-                                if p2_clean and p1_clean and len(p1_clean) == 3: # Souvent le cas pour les milliers (ex: 360)
-                                    revenus_clean = float(p2_clean + p1_clean)
-                                    nom_chantier_clean = " ".join(mots_propres[:-2])
-                                else:
-                                    revenus_clean = float(p1_clean)
-                                    nom_chantier_clean = " ".join(mots_propres[:-1])
-                            except ValueError:
-                                # Repli basique si l'assemblage échoue
-                                try:
-                                    revenus_clean = float(p1_clean)
-                                    nom_chantier_clean = " ".join(mots_propres[:-1])
-                                except ValueError:
-                                    revenus_clean = 0.0
-                                    nom_chantier_clean = ligne_clean
-                            
-                            # Si le nom extrait est vide, on saute la ligne
-                            if not nom_chantier_clean.strip():
-                                continue
-                                
-                            # Injection automatique en base de données
-                            cursor.execute("""
-                                INSERT OR REPLACE INTO modeles_chantiers VALUES (NULL, ?, ?, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '[]')
-                            """, (nom_chantier_clean.strip(), revenus_clean))
-                            compteur_colle += 1
-                    
-                    conn.commit()
-                    conn.close()
-                    
-                    if compteur_colle > 0:
-                        st.success(f"🟢 Extraction réussie ! {compteur_colle} chantiers ont été détectés, nettoyés et injectés dans votre catalogue ! Rafraîchissement...")
-                        st.rerun()
-                    else:
-                        st.warning("⚠️ Aucun chantier valide n'a pu être extrait. Vérifiez le format du texte.")
-
-            st.markdown("---")
-            st.markdown("### 📂 2. Importation Avancée (Format Complet Multi-Critères)")
-            st.caption("Cette option permet de charger un fichier contenant toutes les colonnes techniques détaillées (Sable, Béton, Jours-Homme, JSON...).")
-            
-            fichier_complet = st.file_uploader("Déposer un fichier Complet Détallé (.xlsx ou .csv) :", type=["xlsx", "csv"], key="importateur_format_complet")
-            
-            if fichier_complet is not None:
-                try:
-                    if fichier_complet.name.endswith(".csv"):
-                        df_complet = pd.read_csv(fichier_complet)
-                    else:
-                        df_complet = pd.read_excel(fichier_complet)
-                    
-                    colonnes_obligatoires = ["Nom Unique Chantier", "Revenus (€)", "Durée (jours)"]
-                    if not all(col in df_complet.columns for col in colonnes_obligatoires):
-                        st.error("❌ Le fichier avancé doit contenir les colonnes exactes : 'Nom Unique Chantier', 'Revenus (€)' et 'Durée (jours)'.")
-                    else:
-                        conn = sqlite3.connect(DB_NAME)
-                        cursor = conn.cursor()
-                        compteur_c = 0
-                        
-                        for _, r in df_complet.iterrows():
-                            nom_m = str(r.get("Nom Unique Chantier", "")).strip()
-                            if not nom_m or nom_m.lower() in ["nan", "none"]:
-                                continue
-                            
-                            json_txt = str(r.get("Étapes Engins (JSON requis - ex: [])", "[]")).strip()
-                            try:
-                                json.loads(json_txt)
-                            except ValueError:
-                                json_txt = "[]"
-                            
-                            cursor.execute("""
-                                INSERT OR REPLACE INTO modeles_chantiers VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                            """, (
-                                nom_m, float(r.get("Revenus (€)", 0.0)), int(r.get("Durée (jours)", 0)),
-                                float(r.get("T. Sable", 0.0)), float(r.get("T. Terre", 0.0)), float(r.get("T. Enrobé", 0.0)), float(r.get("U. Armature", 0.0)), float(r.get("U. Tôle", 0.0)),
-                                float(r.get("T. Béton", 0.0)), float(r.get("U. Panneaux", 0.0)), float(r.get("U. Tuyaux", 0.0)), float(r.get("U. Canalisations", 0.0)), float(r.get("U. Poutres", 0.0)),
-                                float(r.get("JH Chef", 0.0)), float(r.get("JH Ouvrier", 0.0)), float(r.get("JH Conducteur", 0.0)), json_txt
-                            ))
-                            compteur_c += 1
-                            
-                        conn.commit()
-                        conn.close()
-                        st.success(f"🟢 Importation avancée réussie : {compteur_c} chantiers configurés en base ! Rechargement...")
-                        st.rerun()
-                except Exception as e:
-                    st.error(f"❌ Erreur lors de l'analyse du fichier complet : {e}")
-
-            st.markdown("---")
-            st.write("📝 **Option 3 : Saisir manuellement ou coller dans la grille ci-dessous**")
+            st.markdown("### 📋 Tableau d'importation en masse de modèles")
+            st.write("Ajoutez ou collez autant de lignes que vous le souhaitez dans le tableau ci-dessous pour configurer plusieurs chantiers d'un coup.")
             
             df_import_init = pd.DataFrame([{
                 "Nom Unique Chantier": "Nom du Chantier Exemple", "Revenus (€)": 150000.0, "Durée (jours)": 10,
@@ -639,6 +512,7 @@ with onglet3:
                         st.success(f"🟢 Fin de l'opération : {compteur_succes} modèle(s) injecté(s) !")
                         st.rerun()
 
+        # --- 4.2 CONFIGURATION GRILLE SALARIALE ---
         with sub_tab2:
             st.write("Modifiez le coût d'une journée de travail.")
             conn = sqlite3.connect(DB_NAME)
@@ -655,6 +529,7 @@ with onglet3:
                 st.success("Grille salariale enregistrée !")
                 st.rerun()
 
+        # --- 4.3 CONFIGURATION DES MATÉRIAUX ---
         with sub_tab3:
             st.write("Ajustez le prix unitaire de vos matières premières.")
             conn = sqlite3.connect(DB_NAME)
@@ -671,6 +546,7 @@ with onglet3:
                 st.success("Catalogue des tarifs matériaux actualisé !")
                 st.rerun()
 
+        # --- 4.4 CATALOGUE DE MACHINES ---
         with sub_tab4:
             st.write("Ajoutez ou modifiez vos engins lourds et leurs tarifs de location.")
             conn = sqlite3.connect(DB_NAME)
@@ -688,6 +564,37 @@ with onglet3:
                 conn.close()
                 st.success("Parc d'engins synchronisé !")
                 st.rerun()
+
+        # --- 4.5 VISUALISATION ET LECTURE DE TOUTES LES TABLES INSCRITES (NOUVEAU) ---
+        with sub_tab5:
+            st.markdown("### 🗂️ Consultation brute des tables enregistrées en base")
+            st.write("Sélectionnez la base de données spécifique que vous souhaitez inspecter en temps réel :")
+            
+            choix_table = st.selectbox(
+                "Choisir la table à afficher :",
+                ["Modèles de Chantiers Pré-configurés", "Grille Salariale Actuelle", "Prix des Matériaux de base", "Catalogue de Location des Engins"]
+            )
+            
+            conn = sqlite3.connect(DB_NAME)
+            if choix_table == "Modèles de Chantiers Pré-configurés":
+                df_table_brute = pd.read_sql_query("SELECT id, nom_modele AS 'Nom du Modèle', revenus AS 'Budget (€)', jours AS 'Durée (j)', jh_chef AS 'JH Chef', jh_ouvrier AS 'JH Ouvrier', jh_cond AS 'JH Conducteur' FROM modeles_chantiers", conn)
+                st.markdown(f"**Total : {len(df_table_brute)} modèles enregistrés**")
+                st.dataframe(df_table_brute, use_container_width=True)
+                
+            elif choix_table == "Grille Salariale Actuelle":
+                df_table_brute = pd.read_sql_query("SELECT poste AS 'Poste', tarif_jour AS 'Tarif (€/jour)' FROM configuration_salaires", conn)
+                st.dataframe(df_table_brute, use_container_width=True)
+                
+            elif choix_table == "Prix des Matériaux de base":
+                df_table_brute = pd.read_sql_query("SELECT materiau AS 'Matériau / Fournitures', prix_unitaire AS 'Tarif Unitaire (€)' FROM configuration_materiaux", conn)
+                st.dataframe(df_table_brute, use_container_width=True)
+                
+            elif choix_table == "Catalogue de Location des Engins":
+                df_table_brute = pd.read_sql_query("SELECT nom_engin AS 'Modèle Engin Extrait', type_brut AS 'Catégorie Technique', prix_jour AS 'Prix Location (€/jour)' FROM catalogue_engins", conn)
+                st.markdown(f"**Total : {len(df_table_brute)} machines prêtes dans le parc**")
+                st.dataframe(df_table_brute, use_container_width=True)
+            conn.close()
                 
     elif mot_de_passe != "":
+
         st.error("🔒 Code d'accès incorrect. Les données financières consolidées restent verrouillées.")
