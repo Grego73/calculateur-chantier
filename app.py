@@ -464,28 +464,120 @@ with onglet3:
             "🏗️ Ajouter un Modèle de Chantier", "👥 Éditer Grille Salariale", "🧱 Éditer Prix Matériaux", "🚜 Éditer Catalogue Engins"
         ])
         
-        # --- 4.1 NOUVELLE GRILLE D'IMPORTATION EN MASSE ---
+        # --- 4.1 LES DEUX SYSTEMES D'IMPORTATIONS DE FICHIERS ---
         with sub_tab1:
-            st.markdown("### 📋 Tableau d'importation en masse de modèles")
-            st.write("Ajoutez ou collez autant de lignes que vous le souhaitez dans le tableau ci-dessous pour configurer plusieurs chantiers d'un coup.")
+            st.markdown("### 📥 1. Importation Simplifiée (Format Rapide : Nom & Prix)")
+            st.caption("Cette option permet d'injecter en masse des listes de chantiers contenant uniquement le Nom et le Prix (ex: Pose de panneaux | 5 700 euros). Les autres valeurs seront mises à 0.")
             
-            # Création de la structure du tableau d'importation par défaut
+            # Bouton de chargement dédié à la liste simple
+            fichier_rapide = st.file_uploader("Déposer un fichier Nom & Prix (.xlsx ou .csv) :", type=["xlsx", "csv"], key="importateur_format_rapide")
+            
+            if fichier_rapide is not None:
+                try:
+                    if fichier_rapide.name.endswith(".csv"):
+                        df_rapide = pd.read_csv(fichier_rapide)
+                    else:
+                        df_rapide = pd.read_excel(fichier_rapide)
+                    
+                    # On renomme ou force la détection des deux premières colonnes peu importe leur nom exact
+                    if len(df_rapide.columns) < 2:
+                        st.error("❌ Le fichier doit contenir au moins 2 colonnes (la première pour le Nom, la deuxième pour le Prix).")
+                    else:
+                        col_nom = df_rapide.columns[0]
+                        col_prix = df_rapide.columns[1]
+                        
+                        conn = sqlite3.connect(DB_NAME)
+                        cursor = conn.cursor()
+                        compteur_r = 0
+                        
+                        for _, r in df_rapide.iterrows():
+                            nom_brut = str(r[col_nom]).strip()
+                            if not nom_brut or nom_brut.lower() in ["nan", "none", "nom du chantier"]:
+                                continue
+                            
+                            # Nettoyage chirurgical du prix (retrait des espaces, du mot euros, etc.)
+                            prix_brut = str(r[col_prix]).lower()
+                            prix_clean = prix_brut.replace("euros", "").replace("euro", "").replace("€", "")
+                            # Supprime tous les espaces cachés dans le nombre (ex: "165 360" -> "165360")
+                            prix_clean = "".join(prix_clean.split())
+                            
+                            try:
+                                revenus_clean = float(prix_clean)
+                            except ValueError:
+                                revenus_clean = 0.0 # Sécurité si le prix n'est pas un nombre
+                            
+                            # Injection avec revenus configurés et tout le reste à 0 par défaut
+                            cursor.execute("""
+                                INSERT OR REPLACE INTO modeles_chantiers VALUES (NULL, ?, ?, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '[]')
+                            """, (nom_brut, revenus_clean))
+                            compteur_r += 1
+                            
+                        conn.commit()
+                        conn.close()
+                        st.success(f"🟢 Importation simplifiée réussie : {compteur_r} chantiers pré-configurés ajoutés avec leur budget ! Rechargement...")
+                        st.rerun()
+                except Exception as e:
+                    st.error(f"❌ Erreur lors de l'analyse du fichier rapide : {e}")
+            
+            st.markdown("---")
+            st.markdown("### 📂 2. Importation Avancée (Format Complet Multi-Critères)")
+            st.caption("Cette option permet de charger un fichier contenant toutes les colonnes techniques détaillées (Sable, Béton, Jours-Homme, JSON...).")
+            
+            fichier_complet = st.file_uploader("Déposer un fichier Complet Détallé (.xlsx ou .csv) :", type=["xlsx", "csv"], key="importateur_format_complet")
+            
+            if fichier_complet is not None:
+                try:
+                    if fichier_complet.name.endswith(".csv"):
+                        df_complet = pd.read_csv(fichier_complet)
+                    else:
+                        df_complet = pd.read_excel(fichier_complet)
+                    
+                    colonnes_obligatoires = ["Nom Unique Chantier", "Revenus (€)", "Durée (jours)"]
+                    if not all(col in df_complet.columns for col in colonnes_obligatoires):
+                        st.error("❌ Le fichier avancé doit contenir les colonnes exactes : 'Nom Unique Chantier', 'Revenus (€)' et 'Durée (jours)'.")
+                    else:
+                        conn = sqlite3.connect(DB_NAME)
+                        cursor = conn.cursor()
+                        compteur_c = 0
+                        
+                        for _, r in df_complet.iterrows():
+                            nom_m = str(r.get("Nom Unique Chantier", "")).strip()
+                            if not nom_m or nom_m.lower() in ["nan", "none"]:
+                                continue
+                            
+                            json_txt = str(r.get("Étapes Engins (JSON requis - ex: [])", "[]")).strip()
+                            try:
+                                json.loads(json_txt)
+                            except ValueError:
+                                json_txt = "[]"
+                            
+                            cursor.execute("""
+                                INSERT OR REPLACE INTO modeles_chantiers VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            """, (
+                                nom_m, float(r.get("Revenus (€)", 0.0)), int(r.get("Durée (jours)", 0)),
+                                float(r.get("T. Sable", 0.0)), float(r.get("T. Terre", 0.0)), float(r.get("T. Enrobé", 0.0)), float(r.get("U. Armature", 0.0)), float(r.get("U. Tôle", 0.0)),
+                                float(r.get("T. Béton", 0.0)), float(r.get("U. Panneaux", 0.0)), float(r.get("U. Tuyaux", 0.0)), float(r.get("U. Canalisations", 0.0)), float(r.get("U. Poutres", 0.0)),
+                                float(r.get("JH Chef", 0.0)), float(r.get("JH Ouvrier", 0.0)), float(r.get("JH Conducteur", 0.0)), json_txt
+                            ))
+                            compteur_c += 1
+                            
+                        conn.commit()
+                        conn.close()
+                        st.success(f"🟢 Importation avancée réussie : {compteur_c} chantiers configurés en base ! Rechargement...")
+                        st.rerun()
+                except Exception as e:
+                    st.error(f"❌ Erreur lors de l'analyse du fichier complet : {e}")
+
+            st.markdown("---")
+            st.write("📝 **Option 3 : Saisir manuellement ou coller dans la grille ci-dessous**")
+            
             df_import_init = pd.DataFrame([{
-                "Nom Unique Chantier": "Nom du Chantier Exemple",
-                "Revenus (€)": 150000.0, "Durée (jours)": 10,
-                "T. Sable": 0.0, "T. Terre": 0.0, "T. Enrobé": 0.0, "U. Armature": 0.0, "U. Tôle": 0.0,
-                "T. Béton": 0.0, "U. Panneaux": 0.0, "U. Tuyaux": 0.0, "U. Canalisations": 0.0, "U. Poutres": 0.0,
-                "JH Chef": 10.0, "JH Ouvrier": 20.0, "JH Conducteur": 10.0,
-                "Étapes Engins (JSON requis - ex: [])": "[]"
+                "Nom Unique Chantier": "Nom du Chantier Exemple", "Revenus (€)": 150000.0, "Durée (jours)": 10,
+                "T. Sable": 0.0, "T. Terre": 0.0, "T. Enrobé": 0.0, "U. Armature": 0.0, "U. Tôle": 0.0, "T. Béton": 0.0, "U. Panneaux": 0.0, "U. Tuyaux": 0.0, "U. Canalisations": 0.0, "U. Poutres": 0.0,
+                "JH Chef": 10.0, "JH Ouvrier": 20.0, "JH Conducteur": 10.0, "Étapes Engins (JSON requis - ex: [])": "[]"
             }])
             
-            # Éditeur de données en bloc
-            grille_import = st.data_editor(
-                df_import_init,
-                num_rows="dynamic",
-                use_container_width=True,
-                key="editeur_import_bloc"
-            )
+            grille_import = st.data_editor(df_import_init, num_rows="dynamic", use_container_width=True, key="editeur_import_bloc")
             
             if st.button("🚨 ENREGISTRER TOUT LE TABLEAU EN BASE DE DONNÉES", type="primary"):
                 if grille_import.empty:
@@ -494,24 +586,13 @@ with onglet3:
                     conn = sqlite3.connect(DB_NAME)
                     cursor = conn.cursor()
                     compteur_succes = 0
-                    format_erreur = False
-                    
                     for _, r in grille_import.iterrows():
                         nom_m = str(r["Nom Unique Chantier"]).strip()
-                        # On passe la ligne d'exemple par défaut
-                        if not nom_m or nom_m == "Nom du Chantier Exemple":
-                            continue
-                            
-                        # Vérification de sécurité du format JSON pour les étapes d'engins
+                        if not nom_m or nom_m == "Nom du Chantier Exemple": continue
                         json_txt = str(r["Étapes Engins (JSON requis - ex: [])"]).strip()
-                        try:
-                            json.loads(json_txt)
-                        except ValueError:
-                            format_erreur = True
-                            st.error(f"❌ Erreur de format JSON sur la ligne du chantier '{nom_m}'. Utilisez '[]' si vous n'avez pas d'étapes.")
-                            continue
+                        try: json.loads(json_txt)
+                        except ValueError: continue
                         
-                        # Insertion ou écrasement en BDD
                         cursor.execute("""
                             INSERT OR REPLACE INTO modeles_chantiers VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """, (
@@ -521,12 +602,10 @@ with onglet3:
                             float(r["JH Chef"]), float(r["JH Ouvrier"]), float(r["JH Conducteur"]), json_txt
                         ))
                         compteur_succes += 1
-                        
                     conn.commit()
                     conn.close()
-                    
                     if compteur_succes > 0:
-                        st.success(f"🟢 Fin de l'opération : {compteur_succes} modèle(s) de chantier ont été injectés avec succès !")
+                        st.success(f"🟢 Fin de l'opération : {compteur_succes} modèle(s) injecté(s) !")
                         st.rerun()
 
         with sub_tab2:
