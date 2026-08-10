@@ -206,7 +206,7 @@ with onglet1:
     with col1:
         st.markdown("### --- PARAMÈTRES GÉNÉRAUX ---")
         revenus = st.number_input("Revenus prévus du chantier (€) :", value=float(donnees_modele["revenus"]))
-        jours_totaux = st.number_input("Durée totale du chantier (jours) :", value=int(donnees_modele["jours"]), min_value=1)
+        jours_totaux = st.number_input("Durée totale du chantier (jours) :", value=int(donnees_modele["jours"]), min_value=0)
 
         st.markdown("### --- MATÉRIAUX ---")
         c_qte, c_px = st.columns(2)
