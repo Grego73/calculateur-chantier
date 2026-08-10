@@ -487,8 +487,9 @@ with onglet3:
                     
                 m_engins_json = st.text_area("Étapes d'Engins requis (JSON) :", value="[]")
                 
+                # Alignement strict du bouton de validation à 16 espaces à l'intérieur du formulaire
                 if st.form_submit_button("SAUVEGARDER LE MODÈLE"):
-                    if not m_nom: 
+                    if not m_nom:
                         st.error("Donnez un nom au modèle.")
                     else:
                         try:
