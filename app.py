@@ -358,9 +358,17 @@ with onglet1:
         cond_mensuel = st.number_input("Salaire mensuel Conducteur (€) :", value=1571)
         jh_cond = st.number_input("Total Jours-Homme Conducteur :", value=donnees_modele["jh_cond"])
 
+        # --- CALCUL ET AFFICHAGE DU TOTAL DES SALAIRES EN DIRECT ---
+        sal_chef_direct = jh_chef * (chef_mensuel / 30)
+        sal_ouvrier_direct = jh_ouvrier * (ouvrier_mensuel / 30)
+        sal_cond_direct = jh_cond * (cond_mensuel / 30)
+        total_salaires_direct = sal_chef_direct + sal_ouvrier_direct + sal_cond_direct
+        
+        st.info(f"👥 **Total estimé des salaires pour ce chantier :** {total_salaires_direct:,.2f} €")
+
         # --- TABLE DES ENGINS NÉCESSAIRES ---
         st.markdown("### --- TABLE DES ENGINS NÉCESSAIRES ---")
-        st.caption("📋 Cochez les engins à louer pour basculer automatiquement la durée et les tarifs requis.")
+        st.caption("📋 Cochez les engins à louer. Les informations de planification (Étape & Durée) sont lues depuis le modèle.")
         
         engins_bruts_modele = []
         if "engins_requis" in donnees_modele and len(donnees_modele["engins_requis"]) > 0:
@@ -432,9 +440,9 @@ with onglet1:
         st.markdown("### --- TABLE DES ENGINS À LOUER ---")
         st.caption("🔗 Les machines cochées ci-dessus se chargent automatiquement ici.")
         
-        df_engins_init = pd.DataFrame(engins_transferes_list)
-        if df_engins_init.empty:
-            df_engins_init = pd.DataFrame(columns=["Sélection de l'engin / Modèle", "Quantité", "Prix Location (€/jour)", "Jours de Location"])
+        df_engins_init = pd.DataFrame(columns=["Sélection de l'engin / Modèle", "Quantité", "Prix Location (€/jour)", "Jours de Location"])
+        if len(engins_transferes_list) > 0:
+            df_engins_init = pd.DataFrame(engins_transferes_list)
         
         engins_edites = st.data_editor(
             df_engins_init,
