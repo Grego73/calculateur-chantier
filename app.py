@@ -485,19 +485,20 @@ with onglet1:
     st.markdown("---")
     st.markdown("### 📊 Récapitulatif Global Estimé")
 
-    # Recalcul de sécurité de tous les postes en direct
-    total_mats_recap = (qte_sable*prix_sable) + (qte_terre*prix_terre) + (qte_enrobe*prix_enrobe) + (qte_armature*prix_armature) + (qte_tole*prix_tole) + (qte_beton*prix_beton) + (qte_panneaux*prix_panneaux) + (qte_tuyaux*prix_tuyaux) + (qte_eaux_usees*prix_eaux_usees) + (qte_poutres*prix_poutres)
+    # Recalcul sécurisé de tous les postes en direct avec conversion forcée en float
+    total_mats_recap = float((qte_sable*prix_sable) + (qte_terre*prix_terre) + (qte_enrobe*prix_enrobe) + (qte_armature*prix_armature) + (qte_tole*prix_tole) + (qte_beton*prix_beton) + (qte_panneaux*prix_panneaux) + (qte_tuyaux*prix_tuyaux) + (qte_eaux_usees*prix_eaux_usees) + (qte_poutres*prix_poutres))
     
     total_location_recap = 0.0
-    if not engins_edites.empty:
+    if engins_edites is not None and not engins_edites.empty:
         df_propres_recap = engins_edites.dropna(subset=["Sélection de l'engin / Modèle"])
-        total_location_recap = (df_propres_recap["Quantité"] * df_propres_recap["Prix Location (€/jour)"] * df_propres_recap["Jours de Location"]).sum()
+        if not df_propres_recap.empty:
+            total_location_recap = float((df_propres_recap["Quantité"] * df_propres_recap["Prix Location (€/jour)"] * df_propres_recap["Jours de Location"]).sum())
         
-    total_salaires_recap = (jh_chef * (chef_mensuel / 30)) + (jh_ouvrier * (ouvrier_mensuel / 30)) + (jh_cond * (cond_mensuel / 30))
+    total_salaires_recap = float((jh_chef * (chef_mensuel / 30)) + (jh_ouvrier * (ouvrier_mensuel / 30)) + (jh_cond * (cond_mensuel / 30)))
     
-    total_depenses_recap = total_mats_recap + total_location_recap + total_salaires_recap
-    benefice_net_recap = revenus - total_depenses_recap
-    roi_recap = (benefice_net_recap / total_depenses_recap) * 100 if total_depenses_recap > 0 else 0
+    total_depenses_recap = float(total_mats_recap + total_location_recap + total_salaires_recap)
+    benefice_net_recap = float(revenus - total_depenses_recap)
+    roi_recap = float((benefice_net_recap / total_depenses_recap) * 100 if total_depenses_recap > 0 else 0)
 
     # Affichage sous forme de colonnes de synthèse
     c_rc1, c_rc2, c_rc3, c_rc4 = st.columns(4)
@@ -516,12 +517,18 @@ with onglet1:
     else:
         st.error(f"🔴 **Chantier déficitaire :** Perte Net de **{benefice_net_recap:,.2f} €** (ROI : **{roi_recap:.2f} %**)")
 
-    st.markdown("<br>", unsafe_allow_stdio=True) # Espacement visuel
+    # CORRECTION ICI : Remplacement du paramètre erroné unsafe_allow_stdio par unsafe_allow_html
+    st.markdown("<br>", unsafe_allow_html=True) 
 
     # --- BOUTON DE VALIDATION ET ENREGISTREMENT ---
     if st.button("LANCER LE CALCUL & ENREGISTRER", type="primary"):
         df_actuel = charger_donnees()
-        doublon_existe = not df_actuel[(df_actuel["Nom du Chantier"] == nom_chantier) & (df_actuel["Revenus (€)"] == revenus)].empty
+        
+        # Sécurité antifuite si la base SQLite renvoie un tableau vide
+        if df_actuel.empty:
+            doublon_existe = False
+        else:
+            doublon_existe = not df_actuel[(df_actuel["Nom du Chantier"] == nom_chantier) & (df_actuel["Revenus (€)"] == revenus)].empty
         
         if not nom_chantier:
             st.error("Veuillez donner un nom ou un numéro valide à votre chantier.")
