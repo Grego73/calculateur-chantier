@@ -512,33 +512,25 @@ with onglet2:
         elif critere_tri == "Plus de revenus d'abord":
             df_affichage = df_affichage.sort_values(by="Revenus (€)", ascending=False)
             
-                # Affichage avec masquage des décimales et ajout automatique du séparateur de milliers
+        # --- CONFIGURATION AVEC SÉPARATEUR D'ESPACE POUR LES MILLIERS ---
         st.dataframe(
             df_affichage, use_container_width=True,
             column_config={
-                "Revenus (€)": st.column_config.NumberColumn(format="%d €"),
+                "Revenus (€)": st.column_config.NumberColumn(format="%,d €"),
                 "Durée (Jours)": st.column_config.NumberColumn(format="%d j"),
-                "Coût Matériaux (€)": st.column_config.NumberColumn(format="%d €"),
-                "Coût Location Engins (€)": st.column_config.NumberColumn(format="%d €"),
-                "Coût Salaires (€)": st.column_config.NumberColumn(format="%d €"),
-                "Dépenses Totales (€)": st.column_config.NumberColumn(format="%d €"),
-                "Bénéfice Net (€)": st.column_config.NumberColumn(format="%d €"),
-                "Gain / Jour (€)": st.column_config.NumberColumn(format="%d €/j"),
+                "Coût Matériaux (€)": st.column_config.NumberColumn(format="%,d €"),
+                "Coût Location Engins (€)": st.column_config.NumberColumn(format="%,d €"),
+                "Coût Salaires (€)": st.column_config.NumberColumn(format="%,d €"),
+                "Dépenses Totales (€)": st.column_config.NumberColumn(format="%,d €"),
+                "Bénéfice Net (€)": st.column_config.NumberColumn(format="%,d €"),
+                "Gain / Jour (€)": st.column_config.NumberColumn(format="%,d €/j"),
                 "ROI (%)": st.column_config.NumberColumn(format="%.2f %%"),
             }
         )
-
         
         csv = df_affichage.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="📥 Télécharger la base de données (CSV)", 
-            data=csv, 
-            file_name="base_donnies_chantiers.csv", 
-            mime="text/csv"
-        )
-        
+        st.download_button(label="📥 Télécharger la base de données (CSV)", data=csv, file_name="base_donnies_chantiers.csv", mime="text/csv")
         st.markdown("---")
         if st.button("🗑️ Vider définitivement la base de données SQLITE", type="secondary"):
             reinitialiser_db()
             st.rerun()
-
