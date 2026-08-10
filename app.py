@@ -521,12 +521,15 @@ with onglet1:
         st.metric(label="⏱️ Durée du Projet", value=f"{int(jours_totaux)} jours")
     with c_rc6:
         st.metric(label="📈 Rentabilité Quotidienne", value=f"{txt_gain_jour} €/j")
+    
+    # Gestion dynamique du pluriel pour les jours de travail
+    mot_jour = "jours" if jours_totaux >= 2 else "jour"
 
-    # Message de rentabilité personnalisé avec inclusion de la durée totale du chantier
+    # Message de rentabilité personnalisé avec gestion du pluriel
     if benefice_net_recap >= 0:
-        st.success(f"🟢 **Rentabilité positive :** Bénéfice de **{txt_benefice} €** soit **{txt_gain_jour} € / jour** de **{int(jours_totaux)} jour(s)** de travail (ROI Global : **{roi_recap:.2f} %** | ROI / Jour : **{roi_par_jour_recap:.2f} %/j**)")
+        st.success(f"🟢 **Rentabilité positive :** Bénéfice de **{txt_benefice} €** soit **{txt_gain_jour} € / jour** de **{int(jours_totaux)} {mot_jour}** de travail (ROI Global : **{roi_recap:.2f} %** | ROI / Jour : **{roi_par_jour_recap:.2f} %/j**)")
     else:
-        st.error(f"🔴 **Chantier déficitaire :** Perte de **{txt_benefice} €** soit **{txt_gain_jour} € / jour** de **{int(jours_totaux)} jour(s)** de perte (ROI Global : **{roi_recap:.2f} %** | ROI / Jour : **{roi_par_jour_recap:.2f} %/j**)")
+        st.error(f"🔴 **Chantier déficitaire :** Perte de **{txt_benefice} €** soit **{txt_gain_jour} € / jour** de **{int(jours_totaux)} {mot_jour}** de perte (ROI Global : **{roi_recap:.2f} %** | ROI / Jour : **{roi_par_jour_recap:.2f} %/j**)")
 
     st.markdown("<br>", unsafe_allow_html=True) 
 
