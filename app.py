@@ -283,7 +283,7 @@ with onglet1:
             prix_eaux_usees = st.number_input("Prix Canalisations (€/u) :", value=35)
             prix_poutres = st.number_input("Prix Poutres acier (€/u) :", value=70)
 
-    with col2:
+        with col2:
         st.markdown("### --- GRILLE SALARIALE & HEURES ---")
         chef_mensuel = st.number_input("Salaire mensuel Chef (€) :", value=1566)
         jh_chef = st.number_input("Total Jours-Homme Chef :", value=donnees_modele["jh_chef"])
@@ -311,6 +311,17 @@ with onglet1:
                 "Prix Location (€/jour)": st.column_config.NumberColumn("Prix / Jour (€)", min_value=0, default=380, step=10),
             }
         )
+
+        # --- CALCUL ET AFFICHAGE DU TOTAL EN TEMPS RÉEL ---
+        total_loc_engins_direct = 0.0
+        if not engins_edites.empty:
+            # On nettoie les lignes où l'engin n'est pas encore sélectionné pour éviter les erreurs
+            df_propres_direct = engins_edites.dropna(subset=["Sélection de l'engin / Modèle"])
+            # Calcul : Quantité * Prix Journalier * Nombre de jours total du chantier
+            total_loc_engins_direct = (df_propres_direct["Quantité"] * df_propres_direct["Prix Location (€/jour)"] * jours_totaux).sum()
+        
+        # Affichage du total sous forme de badge d'information
+        st.info(f"💰 **Total des engins loués sur la durée du chantier ({jours_totaux} jours) :** {total_loc_engins_direct:,.2f} €")
 
     if st.button("LANCER LE CALCUL & ENREGISTRER", type="primary"):
         df_actuel = charger_donnees()
