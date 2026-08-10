@@ -525,7 +525,7 @@ with onglet2:
                 "ROI (%)": st.column_config.NumberColumn(format="%.2f %%"),
             }
         )
-                st.download_button(
+            st.download_button(
             label="📥 Télécharger la base de données (CSV)", 
             data=csv, 
             file_name="base_donnies_chantiers.csv", 
