@@ -470,47 +470,91 @@ with onglet3:
             "🗂️ Consulter les Bases Données"
         ])
         
-        # --- 4.1 GRILLE D'IMPORTATION EN MASSE ---
+        # --- 4.1 LES SYSTÈMES D'IMPORTATIONS ---
         with sub_tab1:
-            st.markdown("### 📋 Tableau d'importation en masse de modèles")
-            st.write("Ajoutez ou collez autant de lignes que vous le souhaitez dans le tableau ci-dessous pour configurer plusieurs chantiers d'un coup.")
+            st.markdown("### 📥 1. Importation Rapide (Copier / Coller du Texte Brut)")
+            st.caption("Collez votre liste de chantiers brute directement ci-dessous. Le système va extraire automatiquement les noms et les prix.")
             
-            df_import_init = pd.DataFrame([{
-                "Nom Unique Chantier": "Nom du Chantier Exemple", "Revenus (€)": 150000.0, "Durée (jours)": 10,
-                "T. Sable": 0.0, "T. Terre": 0.0, "T. Enrobé": 0.0, "U. Armature": 0.0, "U. Tôle": 0.0, "T. Béton": 0.0, "U. Panneaux": 0.0, "U. Tuyaux": 0.0, "U. Canalisations": 0.0, "U. Poutres": 0.0,
-                "JH Chef": 10.0, "JH Ouvrier": 20.0, "JH Conducteur": 10.0, "Étapes Engins (JSON requis - ex: [])": "[]"
-            }])
+            # Zone de texte libre pour coller votre liste directement
+            texte_brut_colle = st.text_area(
+                "Collez votre liste ici (Une ligne par chantier, ex: Nom du chantier   12 500 euros) :",
+                value="",
+                height=300,
+                placeholder="Pose de panneaux de signalisation\t5 700 euros\nCompacter (niveau 2)\t2 916 euros"
+            )
             
-            grille_import = st.data_editor(df_import_init, num_rows="dynamic", use_container_width=True, key="editeur_import_bloc")
-            
-            if st.button("🚨 ENREGISTRER TOUT LE TABLEAU EN BASE DE DONNÉES", type="primary"):
-                if grille_import.empty:
-                    st.error("Le tableau est vide.")
+            if st.button("🚀 ANALYSER ET INJECTER LA LISTE COLLÉE", type="primary"):
+                if not texte_brut_colle.strip():
+                    st.error("❌ La zone de texte est vide. Veuillez y coller vos chantiers.")
                 else:
                     conn = sqlite3.connect(DB_NAME)
                     cursor = conn.cursor()
-                    compteur_succes = 0
-                    for _, r in grille_import.iterrows():
-                        nom_m = str(r["Nom Unique Chantier"]).strip()
-                        if not nom_m or nom_m == "Nom du Chantier Exemple": continue
-                        json_txt = str(r["Étapes Engins (JSON requis - ex: [])"]).strip()
-                        try: json.loads(json_txt)
-                        except ValueError: continue
+                    compteur_colle = 0
+                    
+                    # Découpage du texte ligne par ligne
+                    lignes = texte_brut_colle.split("\n")
+                    
+                    for ligne in lignes:
+                        ligne_clean = ligne.strip()
+                        if not ligne_clean:
+                            continue
                         
-                        cursor.execute("""
-                            INSERT OR REPLACE INTO modeles_chantiers VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """, (
-                            nom_m, float(r["Revenus (€)"]), int(r["Durée (jours)"]),
-                            float(r["T. Sable"]), float(r["T. Terre"]), float(r["T. Enrobé"]), float(r["U. Armature"]), float(r["U. Tôle"]),
-                            float(r["T. Béton"]), float(r["U. Panneaux"]), float(r["U. Tuyaux"]), float(r["U. Canalisations"]), float(r["U. Poutres"]),
-                            float(r["JH Chef"]), float(r["JH Ouvrier"]), float(r["JH Conducteur"]), json_txt
-                        ))
-                        compteur_succes += 1
+                        # --- ALGORITHME D'EXTRACTION INTELLIGENTE ---
+                        # On cherche le prix à la fin de la ligne en partant de la droite
+                        mots = ligne_clean.split()
+                        
+                        # Nettoyage des mots liés au prix à la fin
+                        mots_propres = []
+                        for m in mots:
+                            m_low = m.lower()
+                            if m_low not in ["euros", "euro", "€"]:
+                                mots_propres.append(m)
+                                
+                        if len(mots_propres) >= 2:
+                            # Tentative de reconstruction du prix (on teste si les derniers éléments forment un nombre)
+                            # Cas où le prix est séparé par un espace (ex: "5" "700")
+                            prix_poten_1 = mots_propres[-1]
+                            prix_poten_2 = mots_propres[-2] if len(mots_propres) > 2 else ""
+                            
+                            # Nettoyage des caractères non numériques
+                            p1_clean = "".join(c for c in prix_poten_1 if c.isdigit() or c == ".")
+                            p2_clean = "".join(c for c in prix_poten_2 if c.isdigit() or c == ".")
+                            
+                            # On teste si les deux derniers blocs forment le prix (ex: 165 et 360)
+                            try:
+                                if p2_clean and p1_clean and len(p1_clean) == 3: # Souvent le cas pour les milliers (ex: 360)
+                                    revenus_clean = float(p2_clean + p1_clean)
+                                    nom_chantier_clean = " ".join(mots_propres[:-2])
+                                else:
+                                    revenus_clean = float(p1_clean)
+                                    nom_chantier_clean = " ".join(mots_propres[:-1])
+                            except ValueError:
+                                # Repli basique si l'assemblage échoue
+                                try:
+                                    revenus_clean = float(p1_clean)
+                                    nom_chantier_clean = " ".join(mots_propres[:-1])
+                                except ValueError:
+                                    revenus_clean = 0.0
+                                    nom_chantier_clean = ligne_clean
+                            
+                            # Si le nom extrait est vide, on saute la ligne
+                            if not nom_chantier_clean.strip():
+                                continue
+                                
+                            # Injection automatique en base de données
+                            cursor.execute("""
+                                INSERT OR REPLACE INTO modeles_chantiers VALUES (NULL, ?, ?, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '[]')
+                            """, (nom_chantier_clean.strip(), revenus_clean))
+                            compteur_colle += 1
+                    
                     conn.commit()
                     conn.close()
-                    if compteur_succes > 0:
-                        st.success(f"🟢 Fin de l'opération : {compteur_succes} modèle(s) injecté(s) !")
+                    
+                    if compteur_colle > 0:
+                        st.success(f"🟢 Extraction réussie ! {compteur_colle} chantiers ont été détectés, nettoyés et injectés dans votre catalogue ! Rafraîchissement...")
                         st.rerun()
+                    else:
+                        st.warning("⚠️ Aucun chantier valide n'a pu être extrait. Vérifiez le format du texte.")
 
         # --- 4.2 CONFIGURATION GRILLE SALARIALE ---
         with sub_tab2:
