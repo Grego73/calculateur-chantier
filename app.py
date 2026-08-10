@@ -429,8 +429,13 @@ with onglet1:
                         "Prix Location (€/jour)": prix_trouve, "Jours de Location": duree_etape
                     })
 
+        # --- SÉCURITÉ : RESTRICTION DE LA LISTE AUX 3 PREMIÈRES ENTRÉES MAXIMUM ---
+        if len(engins_transferes_list) > 3:
+            engins_transferes_list = engins_transferes_list[:3]
+            st.warning("⚠️ La table des engins à louer est limitée à 3 machines maximum. Les entrées suivantes ont été ignorées.")
+
         # --- TABLE DES ENGINS À LOUER ---
-        st.markdown("### --- TABLE DES ENGINS À LOUER ---")
+        st.markdown("### --- TABLE DES ENGINS À LOUER (MAX 3) ---")
         df_engins_init = pd.DataFrame(columns=["Sélection de l'engin / Modèle", "Quantité", "Prix Location (€/jour)", "Jours de Location"])
         if len(engins_transferes_list) > 0:
             df_engins_init = pd.DataFrame(engins_transferes_list)
@@ -444,10 +449,19 @@ with onglet1:
                 "Jours de Location": st.column_config.NumberColumn("Jours à louer", min_value=1, max_value=365, step=1)
             }
         )
+        
+        # Sécurité supplémentaire si l'utilisateur ajoute manuellement plus de 3 lignes dans le tableau dynamique
+        if engins_edites is not None and len(engins_edites) > 3:
+            engins_edites = engins_edites.head(3)
+            st.error("🚨 Seules les 3 premières lignes de ce tableau seront comptabilisées dans le calcul final.")
+
         total_loc_engins_direct = 0.0
-        if not engins_edites.empty:
+        if engins_edites is not None and not engins_edites.empty:
             df_propres_direct = engins_edites.dropna(subset=["Sélection de l'engin / Modèle"])
+            # Remplacement sécurisé : si une case "Jours de Location" est laissée vide, on évite le crash en forçant une valeur par défaut de 1
+            df_propres_direct["Jours de Location"] = pd.to_numeric(df_propres_direct["Jours de Location"]).fillna(1).astype(int)
             total_loc_engins_direct = (df_propres_direct["Quantité"] * df_propres_direct["Prix Location (€/jour)"] * df_propres_direct["Jours de Location"]).sum()
+            
         st.info(f"💰 **Total des engins loués (Calcul personnalisé) :** {total_loc_engins_direct:,.0f} €")
 
     # --- RÉCAPITULATIF TOTAL JUSTE AVANT LA VALIDATION ---
