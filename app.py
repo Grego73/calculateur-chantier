@@ -530,11 +530,11 @@ with onglet3:
                 for _, r in mats_edites.iterrows():
                     cursor.execute("UPDATE configuration_materiaux SET prix_unitaire = ? WHERE materiau = ?", (float(r["prix_unitaire"]), str(r["materiau"])))
                 conn.commit()
-                            conn.close()
-                            st.success(f"Modèle '{m_nom}' ajouté ! Rafraîchissement...")
-                            st.rerun()
-                        except ValueError: 
-                            st.error("Le format des étapes JSON est invalide.")
+                conn.close()
+                st.success(f"Modèle '{m_nom}' ajouté ! Rafraîchissement...")
+                st.rerun()
+            except ValueError: 
+                st.error("Le format des étapes JSON est invalide.")
 
         with sub_tab2:
             st.write("Modifiez le coût d'une journée de travail.")
