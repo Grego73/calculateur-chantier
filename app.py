@@ -464,61 +464,92 @@ with onglet3:
             "🏗️ Ajouter un Modèle de Chantier", "👥 Éditer Grille Salariale", "🧱 Éditer Prix Matériaux", "🚜 Éditer Catalogue Engins"
         ])
         
-        # --- 4.1 LES DEUX SYSTEMES D'IMPORTATIONS DE FICHIERS ---
+        # --- 4.1 LES SYSTÈMES D'IMPORTATIONS ---
         with sub_tab1:
-            st.markdown("### 📥 1. Importation Simplifiée (Format Rapide : Nom & Prix)")
-            st.caption("Cette option permet d'injecter en masse des listes de chantiers contenant uniquement le Nom et le Prix (ex: Pose de panneaux | 5 700 euros). Les autres valeurs seront mises à 0.")
+            st.markdown("### 📥 1. Importation Rapide (Copier / Coller du Texte Brut)")
+            st.caption("Collez votre liste de chantiers brute directement ci-dessous. Le système va extraire automatiquement les noms et les prix.")
             
-            # Bouton de chargement dédié à la liste simple
-            fichier_rapide = st.file_uploader("Déposer un fichier Nom & Prix (.xlsx ou .csv) :", type=["xlsx", "csv"], key="importateur_format_rapide")
+            # Zone de texte libre pour coller votre liste directement
+            texte_brut_colle = st.text_area(
+                "Collez votre liste ici (Une ligne par chantier, ex: Nom du chantier   12 500 euros) :",
+                value="",
+                height=300,
+                placeholder="Pose de panneaux de signalisation\t5 700 euros\nCompacter (niveau 2)\t2 916 euros"
+            )
             
-            if fichier_rapide is not None:
-                try:
-                    if fichier_rapide.name.endswith(".csv"):
-                        df_rapide = pd.read_csv(fichier_rapide)
-                    else:
-                        df_rapide = pd.read_excel(fichier_rapide)
+            if st.button("🚀 ANALYSER ET INJECTER LA LISTE COLLÉE", type="primary"):
+                if not texte_brut_colle.strip():
+                    st.error("❌ La zone de texte est vide. Veuillez y coller vos chantiers.")
+                else:
+                    conn = sqlite3.connect(DB_NAME)
+                    cursor = conn.cursor()
+                    compteur_colle = 0
                     
-                    # On renomme ou force la détection des deux premières colonnes peu importe leur nom exact
-                    if len(df_rapide.columns) < 2:
-                        st.error("❌ Le fichier doit contenir au moins 2 colonnes (la première pour le Nom, la deuxième pour le Prix).")
-                    else:
-                        col_nom = df_rapide.columns[0]
-                        col_prix = df_rapide.columns[1]
+                    # Découpage du texte ligne par ligne
+                    lignes = texte_brut_colle.split("\n")
+                    
+                    for ligne in lignes:
+                        ligne_clean = ligne.strip()
+                        if not ligne_clean:
+                            continue
                         
-                        conn = sqlite3.connect(DB_NAME)
-                        cursor = conn.cursor()
-                        compteur_r = 0
+                        # --- ALGORITHME D'EXTRACTION INTELLIGENTE ---
+                        # On cherche le prix à la fin de la ligne en partant de la droite
+                        mots = ligne_clean.split()
                         
-                        for _, r in df_rapide.iterrows():
-                            nom_brut = str(r[col_nom]).strip()
-                            if not nom_brut or nom_brut.lower() in ["nan", "none", "nom du chantier"]:
-                                continue
+                        # Nettoyage des mots liés au prix à la fin
+                        mots_propres = []
+                        for m in mots:
+                            m_low = m.lower()
+                            if m_low not in ["euros", "euro", "€"]:
+                                mots_propres.append(m)
+                                
+                        if len(mots_propres) >= 2:
+                            # Tentative de reconstruction du prix (on teste si les derniers éléments forment un nombre)
+                            # Cas où le prix est séparé par un espace (ex: "5" "700")
+                            prix_poten_1 = mots_propres[-1]
+                            prix_poten_2 = mots_propres[-2] if len(mots_propres) > 2 else ""
                             
-                            # Nettoyage chirurgical du prix (retrait des espaces, du mot euros, etc.)
-                            prix_brut = str(r[col_prix]).lower()
-                            prix_clean = prix_brut.replace("euros", "").replace("euro", "").replace("€", "")
-                            # Supprime tous les espaces cachés dans le nombre (ex: "165 360" -> "165360")
-                            prix_clean = "".join(prix_clean.split())
+                            # Nettoyage des caractères non numériques
+                            p1_clean = "".join(c for c in prix_poten_1 if c.isdigit() or c == ".")
+                            p2_clean = "".join(c for c in prix_poten_2 if c.isdigit() or c == ".")
                             
+                            # On teste si les deux derniers blocs forment le prix (ex: 165 et 360)
                             try:
-                                revenus_clean = float(prix_clean)
+                                if p2_clean and p1_clean and len(p1_clean) == 3: # Souvent le cas pour les milliers (ex: 360)
+                                    revenus_clean = float(p2_clean + p1_clean)
+                                    nom_chantier_clean = " ".join(mots_propres[:-2])
+                                else:
+                                    revenus_clean = float(p1_clean)
+                                    nom_chantier_clean = " ".join(mots_propres[:-1])
                             except ValueError:
-                                revenus_clean = 0.0 # Sécurité si le prix n'est pas un nombre
+                                # Repli basique si l'assemblage échoue
+                                try:
+                                    revenus_clean = float(p1_clean)
+                                    nom_chantier_clean = " ".join(mots_propres[:-1])
+                                except ValueError:
+                                    revenus_clean = 0.0
+                                    nom_chantier_clean = ligne_clean
                             
-                            # Injection avec revenus configurés et tout le reste à 0 par défaut
+                            # Si le nom extrait est vide, on saute la ligne
+                            if not nom_chantier_clean.strip():
+                                continue
+                                
+                            # Injection automatique en base de données
                             cursor.execute("""
                                 INSERT OR REPLACE INTO modeles_chantiers VALUES (NULL, ?, ?, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '[]')
-                            """, (nom_brut, revenus_clean))
-                            compteur_r += 1
-                            
-                        conn.commit()
-                        conn.close()
-                        st.success(f"🟢 Importation simplifiée réussie : {compteur_r} chantiers pré-configurés ajoutés avec leur budget ! Rechargement...")
+                            """, (nom_chantier_clean.strip(), revenus_clean))
+                            compteur_colle += 1
+                    
+                    conn.commit()
+                    conn.close()
+                    
+                    if compteur_colle > 0:
+                        st.success(f"🟢 Extraction réussie ! {compteur_colle} chantiers ont été détectés, nettoyés et injectés dans votre catalogue ! Rafraîchissement...")
                         st.rerun()
-                except Exception as e:
-                    st.error(f"❌ Erreur lors de l'analyse du fichier rapide : {e}")
-            
+                    else:
+                        st.warning("⚠️ Aucun chantier valide n'a pu être extrait. Vérifiez le format du texte.")
+
             st.markdown("---")
             st.markdown("### 📂 2. Importation Avancée (Format Complet Multi-Critères)")
             st.caption("Cette option permet de charger un fichier contenant toutes les colonnes techniques détaillées (Sable, Béton, Jours-Homme, JSON...).")
