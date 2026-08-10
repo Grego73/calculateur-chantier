@@ -280,15 +280,6 @@ with onglet1:
         cond_mensuel = st.number_input("Salaire mensuel Conducteur (€) :", value=1571)
         jh_cond = st.number_input("Total Jours-Homme Conducteur :", value=donnees_modele["jh_cond"])
 
-            with col2:
-        st.markdown("### --- GRILLE SALARIALE & HEURES ---")
-        chef_mensuel = st.number_input("Salaire mensuel Chef (€) :", value=1566)
-        jh_chef = st.number_input("Total Jours-Homme Chef :", value=donnees_modele["jh_chef"])
-        ouvrier_mensuel = st.number_input("Salaire mensuel Ouvrier (€) :", value=1616)
-        jh_ouvrier = st.number_input("Total Jours-Homme Ouvrier :", value=donnees_modele["jh_ouvrier"])
-        cond_mensuel = st.number_input("Salaire mensuel Conducteur (€) :", value=1571)
-        jh_cond = st.number_input("Total Jours-Homme Conducteur :", value=donnees_modele["jh_cond"])
-
         # --- NOUVELLE TABLE : ENGINS NÉCESSAIRES ---
         st.markdown("### --- TABLE DES ENGINS NÉCESSAIRES ---")
         st.caption("📋 Listez ici les engins théoriquement indispensables ou planifiés pour valider le cahier des charges.")
