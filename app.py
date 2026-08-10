@@ -349,6 +349,23 @@ with onglet1:
             prix_eaux_usees = st.number_input("Prix Canalisations (€/u) :", value=35)
             prix_poutres = st.number_input("Prix Poutres acier (€/u) :", value=70)
 
+        # --- CALCUL ET AFFICHAGE DU TOTAL DES MATÉRIAUX EN DIRECT ---
+        total_mats_direct = (
+            (qte_sable * prix_sable) + 
+            (qte_terre * prix_terre) + 
+            (qte_enrobe * prix_enrobe) + 
+            (qte_armature * prix_armature) + 
+            (qte_tole * prix_tole) + 
+            (qte_beton * prix_beton) + 
+            (qte_panneaux * prix_panneaux) + 
+            (qte_tuyaux * prix_tuyaux) + 
+            (qte_eaux_usees * prix_eaux_usees) + 
+            (qte_poutres * prix_poutres)
+        )
+        
+        st.info(f"🧱 **Total estimé des matériaux :** {total_mats_direct:,.2f} €")
+
+
     with col2:
         st.markdown("### --- GRILLE SALARIALE & HEURES ---")
         chef_mensuel = st.number_input("Salaire mensuel Chef (€) :", value=1566)
@@ -464,6 +481,44 @@ with onglet1:
         
         st.info(f"💰 **Total des engins loués (Calcul personnalisé) :** {total_loc_engins_direct:,.2f} €")
 
+    # --- RÉCAPITULATIF TOTAL JUSTE AVANT LA VALIDATION ---
+    st.markdown("---")
+    st.markdown("### 📊 Récapitulatif Global Estimé")
+
+    # Recalcul de sécurité de tous les postes en direct
+    total_mats_recap = (qte_sable*prix_sable) + (qte_terre*prix_terre) + (qte_enrobe*prix_enrobe) + (qte_armature*prix_armature) + (qte_tole*prix_tole) + (qte_beton*prix_beton) + (qte_panneaux*prix_panneaux) + (qte_tuyaux*prix_tuyaux) + (qte_eaux_usees*prix_eaux_usees) + (qte_poutres*prix_poutres)
+    
+    total_location_recap = 0.0
+    if not engins_edites.empty:
+        df_propres_recap = engins_edites.dropna(subset=["Sélection de l'engin / Modèle"])
+        total_location_recap = (df_propres_recap["Quantité"] * df_propres_recap["Prix Location (€/jour)"] * df_propres_recap["Jours de Location"]).sum()
+        
+    total_salaires_recap = (jh_chef * (chef_mensuel / 30)) + (jh_ouvrier * (ouvrier_mensuel / 30)) + (jh_cond * (cond_mensuel / 30))
+    
+    total_depenses_recap = total_mats_recap + total_location_recap + total_salaires_recap
+    benefice_net_recap = revenus - total_depenses_recap
+    roi_recap = (benefice_net_recap / total_depenses_recap) * 100 if total_depenses_recap > 0 else 0
+
+    # Affichage sous forme de colonnes de synthèse
+    c_rc1, c_rc2, c_rc3, c_rc4 = st.columns(4)
+    with c_rc1:
+        st.metric(label="🧱 Total Matériaux", value=f"{total_mats_recap:,.2f} €")
+    with c_rc2:
+        st.metric(label="🚜 Total Location Engins", value=f"{total_location_recap:,.2f} €")
+    with c_rc3:
+        st.metric(label="👥 Total Salaires", value=f"{total_salaires_recap:,.2f} €")
+    with c_rc4:
+        st.metric(label="📉 Dépenses Totales", value=f"{total_depenses_recap:,.2f} €")
+
+    # Message de rentabilité direct avant validation
+    if benefice_net_recap >= 0:
+        st.success(f"🟢 **Rentabilité estimée positive :** Bénéfice Net de **{benefice_net_recap:,.2f} €** (ROI : **{roi_recap:.2f} %**)")
+    else:
+        st.error(f"🔴 **Chantier déficitaire :** Perte Net de **{benefice_net_recap:,.2f} €** (ROI : **{roi_recap:.2f} %**)")
+
+    st.markdown("<br>", unsafe_allow_stdio=True) # Espacement visuel
+
+    # --- BOUTON DE VALIDATION ET ENREGISTREMENT ---
     if st.button("LANCER LE CALCUL & ENREGISTRER", type="primary"):
         df_actuel = charger_donnees()
         doublon_existe = not df_actuel[(df_actuel["Nom du Chantier"] == nom_chantier) & (df_actuel["Revenus (€)"] == revenus)].empty
@@ -473,30 +528,10 @@ with onglet1:
         elif doublon_existe:
             st.error(f"Impossible d'enregistrer : Ce chantier au montant de {revenus:,.2f} € existe déjà.")
         else:
-            total_mats = (qte_sable*prix_sable) + (qte_terre*prix_terre) + (qte_enrobe*prix_enrobe) + (qte_armature*prix_armature) + (qte_tole*prix_tole) + (qte_beton*prix_beton) + (qte_panneaux*prix_panneaux) + (qte_tuyaux*prix_tuyaux) + (qte_eaux_usees*prix_eaux_usees) + (qte_poutres*prix_poutres)
-            
-            total_location = 0.0
-            if not engins_edites.empty:
-                df_propres = engins_edites.dropna(subset=["Sélection de l'engin / Modèle"])
-                total_location = (df_propres["Quantité"] * df_propres["Prix Location (€/jour)"] * df_propres["Jours de Location"]).sum()
-                
-            total_salaires = (jh_chef * (chef_mensuel / 30)) + (jh_ouvrier * (ouvrier_mensuel / 30)) + (jh_cond * (cond_mensuel / 30))
-            total_depenses = total_mats + total_location + total_salaires
-            benefice_net = revenus - total_depenses
-            roi = (benefice_net / total_depenses) * 100 if total_depenses > 0 else 0
-
-            st.markdown("---")
-            st.write(f"**Coût Matériaux globaux** : {total_mats:,.2f} €")
-            st.write(f"**Coût Location Engins** : {total_location:,.2f} €")
-            st.write(f"**Coût Salaires** : {total_salaires:,.2f} €")
-            
-            if benefice_net >= 0:
-                st.success(f"Bénéfice Net : {benefice_net:,.2f} € (ROI : {roi:.2f} %)")
-            else:
-                st.error(f"Bénéfice Net : {benefice_net:,.2f} € (ROI : {roi:.2f} %)")
-
-            inserer_chantier(nom_chantier, revenus, total_mats, total_location, total_salaires, total_depenses, benefice_net, round(roi, 2))
+            # Enregistrement en base de données avec les valeurs déjà calculées
+            inserer_chantier(nom_chantier, revenus, total_mats_recap, total_location_recap, total_salaires_recap, total_depenses_recap, benefice_net_recap, round(roi_recap, 2))
             st.toast("Chantier enregistré avec succès dans la base SQLite !")
+            st.rerun()
 
 with onglet2:
     st.subheader("Base de données des chantiers enregistrés")
