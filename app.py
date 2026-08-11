@@ -609,12 +609,22 @@ with onglet3:
                                     "Type d'engin requis": "Pelleteuses" if e_num == 1 else "Camions Benne", 
                                     "Niveau requis": "N2"
                                 })
-                        
-                        cursor.execute("""
-                            INSERT OR REPLACE INTO modeles_chantiers VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """, (
+                        # --- BLOC D'INSERTION DIRECT ET SÉCURISÉ ---
+                        cursor.execute("INSERT OR REPLACE INTO modeles_chantiers VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (
                             name, data["revenus"], data["jours"],
-
+                            data["sable"], data["terre"], data["enrobe"], data["armature"], data["tole"],
+                            data["beton"], data["panneaux"], data["tuyaux"], data["canalisations"], data["poutres"],
+                            data["jh_chef"], data["jh_ouvrier"], data["jh_cond"],
+                            json.dumps(data["engins_requis"])
+                        ))
+                        compteur_total += 1
+                        
+                    conn.commit()
+                    conn.close()
+                    
+                    if compteur_total > 0:
+                        st.success(f"🟢 Traitement terminé ! {compteur_total} fiche(s) injectée(s) ! Rechargement...")
+                        st.rerun()
         # --- 4.2 CONFIGURATION GRILLE SALARIALE ---
         with sub_tab2:
             st.write("Modifiez le coût d'une journée de travail.")
