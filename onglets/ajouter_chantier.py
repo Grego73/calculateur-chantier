@@ -26,8 +26,11 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         with c_m:
             minutes_saisies = st.number_input("Minutes", min_value=0, max_value=59, value=0, step=1)
 
-        # Logique de jeu : 1 journée = 24 heures
-        jours_totaux = jours_saisis + (heures_saisies / 24.0) + (minutes_saisies / 1440.0)
+                # Logique de jeu : 1 journée = 24 heures = 1440 minutes
+        # On utilise des parenthèses strictes pour éviter l'erreur des priorités
+        heures_en_jours = heures_saisies / 24.0
+        minutes_en_jours = minutes_saisies / 1440.0
+        jours_totaux = float(jours_saisis + heures_en_jours + minutes_en_jours)
 
         st.markdown("### --- MATÉRIAUX ---")
         c_qte, c_px = st.columns(2)
