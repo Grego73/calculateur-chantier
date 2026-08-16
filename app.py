@@ -24,27 +24,40 @@ db = firestore.client()
 # ==============================================================================
 
 def charger_salaires_config():
-    doc_ref = db.collection("configuration_salaires").document("grille")
-    doc = doc_ref.get()
-    if doc.exists:
-        return doc.to_dict()
-    else:
-        data_defaut = {"Chef": 230.0, "Ouvrier": 230.0, "Conducteur": 230.0, "Intérim": 220.0}
-        doc_ref.set(data_defaut)
-        return data_defaut
+    try:
+        doc_ref = db.collection("configuration_salaires").document("grille")
+        doc = doc_ref.get()
+        if doc.exists:
+            return doc.to_dict()
+    except Exception:
+        pass
+    
+    # Données par défaut si le document n'existe pas encore ou bug
+    data_defaut = {"Chef": 230.0, "Ouvrier": 230.0, "Conducteur": 230.0, "Intérim": 220.0}
+    try:
+        db.collection("configuration_salaires").document("grille").set(data_defaut)
+    except Exception:
+        pass
+    return data_defaut
 
 def charger_materiaux_config():
-    doc_ref = db.collection("configuration_materiaux").document("catalogue")
-    doc = doc_ref.get()
-    if doc.exists:
-        return doc.to_dict()
-    else:
-        data_defaut = {
-            "Sable": 12.0, "Terre": 16.0, "Enrobé": 42.0, "Armature": 70.0, "Tôle": 55.0,
-            "Béton": 45.0, "Panneaux": 90.0, "Tuyaux": 32.0, "Canalisations": 35.0, "Poutres": 70.0
-        }
-        doc_ref.set(data_defaut)
-        return data_defaut
+    try:
+        doc_ref = db.collection("configuration_materiaux").document("catalogue")
+        doc = doc_ref.get()
+        if doc.exists:
+            return doc.to_dict()
+    except Exception:
+        pass
+        
+    data_defaut = {
+        "Sable": 12.0, "Terre": 16.0, "Enrobé": 42.0, "Armature": 70.0, "Tôle": 55.0,
+        "Béton": 45.0, "Panneaux": 90.0, "Tuyaux": 32.0, "Canalisations": 35.0, "Poutres": 70.0
+    }
+    try:
+        db.collection("configuration_materiaux").document("catalogue").set(data_defaut)
+    except Exception:
+        pass
+    return data_defaut
 
 def charger_catalogue_engins():
     docs = db.collection("catalogue_engins").stream()
