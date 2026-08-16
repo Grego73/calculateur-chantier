@@ -165,7 +165,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
             )
 
             if st.button("📊 ANALYSER ET METTRE À JOUR CE POSTE"):
-                if not text_recrutement_brut.strip():
+                if not texte_recrutement_brut.strip():
                     st.error("❌ La zone de texte est vide.")
                 else:
                     lignes_recrues = texte_recrutement_brut.split("\n")
