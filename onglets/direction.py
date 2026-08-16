@@ -213,23 +213,24 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                     if st.button("❌ ANNULER", use_container_width=True):
                         st.rerun()
 
-                # Boutons de décision finale
+                # Boutons de décision finale avec clés uniques dynamiques
                 c_p1, c_p2 = st.columns(2)
                 with c_p1:
-                    if st.button("✅ ENREGISTRER SUR FIREBASE", type="primary", use_container_width=True):
+                    # Ajout d'une key unique basée sur le métier pour éviter le doublon
+                    if st.button("✅ ENREGISTRER SUR FIREBASE", type="primary", use_container_width=True, key=f"btn_save_cloud_{metier}"):
                         grille_actuelle = dict(SALAIRES_DB)
                         
-                        # IMPORTANT : On enregistre directement les valeurs ramenées AU JOUR pour que l'onglet 1 n'ait plus de division complexe à faire !
-                        grille_actuelle[f"{metier}_Min"] = float(round(sj_min, 2))
-                        grille_actuelle[f"{metier}_Moyen"] = float(round(sj_moyen, 2))
-                        grille_actuelle[f"{metier}_Max"] = float(round(sj_max, 2))
-                        grille_actuelle[metier] = float(round(sj_moyen, 2))
+                        grille_actuelle[f"{metier}_Min"] = int(sj_min)
+                        grille_actuelle[f"{metier}_Moyen"] = int(sj_moyen)
+                        grille_actuelle[f"{metier}_Max"] = int(sj_max)
+                        grille_actuelle[metier] = int(sj_moyen)
 
                         db.db.collection("configuration_salaires").document("grille").set(grille_actuelle)
-                        st.toast(f"🚀 Tarifs journaliers enregistrés pour les {metier}s !")
+                        st.toast(f"🚀 Tarifs journaliers enregistrés en entiers pour les {metier}s !")
                         st.rerun()
                 with c_p2:
-                    if st.button("❌ ANNULER", use_container_width=True):
+                    # Ajout d'une key unique ici aussi
+                    if st.button("❌ ANNULER", use_container_width=True, key=f"btn_cancel_cloud_{metier}"):
                         st.rerun()
 
             # --- LE BOUTON PRINCIPAL D'ANALYSE CORRIGÉ ---
