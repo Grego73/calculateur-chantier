@@ -62,51 +62,53 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         
     with col2:
         st.markdown("### --- GRILLE SALARIALE (PALIERS & CONTRATS D'ÉQUIPE) ---")
-        st.caption("💡 Règles RH : Les CDI sont payés au prorata exact (1 mois = 7j). Les CDD sont payés à la journée entamée (arrondi supérieur).")
+        st.caption("💡 Règles RH : Les CDI se basent sur votre grille CDI. Les CDD se basent sur votre grille CDD (toute journée entamée est due).")
         
         # --- 1. CONFIGURATION CONDUCTEURS ---
         st.markdown("**🕹️ PROFIL : CONDUCTEURS D'ENGINS**")
-        c_cond_strat, c_cond_type, c_cond_jh = st.columns(3) # Divisé en 3 colonnes désorrmais
-        with c_cond_strat:
-            p_min_co = float(SALAIRES_DB.get("Conducteur_Min", 230.0))
-            p_moy_co = float(SALAIRES_DB.get("Conducteur_Moyen", 230.0))
-            p_max_co = float(SALAIRES_DB.get("Conducteur_Max", 230.0))
-            strat_cond = st.selectbox("Salaire :", [f"Économique ({p_min_co:.0f} €)", f"Standard ({p_moy_co:.0f} €)", f"Premium ({p_max_co:.0f} €)"], key="sel_strat_cond")
-            px_cond = p_min_co if "Économique" in strat_cond else (p_moy_co if "Standard" in strat_cond else p_max_co)
+        c_cond_type, c_cond_strat, c_cond_jh = st.columns(3)
         with c_cond_type:
-            type_contrat_cond = st.selectbox("Contrat :", ["CDI (Au mois)", "CDD (À la journée)"], key="type_contrat_cond")
+            type_contrat_cond = st.selectbox("Contrat :", ["CDI", "CDD"], key="type_contrat_cond")
+        with c_cond_strat:
+            # Récupération de la clé correspondante (CDI ou CDD) selon le choix du sélecteur
+            p_min_co = float(SALAIRES_DB.get(f"Conducteur_{type_contrat_cond}_Min", 230.0))
+            p_moy_co = float(SALAIRES_DB.get(f"Conducteur_{type_contrat_cond}_Moyen", 230.0))
+            p_max_co = float(SALAIRES_DB.get(f"Conducteur_{type_contrat_cond}_Max", 230.0))
+            strat_cond = st.selectbox("Salaire :", [f"Économique ({p_min_co:.0f} €/j)", f"Standard ({p_moy_co:.0f} €/j)", f"Premium ({p_max_co:.0f} €/j)"], key="sel_strat_cond")
+            px_cond = p_min_co if "Économique" in strat_cond else (p_moy_co if "Standard" in strat_cond else p_max_co)
         with c_cond_jh:
             jh_cond = st.number_input("Nombre d'employés", min_value=0.0, value=float(donnees_modele.get("jh_cond", 0.0)), key="jh_input_cond")
 
         # --- 2. CONFIGURATION CHEFS ---
         st.markdown("**🧑‍💼 PROFIL : CHEFS DE CHANTIER**")
-        c_chef_strat, c_chef_type, c_chef_jh = st.columns(3)
-        with c_chef_strat:
-            p_min_c = float(SALAIRES_DB.get("Chef_Min", 230.0))
-            p_moy_c = float(SALAIRES_DB.get("Chef_Moyen", 230.0))
-            p_max_c = float(SALAIRES_DB.get("Chef_Max", 230.0))
-            strat_chef = st.selectbox("Salaire :", [f"Économique ({p_min_c:.0f} €)", f"Standard ({p_moy_c:.0f} €)", f"Premium ({p_max_c:.0f} €)"], key="sel_strat_chef")
-            px_chef = p_min_c if "Économique" in strat_chef else (p_moy_c if "Standard" in strat_chef else p_max_c)
+        c_chef_type, c_chef_strat, c_chef_jh = st.columns(3)
         with c_chef_type:
-            type_contrat_chef = st.selectbox("Contrat :", ["CDI (Au mois)", "CDD (À la journée)"], key="type_contrat_chef")
+            type_contrat_chef = st.selectbox("Contrat :", ["CDI", "CDD"], key="type_contrat_chef")
+        with c_chef_strat:
+            p_min_c = float(SALAIRES_DB.get(f"Chef_{type_contrat_chef}_Min", 230.0))
+            p_moy_c = float(SALAIRES_DB.get(f"Chef_{type_contrat_chef}_Moyen", 230.0))
+            p_max_c = float(SALAIRES_DB.get(f"Chef_{type_contrat_chef}_Max", 230.0))
+            strat_chef = st.selectbox("Salaire :", [f"Économique ({p_min_c:.0f} €/j)", f"Standard ({p_moy_c:.0f} €/j)", f"Premium ({p_max_c:.0f} €/j)"], key="sel_strat_chef")
+            px_chef = p_min_c if "Économique" in strat_chef else (p_moy_c if "Standard" in strat_chef else p_max_c)
         with c_chef_jh:
             jh_chef = st.number_input("Nombre d'employés", min_value=0.0, value=float(donnees_modele.get("jh_chef", 0.0)), key="jh_input_chef")
 
         # --- 3. CONFIGURATION OUVRIERS ---
         st.markdown("**👷 PROFIL : OUVRIERS QUALIFIÉS**")
-        c_ouv_strat, c_ouv_type, c_ouv_jh = st.columns(3)
-        with c_ouv_strat:
-            p_min_o = float(SALAIRES_DB.get("Ouvrier_Min", 230.0))
-            p_moy_o = float(SALAIRES_DB.get("Ouvrier_Moyen", 230.0))
-            p_max_o = float(SALAIRES_DB.get("Ouvrier_Max", 230.0))
-            strat_ouv = st.selectbox("Salaire :", [f"Économique ({p_min_o:.0f} €)", f"Standard ({p_moy_o:.0f} €)", f"Premium ({p_max_o:.0f} €)"], key="sel_strat_ouv")
-            px_ouvrier = p_min_o if "Économique" in strat_ouv else (p_moy_o if "Standard" in strat_ouv else p_max_o)
+        c_ouv_type, c_ouv_strat, c_ouv_jh = st.columns(3)
         with c_ouv_type:
-            type_contrat_ouv = st.selectbox("Contrat :", ["CDI (Au mois)", "CDD (À la journée)"], key="type_contrat_ouv")
+            type_contrat_ouv = st.selectbox("Contrat :", ["CDI", "CDD"], key="type_contrat_ouv")
+        with c_ouv_strat:
+            p_min_o = float(SALAIRES_DB.get(f"Ouvrier_{type_contrat_ouv}_Min", 230.0))
+            p_moy_o = float(SALAIRES_DB.get(f"Ouvrier_{type_contrat_ouv}_Moyen", 230.0))
+            p_max_o = float(SALAIRES_DB.get(f"Ouvrier_{type_contrat_ouv}_Max", 230.0))
+            strat_ouv = st.selectbox("Salaire :", [f"Économique ({p_min_o:.0f} €/j)", f"Standard ({p_moy_o:.0f} €/j)", f"Premium ({p_max_o:.0f} €/j)"], key="sel_strat_ouv")
+            px_ouvrier = p_min_o if "Économique" in strat_ouv else (p_moy_o if "Standard" in strat_ouv else p_max_o)
         with c_ouv_jh:
             jh_ouvrier = st.number_input("Nombre d'employés", min_value=0.0, value=float(donnees_modele.get("jh_ouvrier", 0.0)), key="jh_input_ouv")
 
         st.markdown("### --- TABLE DES ENGINS NÉCESSAIRES ---")
+
 
 
         engins_bruts_modele = []
