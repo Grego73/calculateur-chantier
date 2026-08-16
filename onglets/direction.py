@@ -143,22 +143,28 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                         compteur_total += 1
                     if compteur_total > 0: st.success(f"🟢 {compteur_total} fiche(s) injectée(s) !"); st.rerun()
 
-                # --- 4.2 CONFIGURATION GRILLE SALARIALE AVEC EXTRACTEUR DE RECRUTEMENT ---
+        # --- 4.2 CONFIGURATION GRILLE SALARIALE AVEC EXTRACTEUR DE RECRUTEMENT PAR MÉTIER ---
         with sub_tab2:
-            st.markdown("### 👥 Extracteur et Calculateur de Salaires (Recrutement)")
-            st.write("Collez le tableau brut de vos recrues potentielles ci-dessous. L'algorithme calculera les montants Min, Moyen et Max pour mettre à jour la grille de votre jeu.")
+            st.markdown("### 👥 Extracteur et Calculateur de Salaires par Métier")
+            st.write("Sélectionnez le poste concerné, puis collez le tableau brut de vos recrues potentielles.")
+
+            # --- NOUVEAU : MENU DÉROULANT DE SÉLECTION DU MÉTIER ---
+            metier_cible = st.selectbox(
+                "💼 Pour quel poste analysez-vous ces salaires ?",
+                ["Ouvrier", "Chef", "Conducteur", "Intérim"]
+            )
 
             # Zone de saisie brute pour coller le tableau du jeu
             texte_recrutement_brut = st.text_area(
-                "Collez le tableau des recrues ici (avec les en-têtes ou sans) :",
+                f"Collez le tableau des recrues pour le poste [{metier_cible}] ici :",
                 value="",
                 height=250,
                 key="zone_texte_recrutement_brut",
                 placeholder="Betty\t48 ans\t1 622 €\tEngager\nJean-pierre\t45 ans\t1 623 €\tEngager"
             )
 
-            if st.button("📊 ANALYSER LES SALAIRES & METTRE À JOUR LA GRILLE"):
-                if not texte_recrutement_brut.strip():
+            if st.button("📊 ANALYSER ET METTRE À JOUR CE POSTE"):
+                if not text_recrutement_brut.strip():
                     st.error("❌ La zone de texte est vide.")
                 else:
                     lignes_recrues = texte_recrutement_brut.split("\n")
@@ -167,52 +173,43 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                     for ligne in lignes_recrues:
                         l_clean = ligne.strip()
                         if not l_clean or "salaire" in l_clean.lower(): 
-                            continue # On ignore les lignes vides et l'en-tête du tableau
+                            continue 
                         
-                        # Découpage par tabulation (copie-collé standard de tableaux web) ou espaces
                         elements = l_clean.split("\t") if "\t" in l_clean else l_clean.split()
                         
-                        # Recherche du salaire dans la ligne (élément contenant € ou un nombre proche de la fin)
                         for el in elements:
                             if "€" in el or any(c.isdigit() for c in el):
-                                # Nettoyage complet pour ne garder que les chiffres (ex: "1 622 €" -> 1622)
                                 chiffre_net = "".join(c for c in el if c.isdigit())
                                 if chiffre_net:
                                     liste_salaires_extraits.append(float(chiffre_net))
-                                    break # On a trouvé le salaire de cette ligne, on passe à la recrue suivante
+                                    break 
 
                     if len(liste_salaires_extraits) > 0:
-                        # Calculs statistiques pour ton gameplay
                         salaire_min = float(min(liste_salaires_extraits))
                         salaire_max = float(max(liste_salaires_extraits))
                         salaire_moyen = float(sum(liste_salaires_extraits) / len(liste_salaires_extraits))
 
-                        # Enregistrement des trois paliers directement dans ton document Firebase
-                        nouveau_catalogue_salaires = {
-                            "Chef": 230.0,      # Valeurs par défaut conservées pour tes autres structures
-                            "Ouvrier": 230.0,
-                            "Conducteur": 230.0,
-                            "Intérim": 220.0,
-                            "Jeu_Palier_Min": salaire_min,
-                            "Jeu_Palier_Moyen": round(salaire_moyen, 2),
-                            "Jeu_Palier_Max": salaire_max
-                        }
-
-                        db.db.collection("configuration_salaires").document("grille").set(nouveau_catalogue_salaires)
+                        # On récupère d'abord toute la grille existante dans Firebase pour ne pas effacer les autres métiers
+                        grille_actuelle = dict(SALAIRES_DB)
                         
-                        st.success(f"🎉 Grille synchronisée ! {len(liste_salaires_extraits)} employés analysés.")
-                        st.metric("Montant Minimum", f"{salaire_min:,.2f} €".replace(",", " "))
-                        st.metric("Montant Moyen", f"{salaire_moyen:,.2f} €".replace(",", " "))
-                        st.metric("Montant Maximum", f"{salaire_max:,.2f} €".replace(",", " "))
+                        # On injecte les 3 paliers spécifiques au métier sélectionné
+                        grille_actuelle[f"{metier_cible}_Min"] = salaire_min
+                        grille_actuelle[f"{metier_cible}_Moyen"] = round(salaire_moyen, 2)
+                        grille_actuelle[f"{metier_cible}_Max"] = salaire_max
+
+                        # Par sécurité pour le reste du code, on met aussi à jour la valeur par défaut sur le prix moyen
+                        grille_actuelle[metier_cible] = round(salaire_moyen, 2)
+
+                        db.db.collection("configuration_salaires").document("grille").set(grille_actuelle)
+                        
+                        st.success(f"🎉 Paliers Cloud mis à jour pour le poste : {metier_cible} !")
                         st.rerun()
                     else:
-                        st.error("❌ Aucun montant de salaire valide n'a pu être extrait. Vérifiez le format de votre texte.")
+                        st.error("❌ Aucun montant de salaire valide extrait.")
 
-            # --- AFFICHAGE DE LA GRILLE ACTUELLE POUR CONTRÔLE ---
             st.markdown("---")
-            st.write("⚙️ **Aperçu des tarifs actuellement enregistrés en base :**")
-            salaires_actuels_df = pd.DataFrame(list(SALAIRES_DB.items()), columns=["Type / Palier", "Montant (€)"])
-            st.dataframe(salaires_actuels_df, use_container_width=True, hide_index=True)
+            st.write("⚙️ **Grille tarifaire enregistrée en base :**")
+            st.dataframe(pd.DataFrame(list(SALAIRES_DB.items()), columns=["Poste / Palier", "Montant (€)"]), use_container_width=True, hide_index=True)
 
         # --- 4.3 CONFIGURATION DES MATÉRIAUX ---
         with sub_tab3:
