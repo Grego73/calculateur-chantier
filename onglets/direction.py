@@ -196,24 +196,30 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                         compteur_total += 1
                     if compteur_total > 0: st.success(f"🟢 {compteur_total} fiche(s) injectée(s) !"); st.rerun()
 
-        # --- 4.2 CONFIGURATION GRILLE SALARIALE (RECRUTEMENT MIS À JOUR SANS INTÉRIM) ---
+        # --- 4.2 CONFIGURATION GRILLE SALARIALE (AVEC CALCUL COMPTABILITÉ CDI / CDD) ---
         with sub_tab2:
-            st.markdown("### 👥 Extracteur et Calculateur de Salaires par Métier")
-            st.write("Sélectionnez le poste concerné (Conducteur, Chef ou Ouvrier), puis collez le tableau brut de vos recrues.")
+            st.markdown("### 👥 Extracteur et Calculateur de Salaires par Métier & Contrat")
+            st.write("Sélectionnez les paramètres, puis collez le tableau brut de vos recrues potentielles.")
 
-            # Menu déroulant mis à jour : l'intérim est supprimé
-            metier_cible = st.selectbox(
-                "💼 Pour quel poste analysez-vous ces salaires ?",
-                ["Conducteur", "Chef", "Ouvrier"]
-            )
+            c_admin_poste, c_admin_contrat = st.columns(2)
+            with c_admin_poste:
+                metier_cible = st.selectbox(
+                    "💼 Poste à analyser :",
+                    ["Conducteur", "Chef", "Ouvrier"]
+                )
+            with c_admin_contrat:
+                type_contrat_cible = st.selectbox(
+                    "📜 Type de contrat collé :",
+                    ["CDI (Tableau en salaire mensuel)", "CDD (Tableau en salaire par jour)"]
+                )
 
             texte_recrutement_brut = st.text_area(
-                f"Collez le tableau des recrues pour le poste [{metier_cible}] ici :",
+                f"Collez le tableau des recrues pour [{metier_cible}] en [{type_contrat_cible}] ici :",
                 value="", height=250, key="zone_texte_recrutement_brut",
                 placeholder="Betty\t48 ans\t1 622 €\tEngager\nJean-pierre\t45 ans\t1 623 €\tEngager"
             )
 
-            if st.button("📊 ANALYSER LES SALAIRES SOUMIS"):
+            if st.button("📊 ANALYSER LES SALAIRES SOUMIS", key="btn_declencher_analyse_unique"):
                 if not texte_recrutement_brut.strip():
                     st.error("❌ La zone de texte est vide.")
                 else:
@@ -243,23 +249,44 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             liste_salaires_extraits.append(salaire_trouve)
 
                     if len(liste_salaires_extraits) > 0:
-                        # Appel du pop-up d'analyse en transmettant le dictionnaire global
-                        pop_up_validation_recrutement(liste_salaires_extraits, metier_cible, SALAIRES_DB)
+                        # --- TRAITEMENT ET CONVERSION DES ENTIERS SELON LE CONTRAT ---
+                        sm_min = min(liste_salaires_extraits)
+                        sm_max = max(liste_salaires_extraits)
+                        sm_moyen = sum(liste_salaires_extraits) / len(liste_salaires_extraits)
+
+                        # Si c'est du CDI, on divise par 7 pour trouver le jour. Si c'est du CDD, on garde brut !
+                        if "CDI" in type_contrat_cible:
+                            sj_min = math.ceil(sm_min / 7.0)
+                            sj_moyen = math.ceil(sm_moyen / 7.0)
+                            sj_max = math.ceil(sm_max / 7.0)
+                            prefixe_cle = f"{metier_cible}_CDI"
+                            st.info(f"💡 Rappel : Conversion CDI mensuelle ramenée au jour (Salaire moyen lu : {int(sm_moyen)} €/mois)")
+                        else:
+                            sj_min = math.ceil(sm_min)
+                            sj_moyen = math.ceil(sm_moyen)
+                            sj_max = math.ceil(sm_max)
+                            prefixe_cle = f"{metier_cible}_CDD"
+                            st.info(f"💡 Rappel : Enregistrement CDD direct au jour (Salaire moyen lu : {int(sm_moyen)} €/jour)")
+
+                        # Sauvegarde dans Firebase
+                        grille_actuelle = dict(SALAIRES_DB)
+                        grille_actuelle[f"{prefixe_cle}_Min"] = int(sj_min)
+                        grille_actuelle[f"{prefixe_cle}_Moyen"] = int(sj_moyen)
+                        grille_actuelle[f"{prefixe_cle}_Max"] = int(sj_max)
+                        
+                        # Sécurité pour éviter les bugs d'anciennes versions
+                        grille_actuelle[metier_cible] = int(sj_moyen)
+
+                        db.db.collection("configuration_salaires").document("grille").set(grille_actuelle)
+                        st.success(f"🚀 Tarifs journaliers mis à jour pour {metier_cible} en format {type_contrat_cible.split()[0]} !")
+                        st.rerun()
                     else:
                         st.error("❌ Aucun montant de salaire valide n'a pu être extrait.")
 
-            # --- AFFICHAGE FILTRÉ DE LA GRILLE ACTUELLE POUR TON JEU ---
             st.markdown("---")
-            st.write("⚙️ **Grille tarifaire enregistrée en base (Hors anciens profils) :**")
-            
-            # On nettoie l'affichage pour masquer les anciennes clés "Intérim" obsolètes de la base Firebase
-            lignes_propres = [
-                (poste, mt) for poste, mt in SALAIRES_DB.items() 
-                if "Intérim" not in poste and "Intérim_Min" not in poste and "Intérim_Moyen" not in poste and "Intérim_Max" not in poste
-            ]
-            
-            salaires_actuels_df = pd.DataFrame(lignes_propres, columns=["Poste / Palier de Jeu", "Montant / jour (€)"])
-            st.dataframe(salaires_actuels_df, use_container_width=True, hide_index=True)
+            st.write("⚙ Honoraires journaliers en base de données :")
+            lignes_propres = [(poste, mt) for poste, mt in SALAIRES_DB.items() if "Intérim" not in poste]
+            st.dataframe(pd.DataFrame(lignes_propres, columns=["Clé de Grille", "Montant / jour (€)"]), use_container_width=True, hide_index=True)
 
         # --- 4.3 CONFIGURATION DES MATÉRIAUX ---
         with sub_tab3:
