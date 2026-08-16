@@ -3,6 +3,7 @@ import pandas as pd
 import firebase_admin
 from firebase_admin import credentials, firestore
 import json
+import math
 
 st.set_page_config(page_title="Gestion des Chantiers", page_icon="🏗️", layout="wide")
 st.title("Gestion et Rentabilité des Chantiers")
@@ -31,8 +32,6 @@ def charger_salaires_config():
             return doc.to_dict()
     except Exception:
         pass
-    
-    # Données par défaut si le document n'existe pas encore ou bug
     data_defaut = {"Chef": 230.0, "Ouvrier": 230.0, "Conducteur": 230.0, "Intérim": 220.0}
     try:
         db.collection("configuration_salaires").document("grille").set(data_defaut)
@@ -48,7 +47,6 @@ def charger_materiaux_config():
             return doc.to_dict()
     except Exception:
         pass
-        
     data_defaut = {
         "Sable": 12.0, "Terre": 16.0, "Enrobé": 42.0, "Armature": 70.0, "Tôle": 55.0,
         "Béton": 45.0, "Panneaux": 90.0, "Tuyaux": 32.0, "Canalisations": 35.0, "Poutres": 70.0
@@ -171,10 +169,8 @@ with onglet1:
     with col1:
         st.markdown("### --- PARAMÈTRES GÉNÉRAUX ---")
         revenus = st.number_input("Revenus prévus du chantier (€) :", value=float(donnees_modele["revenus"]))
-        st.markdown("### --- PARAMÈTRES GÉNÉRAUX ---")
-        revenus = st.number_input("Revenus prévus du chantier (€) :", value=float(donnees_modele["revenus"]))
         
-        st.label("Durée totale du chantier :")
+        st.write("⏱️ **Durée totale du chantier :**")
         c_j, c_h, c_m = st.columns(3)
         with c_j:
             jours_saisis = st.number_input("Jours", min_value=0, value=int(donnees_modele["jours"]), step=1)
@@ -183,10 +179,8 @@ with onglet1:
         with c_m:
             minutes_saisies = st.number_input("Minutes", min_value=0, max_value=59, value=0, step=1)
 
-        # Conversion universelle en jours décimaux (Base : 1 jour = 7h de travail effectif)
-        heures_totales_decimales = heures_saisies + (minutes_saisies / 60.0)
-        jours_totaux = jours_saisis + (heures_totales_decimales / 7.0)
-
+        # Logique de jeu : 1 journée = 24 heures
+        jours_totaux = jours_saisis + (heures_saisies / 24.0) + (minutes_saisies / 1440.0)
 
         st.markdown("### --- MATÉRIAUX ---")
         c_qte, c_px = st.columns(2)
@@ -213,29 +207,22 @@ with onglet1:
             prix_eaux_usees = st.number_input("Prix Canalisations (€/u) :", value=float(MATERIAUX_DB.get("Canalisations", 35)))
             prix_poutres = st.number_input("Prix Poutres acier (€/u) :", value=float(MATERIAUX_DB.get("Poutres", 70)))
 
-        # Calcul instantané du coût de revient des fournitures
         total_mats_direct = float((qte_sable*prix_sable) + (qte_terre*prix_terre) + (qte_enrobe*prix_enrobe) + (qte_armature*prix_armature) + (qte_tole*prix_tole) + (qte_beton*prix_beton) + (qte_panneaux*prix_panneaux) + (qte_tuyaux*prix_tuyaux) + (qte_eaux_usees*prix_eaux_usees) + (qte_poutres*prix_poutres))
-        total_mats_formatte = f"{total_mats_direct:,.0f}".replace(",", " ")
-        st.info(f"🧱 **Total estimé des matériaux :** {total_mats_formatte} €")
+        st.info(f"🧱 **Total est. matériaux :** {total_mats_direct:,.0f}".replace(",", " ") + " €")
         
     with col2:
-        st.markdown("### --- GRILLE SALARIALE & INTERIM ---")
-        px_chef = st.number_input("Coût journalier Chef (€/jour) :", value=float(SALAIRES_DB.get("Chef", 230)))
+        st.markdown("### --- GRILLE SALARIALE & INTERIM (RÈGLES DU JEU) ---")
+        st.caption("💡 Rappel : Chefs, Ouvriers et Conducteurs sont payés au mois (1 mois = 7 jours de jeu). Les Intérimaires sont payés à la journée.")
+        
+        px_chef = st.number_input("Salaire MENSUEL Chef (€/mois) :", value=float(SALAIRES_DB.get("Chef", 230)))
         jh_chef = st.number_input("Total Jours-Homme Chef :", value=float(donnees_modele["jh_chef"]))
-        
-        px_ouvrier = st.number_input("Coût journalier Ouvrier (€/jour) :", value=float(SALAIRES_DB.get("Ouvrier", 230)))
+        px_ouvrier = st.number_input("Salaire MENSUEL Ouvrier (€/mois) :", value=float(SALAIRES_DB.get("Ouvrier", 230)))
         jh_ouvrier = st.number_input("Total Jours-Homme Ouvrier :", value=float(donnees_modele["jh_ouvrier"]))
-        
-        px_cond = st.number_input("Coût journalier Conducteur (€/jour) :", value=float(SALAIRES_DB.get("Conducteur", 230)))
+        px_cond = st.number_input("Salaire MENSUEL Conducteur (€/mois) :", value=float(SALAIRES_DB.get("Conducteur", 230)))
         jh_cond = st.number_input("Total Jours-Homme Conducteur :", value=float(donnees_modele["jh_cond"]))
-        
-        st.caption("⚙️ Options intérimaires externes")
-        px_interim = st.number_input("Coût journalier moyen d'un Intérimaire (€/jour) :", value=float(SALAIRES_DB.get("Intérim", 220)))
+        st.caption("⚙️ Option Intérim (Contrat à la journée)")
+        px_interim = st.number_input("Coût JOURNALIER d'un Intérimaire (€/jour) :", value=float(SALAIRES_DB.get("Intérim", 220)))
         jh_interim = st.number_input("Total Jours-Homme requis en Intérim :", value=0.0)
-
-        total_salaires_direct = float((jh_chef * px_chef) + (jh_ouvrier * px_ouvrier) + (jh_cond * px_cond) + (jh_interim * px_interim))
-        total_salaires_formatte = f"{total_salaires_direct:,.0f}".replace(",", " ")
-        st.info(f"👥 **Total estimé salaires + intérim :** {total_salaires_formatte} €")
 
         st.markdown("### --- TABLE DES ENGINS NÉCESSAIRES ---")
         engins_bruts_modele = []
@@ -258,7 +245,6 @@ with onglet1:
                 "À louer ?": st.column_config.CheckboxColumn("À louer ?", default=False)
             }
         )
-
         # Logique de transfert universelle vers la table des engins à louer
         engins_transferes_list = []
         if not engins_necessaires.empty:
@@ -304,46 +290,28 @@ with onglet1:
                 "Jours de Location": st.column_config.NumberColumn("Jours à louer", min_value=1, max_value=365, step=1)
             }
         )
-        
-        total_loc_engins_direct = 0.0
-        if engins_edites is not None and not engins_edites.empty:
-            df_propres_direct = engins_edites.dropna(subset=["Sélection de l'engin / Modèle"])
-            df_propres_direct["Jours de Location"] = pd.to_numeric(df_propres_direct["Jours de Location"]).fillna(1).astype(int)
-            total_loc_engins_direct = (df_propres_direct["Quantité"] * df_propres_direct["Prix Location (€/jour)"] * df_propres_direct["Jours de Location"]).sum()
-            
-        total_engins_formatte = f"{total_loc_engins_direct:,.0f}".replace(",", " ")
-        st.info(f"💰 **Total des engins loués (Calcul personnalisé) :** {total_engins_formatte} €")
 
-    # --- RECAPITULATIF FINANCIER GLOBAL ---
-    st.markdown("---")
-    st.markdown("### 📊 Récapitulatif Global Estimé")
-
-    total_mats_recap = float(total_mats_direct)
     # ==============================================================================
     # --- LOGIQUE DE CALCUL DU JEU (ARRONDI AU JOUR SUPÉRIEUR POUR LOC/INTÉRIM) ---
     # ==============================================================================
-    import math
-
-    # Règle du jeu : toute journée entamée est entièrement due pour la location et l'intérim
-    # Si jours_totaux = 1.04 (1j 1h), jours_factures_jeu vaudra 2.0
+    # Règle du jeu : toute journée entamée est due pour la location et l'intérim
     jours_factures_jeu = math.ceil(jours_totaux)
 
     # 1. Calcul des Matériaux
     total_mats_recap = float(total_mats_direct)
 
-    # 2. Calcul de la Location des Engins (Quantité * Prix/Jour * Jours Facturés)
+    # 2. Calcul de la Location des Engins
     total_location_recap = 0.0
     if engins_edites is not None and not engins_edites.empty:
         df_propres_direct = engins_edites.dropna(subset=["Sélection de l'engin / Modèle"])
         total_location_recap = float((df_propres_direct["Quantité"] * df_propres_direct["Prix Location (€/jour)"] * jours_factures_jeu).sum())
 
     # 3. Calcul de la Grille Salariale
-    # Fixes (Mensuels) : au prorata exact du temps réel du chantier (1 semaine = 7 jours = 1 mois)
+    # Fixes : au prorata réel (1 semaine = 7 jours = 1 mois)
     cout_chefs = jh_chef * (px_chef / 7.0) * jours_totaux
     cout_ouvriers = jh_ouvrier * (px_ouvrier / 7.0) * jours_totaux
     cout_cond = jh_cond * (px_cond / 7.0) * jours_totaux
-    
-    # Intérimaires (Journaliers) : payés à la journée entamée (arrondi supérieur)
+    # Intérimaires : à la journée entamée
     cout_interim = jh_interim * px_interim * jours_factures_jeu
 
     total_salaires_recap = float(cout_chefs + cout_ouvriers + cout_cond + cout_interim)
@@ -356,7 +324,6 @@ with onglet1:
     gain_par_jour_recap = float(benefice_net_recap / jours_totaux if jours_totaux > 0 else 0.0)
     roi_par_jour_recap = float(roi_recap / jours_totaux if jours_totaux > 0 else roi_recap)
 
-    # Formatage du texte pour l'affichage
     txt_mats = f"{total_mats_recap:,.0f}".replace(",", " ")
     txt_loc = f"{total_location_recap:,.0f}".replace(",", " ")
     txt_sal = f"{total_salaires_recap:,.0f}".replace(",", " ")
@@ -364,7 +331,6 @@ with onglet1:
     txt_gain_jour = f"{gain_par_jour_recap:,.0f}".replace(",", " ")
     txt_benefice = f"{abs(benefice_net_recap):,.0f}".replace(",", " ")
 
-    # --- RECAPITULATIF VISUEL ---
     st.markdown("---")
     st.markdown("### 📊 Récapitulatif Global Estimé (Règles du Jeu)")
     if jours_totaux > 0 and jours_totaux != jours_factures_jeu:
@@ -395,12 +361,9 @@ with onglet1:
         if not nom_chantier: st.error("Veuillez donner un nom ou un numéro valide.")
         elif doublon_existe: st.error(f"Impossible d'enregistrer : ce chantier existe déjà.")
         else:
-            # On enregistre la durée exacte (jours_totaux) pour garder des stats précises en BDD
             inserer_chantier(nom_chantier, revenus, total_mats_recap, total_location_recap, total_salaires_recap, total_depenses_recap, benefice_net_recap, round(roi_recap, 2), float(jours_totaux), round(gain_par_jour_recap, 2), round(roi_par_jour_recap, 2))
             st.toast("Chantier enregistré avec succès dans Firebase !")
             st.rerun()
-
-
 # --- ONGLET 2 : HISTORIQUE ET CLASSEMENT ---
 with onglet2:
     st.subheader("Base de données des chantiers enregistrés en temps réel")
@@ -451,7 +414,6 @@ with onglet2:
         
         csv = df_affichage.to_csv(index=False).encode('utf-8')
         st.download_button(label="📥 Télécharger la base de données cloud (CSV)", data=csv, file_name="base_donnies_chantiers.csv", mime="text/csv")
-        st.markdown("---")
 
 # --- PANNEAU DE CONTRÔLE SUPRÊME (🔒 ESPACE DIRECTION) ---
 with onglet3:
@@ -475,34 +437,29 @@ with onglet3:
             with c_st3: st.metric(label="📉 Dépenses Totales", value=f"{somme_depenses:,.0f}".replace(",", " ") + " €")
             with c_st4: st.metric(label="📈 Résultat Net / Bénéfice", value=f"{somme_benefices:,.0f}".replace(",", " ") + " €")
             
-            # --- NOUVEAU : ZONE DE SÉCURITÉ ET NETTOYAGE CIBLÉ DES TABLES ---
+            # --- ZONE DE SÉCURITÉ ET NETTOYAGE CIBLÉ DES TABLES ---
             st.markdown("<br>", unsafe_allow_html=True)
             with st.expander("🚨 Zone de Danger : Réinitialisation et Nettoyage des Tables"):
                 st.warning("Attention : Ces actions suppriment définitivement les données stockées sur Firebase.")
                 
                 col_del1, col_del2, col_del3 = st.columns(3)
-                
                 with col_del1:
                     if st.button("🗑️ Vider l'Historique des Chantiers", type="secondary", use_container_width=True):
                         docs = db.collection("chantiers").stream()
                         for d in docs: d.reference.delete()
                         st.toast("Historique des chantiers supprimé !")
                         st.rerun()
-                        
                 with col_del2:
                     if st.button("🗑️ Vider les Modèles Préfabriqués", type="secondary", use_container_width=True):
                         docs = db.collection("modeles_chantiers").stream()
                         for d in docs: d.reference.delete()
                         st.toast("Catalogue des modèles vidé !")
                         st.rerun()
-                        
                 with col_del3:
-                    if st.button("💥 TOUT RÉINITIALISER (Configuration incluse)", type="primary", use_container_width=True):
+                    if st.button("💥 TOUT RÉINITIALISER", type="primary", use_container_width=True):
                         reinitialiser_db()
                         st.rerun()
-            
             st.markdown("---")
-
 
         st.markdown("## ⚙️ Administration Suprême des Bases NoSQL")
         sub_tab1, sub_tab2, sub_tab3, sub_tab4, sub_tab5 = st.tabs([
@@ -561,6 +518,7 @@ with onglet3:
                         if l_clean.lower().startswith("revenus"):
                             num_part = "".join(c for c in l_clean if c.isdigit())
                             if num_part: chantiers_detectes[nom_courant]["revenus"] = float(num_part)
+                                
                         if "nombre d'étapes" in l_clean.lower() or "nb ombre" in l_clean.lower():
                             partie_etape = l_clean.split(":")[-1] if ":" in l_clean else l_clean
                             num_etapes = "".join(c for c in partie_etape.split() if c.isdigit()) if partie_etape.split() else ""
@@ -688,10 +646,7 @@ with onglet3:
                 docs = db.collection("catalogue_engins").stream()
                 res = [{"Engin Modèle": d.id, "Catégorie Technique": d.to_dict().get("type_brut"), "Prix de location (€/jour)": d.to_dict().get("prix_jour")} for d in docs]
                 if res: st.dataframe(pd.DataFrame(res), use_container_width=True)
-                else: st.info("Le catalogue de machines est vide.")
+                else: st.info("Le catalogue de machines é vide.")
                 
     elif mot_de_passe != "":
         st.error("🔒 Code d'accès incorrect. Les privilèges d'administration restent verrouillés.")
-
-
-
