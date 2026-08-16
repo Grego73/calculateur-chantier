@@ -207,8 +207,8 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                     if st.button("❌ ANNULER", use_container_width=True):
                         st.rerun()
 
-            # --- LE BOUTON PRINCIPAL D'ANALYSE ---
-            if st.button("📊 ANALYSER LES SALAIRES SOU MIS"):
+            # --- LE BOUTON PRINCIPAL D'ANALYSE CORRIGÉ ---
+            if st.button("📊 ANALYSER LES SALAIRES SOUMIS"):
                 if not texte_recrutement_brut.strip():
                     st.error("❌ La zone de texte est vide.")
                 else:
@@ -222,15 +222,31 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                         
                         elements = l_clean.split("\t") if "\t" in l_clean else l_clean.split()
                         
+                        # --- STRATÉGIE DE LECTURE DU COMPAGNON DU JEU ---
+                        salaire_trouve = None
+                        
+                        # Étape 1 : On cherche d'abord la case qui contient STRICTEMENT le symbole €
                         for el in elements:
-                            if "€" in el or any(c.isdigit() for c in el):
+                            if "€" in el:
                                 chiffre_net = "".join(c for c in el if c.isdigit())
                                 if chiffre_net:
-                                    liste_salaires_extraits.append(float(chiffre_net))
-                                    break 
+                                    salaire_trouve = float(chiffre_net)
+                                    break
+                        
+                        # Étape 2 : Si pas de €, on cherche de droite à gauche (l'âge est au début, le salaire à la fin)
+                        if salaire_trouve is None:
+                            for el in reversed(elements):
+                                if any(c.isdigit() for c in el) and "an" not in el.lower():
+                                    chiffre_net = "".join(c for c in el if c.isdigit())
+                                    if chiffre_net:
+                                        salaire_trouve = float(chiffre_net)
+                                        break
+                                        
+                        if salaire_trouve is not None:
+                            liste_salaires_extraits.append(salaire_trouve)
 
                     if len(liste_salaires_extraits) > 0:
-                        # Si l'extraction fonctionne, on ouvre la boîte de dialogue avec les résultats
+                        # Si l'extraction fonctionne, on ouvre la boîte de dialogue avec les vrais salaires
                         pop_up_validation_recrutement(liste_salaires_extraits, metier_cible)
                     else:
                         st.error("❌ Aucun montant de salaire valide n'a pu être extrait. Vérifiez le format de votre texte.")
