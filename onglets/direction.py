@@ -143,19 +143,16 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                         compteur_total += 1
                     if compteur_total > 0: st.success(f"🟢 {compteur_total} fiche(s) injectée(s) !"); st.rerun()
 
-        # --- 4.2 CONFIGURATION GRILLE SALARIALE AVEC EXTRACTEUR DE RECRUTEMENT PAR MÉTIER ---
+        # --- 4.2 CONFIGURATION GRILLE SALARIALE AVEC POP-UP DE VALIDATION ET DÉTAIL DES CALCULS ---
         with sub_tab2:
             st.markdown("### 👥 Extracteur et Calculateur de Salaires par Métier")
             st.write("Sélectionnez le poste concerné, puis collez le tableau brut de vos recrues potentielles.")
 
-            # L'ordre du menu déroulant respecte maintenant la logique de saisie
             metier_cible = st.selectbox(
                 "💼 Pour quel poste analysez-vous ces salaires ?",
                 ["Conducteur", "Chef", "Ouvrier", "Intérim"]
             )
 
-
-            # Zone de saisie brute pour coller le tableau du jeu
             texte_recrutement_brut = st.text_area(
                 f"Collez le tableau des recrues pour le poste [{metier_cible}] ici :",
                 value="",
@@ -164,7 +161,54 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                 placeholder="Betty\t48 ans\t1 622 €\tEngager\nJean-pierre\t45 ans\t1 623 €\tEngager"
             )
 
-            if st.button("📊 ANALYSER ET METTRE À JOUR CE POSTE"):
+            # --- POP-UP DIALOG POUR LE DÉTAIL DES CALCULS DE RECRUTEMENT ---
+            @st.dialog("📊 Rapport d'Analyse et de Calcul des Paliers")
+            def pop_up_validation_recrutement(salaires, metier):
+                st.write(f"Voici le détail de l'analyse textuelle pour le poste de **{metier}** :")
+                
+                # 1. Calculs statistiques
+                s_min = min(salaires)
+                s_max = max(salaires)
+                s_somme = sum(salaires)
+                s_nb = len(salaires)
+                s_moyen = s_somme / s_nb
+
+                # 2. Affichage des coulisses du calcul
+                st.info(f"🔍 **Données extraites :** L'algorithme a trouvé **{s_nb} salaires valides** dans votre texte brut.")
+                
+                with st.expander("📄 Voir la liste complète des prix détectés"):
+                    st.write(", ".join([f"{s:.0f} €" for s in salaires]))
+
+                st.markdown("### 🧮 Formules et Paliers calculés :")
+                st.markdown(f"- **Prix Minimum détecté :** `{s_min:.0f} €`")
+                st.markdown(f"- **Prix Maximum détecté :** `{s_max:.0f} €`")
+                st.markdown(f"- **Prix Moyen calculé :** `Somme ({s_somme:,.0f} €) / Nombre ({s_nb})` = `{s_moyen:.2f} €`")
+
+                st.write("Voulez-vous écraser la grille actuelle du jeu avec ces nouvelles valeurs sur le cloud ?")
+
+                # Boutons de décision finale
+                c_p1, c_p2 = st.columns(2)
+                with c_p1:
+                    if st.button("✅ ENREGISTRER SUR FIREBASE", type="primary", use_container_width=True):
+                        # Lecture de la grille pour ne pas effacer les autres métiers
+                        grille_actuelle = dict(SALAIRES_DB)
+                        
+                        # Injection des nouveaux paliers
+                        grille_actuelle[f"{metier}_Min"] = float(s_min)
+                        grille_actuelle[f"{metier}_Moyen"] = float(round(s_moyen, 2))
+                        grille_actuelle[f"{metier}_Max"] = float(s_max)
+                        grille_actuelle[metier] = float(round(s_moyen, 2))
+
+                        # Envoi cloud
+                        db.db.collection("configuration_salaires").document("grille").set(grille_actuelle)
+                        st.toast(f"🚀 Grille mise à jour pour les {metier}s !")
+                        st.rerun()
+                with c_p2:
+                    if st.button("❌ ANNULER", use_container_width=True):
+                        st.rerun()
+
+            # --- LE BOUTON PRINCIPAL D'ANALYSE ---
+            if st.button("📊 ANALYSER LES SALAIRES SOU MIS"):
                 if not texte_recrutement_brut.strip():
                     st.error("❌ La zone de texte est vide.")
                 else:
@@ -186,27 +230,10 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                     break 
 
                     if len(liste_salaires_extraits) > 0:
-                        salaire_min = float(min(liste_salaires_extraits))
-                        salaire_max = float(max(liste_salaires_extraits))
-                        salaire_moyen = float(sum(liste_salaires_extraits) / len(liste_salaires_extraits))
-
-                        # On récupère d'abord toute la grille existante dans Firebase pour ne pas effacer les autres métiers
-                        grille_actuelle = dict(SALAIRES_DB)
-                        
-                        # On injecte les 3 paliers spécifiques au métier sélectionné
-                        grille_actuelle[f"{metier_cible}_Min"] = salaire_min
-                        grille_actuelle[f"{metier_cible}_Moyen"] = round(salaire_moyen, 2)
-                        grille_actuelle[f"{metier_cible}_Max"] = salaire_max
-
-                        # Par sécurité pour le reste du code, on met aussi à jour la valeur par défaut sur le prix moyen
-                        grille_actuelle[metier_cible] = round(salaire_moyen, 2)
-
-                        db.db.collection("configuration_salaires").document("grille").set(grille_actuelle)
-                        
-                        st.success(f"🎉 Paliers Cloud mis à jour pour le poste : {metier_cible} !")
-                        st.rerun()
+                        # Si l'extraction fonctionne, on ouvre la boîte de dialogue avec les résultats
+                        pop_up_validation_recrutement(liste_salaires_extraits, metier_cible)
                     else:
-                        st.error("❌ Aucun montant de salaire valide extrait.")
+                        st.error("❌ Aucun montant de salaire valide n'a pu être extrait. Vérifiez le format de votre texte.")
 
             st.markdown("---")
             st.write("⚙️ **Grille tarifaire enregistrée en base :**")
