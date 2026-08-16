@@ -171,7 +171,22 @@ with onglet1:
     with col1:
         st.markdown("### --- PARAMÈTRES GÉNÉRAUX ---")
         revenus = st.number_input("Revenus prévus du chantier (€) :", value=float(donnees_modele["revenus"]))
-        jours_totaux = st.number_input("Durée totale du chantier (jours) :", value=int(donnees_modele["jours"]), min_value=0)
+                st.markdown("### --- PARAMÈTRES GÉNÉRAUX ---")
+        revenus = st.number_input("Revenus prévus du chantier (€) :", value=float(donnees_modele["revenus"]))
+        
+        st.label("Durée totale du chantier :")
+        c_j, c_h, c_m = st.columns(3)
+        with c_j:
+            jours_saisis = st.number_input("Jours", min_value=0, value=int(donnees_modele["jours"]), step=1)
+        with c_h:
+            heures_saisies = st.number_input("Heures", min_value=0, max_value=23, value=0, step=1)
+        with c_m:
+            minutes_saisies = st.number_input("Minutes", min_value=0, max_value=59, value=0, step=1)
+
+        # Conversion universelle en jours décimaux (Base : 1 jour = 7h de travail effectif)
+        heures_totales_decimales = heures_saisies + (minutes_saisies / 60.0)
+        jours_totaux = jours_saisis + (heures_totales_decimales / 7.0)
+
 
         st.markdown("### --- MATÉRIAUX ---")
         c_qte, c_px = st.columns(2)
@@ -304,8 +319,36 @@ with onglet1:
     st.markdown("### 📊 Récapitulatif Global Estimé")
 
     total_mats_recap = float(total_mats_direct)
-    total_location_recap = float(total_loc_engins_direct)
-    total_salaires_recap = float(total_salaires_direct)
+    # ==============================================================================
+    # --- LOGIQUE DE CALCUL DU JEU (ARRONDI AU JOUR SUPÉRIEUR POUR LOC/INTÉRIM) ---
+    # ==============================================================================
+    import math
+
+    # Règle du jeu : toute journée entamée est entièrement due pour la location et l'intérim
+    # Si jours_totaux = 1.04 (1j 1h), jours_factures_jeu vaudra 2.0
+    jours_factures_jeu = math.ceil(jours_totaux)
+
+    # 1. Calcul des Matériaux
+    total_mats_recap = float(total_mats_direct)
+
+    # 2. Calcul de la Location des Engins (Quantité * Prix/Jour * Jours Facturés)
+    total_location_recap = 0.0
+    if engins_edites is not None and not engins_edites.empty:
+        df_propres_direct = engins_edites.dropna(subset=["Sélection de l'engin / Modèle"])
+        total_location_recap = float((df_propres_direct["Quantité"] * df_propres_direct["Prix Location (€/jour)"] * jours_factures_jeu).sum())
+
+    # 3. Calcul de la Grille Salariale
+    # Fixes (Mensuels) : au prorata exact du temps réel du chantier (1 semaine = 7 jours = 1 mois)
+    cout_chefs = jh_chef * (px_chef / 7.0) * jours_totaux
+    cout_ouvriers = jh_ouvrier * (px_ouvrier / 7.0) * jours_totaux
+    cout_cond = jh_cond * (px_cond / 7.0) * jours_totaux
+    
+    # Intérimaires (Journaliers) : payés à la journée entamée (arrondi supérieur)
+    cout_interim = jh_interim * px_interim * jours_factures_jeu
+
+    total_salaires_recap = float(cout_chefs + cout_ouvriers + cout_cond + cout_interim)
+
+    # 4. Synthèse financière
     total_depenses_recap = float(total_mats_recap + total_location_recap + total_salaires_recap)
     benefice_net_recap = float(revenus - total_depenses_recap)
     roi_recap = float((benefice_net_recap / total_depenses_recap) * 100 if total_depenses_recap > 0 else 0)
@@ -313,19 +356,35 @@ with onglet1:
     gain_par_jour_recap = float(benefice_net_recap / jours_totaux if jours_totaux > 0 else 0.0)
     roi_par_jour_recap = float(roi_recap / jours_totaux if jours_totaux > 0 else roi_recap)
 
-    txt_mats, txt_loc, txt_sal, txt_depenses, txt_gain_jour, txt_benefice = f"{total_mats_recap:,.0f}".replace(",", " "), f"{total_location_recap:,.0f}".replace(",", " "), f"{total_salaires_recap:,.0f}".replace(",", " "), f"{total_depenses_recap:,.0f}".replace(",", " "), f"{gain_par_jour_recap:,.0f}".replace(",", " "), f"{abs(benefice_net_recap):,.0f}".replace(",", " ")
+    # Formatage du texte pour l'affichage
+    txt_mats = f"{total_mats_recap:,.0f}".replace(",", " ")
+    txt_loc = f"{total_location_recap:,.0f}".replace(",", " ")
+    txt_sal = f"{total_salaires_recap:,.0f}".replace(",", " ")
+    txt_depenses = f"{total_depenses_recap:,.0f}".replace(",", " ")
+    txt_gain_jour = f"{gain_par_jour_recap:,.0f}".replace(",", " ")
+    txt_benefice = f"{abs(benefice_net_recap):,.0f}".replace(",", " ")
+
+    # --- RECAPITULATIF VISUEL ---
+    st.markdown("---")
+    st.markdown("### 📊 Récapitulatif Global Estimé (Règles du Jeu)")
+    if jours_totaux > 0 and jours_totaux != jours_factures_jeu:
+        st.warning(f"⚠️ **Pénalité de temps :** Le chantier dépasse sur la journée suivante. Vous êtes facturé **{jours_factures_jeu} jours** au lieu de {jours_totaux:.2f} jours pour la location et l'intérim.")
+
+    txt_duree_precise = f"{jours_saisis}j {heures_saisies}h {minutes_saisies}m" if jours_totaux > 0 else "0 jour"
 
     c_rc1, c_rc2, c_rc3, c_rc4, c_rc5, c_rc6 = st.columns(6)
     with c_rc1: st.metric(label="🧱 Total Matériaux", value=f"{txt_mats} €")
     with c_rc2: st.metric(label="🚜 Total Location", value=f"{txt_loc} €")
     with c_rc3: st.metric(label="👥 Total Salaires & Intérim", value=f"{txt_sal} €")
     with c_rc4: st.metric(label="📉 Dépenses Totales", value=f"{txt_depenses} €")
-    with c_rc5: st.metric(label="⏱️ Durée du Projet", value=f"{int(jours_totaux)} jours")
+    with c_rc5: st.metric(label="⏱️ Durée du Projet", value=txt_duree_precise)
     with c_rc6: st.metric(label="📈 Rentabilité Quotidienne", value=f"{txt_gain_jour} €/j")
 
     mot_jour = "jours" if jours_totaux >= 2 else "jour"
-    if benefice_net_recap >= 0: st.success(f"🟢 **Rentabilité positive :** Bénéfice de **{txt_benefice} €** soit **{txt_gain_jour} € / jour** de **{int(jours_totaux)} {mot_jour}** de travail (ROI Global : **{roi_recap:.2f} %** | ROI / Jour : **{roi_par_jour_recap:.2f} %/j**)")
-    else: st.error(f"🔴 **Chantier déficitaire :** Perte de **{txt_benefice} €** soit **{txt_gain_jour} € / jour** de **{int(jours_totaux)} {mot_jour}** de perte (ROI Global : **{roi_recap:.2f} %** | ROI / Jour : **{roi_par_jour_recap:.2f} %/j**)")
+    if benefice_net_recap >= 0: 
+        st.success(f"🟢 **Rentabilité positive :** Bénéfice de **{txt_benefice} €** soit **{txt_gain_jour} € / jour** sur **{txt_duree_precise}** de travail (ROI Global : **{roi_recap:.2f} %** | ROI / Jour : **{roi_par_jour_recap:.2f} %/j**)")
+    else: 
+        st.error(f"🔴 **Chantier déficitaire :** Perte de **{txt_benefice} €** soit **{txt_gain_jour} € / jour** sur **{txt_duree_precise}** de perte (ROI Global : **{roi_recap:.2f} %** | ROI / Jour : **{roi_par_jour_recap:.2f} %/j**)")
 
     st.markdown("<br>", unsafe_allow_html=True) 
 
@@ -336,9 +395,11 @@ with onglet1:
         if not nom_chantier: st.error("Veuillez donner un nom ou un numéro valide.")
         elif doublon_existe: st.error(f"Impossible d'enregistrer : ce chantier existe déjà.")
         else:
-            inserer_chantier(nom_chantier, revenus, total_mats_recap, total_location_recap, total_salaires_recap, total_depenses_recap, benefice_net_recap, round(roi_recap, 2), int(jours_totaux), round(gain_par_jour_recap, 2), round(roi_par_jour_recap, 2))
-            st.toast("Chantier enregistré avec succès dans Firebase Firestore !")
+            # On enregistre la durée exacte (jours_totaux) pour garder des stats précises en BDD
+            inserer_chantier(nom_chantier, revenus, total_mats_recap, total_location_recap, total_salaires_recap, total_depenses_recap, benefice_net_recap, round(roi_recap, 2), float(jours_totaux), round(gain_par_jour_recap, 2), round(roi_par_jour_recap, 2))
+            st.toast("Chantier enregistré avec succès dans Firebase !")
             st.rerun()
+
 
 # --- ONGLET 2 : HISTORIQUE ET CLASSEMENT ---
 with onglet2:
