@@ -1,8 +1,61 @@
 import streamlit as st
 import pandas as pd
 import database as db
-import math 
+import math
 
+# ==============================================================================
+# --- 1. DÉCLARATION DU POP-UP TOUT EN HAUT (HORS DES BOUCLES STREAMLIT) ---
+# ==============================================================================
+@st.dialog("📊 Rapport d'Analyse et de Calcul des Paliers")
+def pop_up_validation_recrutement(salaires_mensuels, metier, salaires_db_dict):
+    st.write(f"Voici le détail de l'analyse et la conversion au jour pour le poste de **{metier}** :")
+    
+    # Calculs statistiques sur les valeurs mensuelles
+    sm_min = min(salaires_mensuels)
+    sm_max = max(salaires_mensuels)
+    sm_somme = sum(salaires_mensuels)
+    sm_nb = len(salaires_mensuels)
+    sm_moyen = sm_somme / sm_nb
+
+    # Conversion à la journée arrondie à l'entier supérieur (1 mois = 7 jours)
+    sj_min = math.ceil(sm_min / 7.0)
+    sj_moyen = math.ceil(sm_moyen / 7.0)
+    sj_max = math.ceil(sm_max / 7.0)
+
+    st.info(f"🔍 **Analyse :** **{sm_nb} recrues** détectées.")
+    
+    st.markdown("### 🏬 Valeurs Mensuelles lues :")
+    st.write(f"- Minimum Mensuel : `{int(sm_min)} €/mois`")
+    st.write(f"- Moyen Mensuel : `{int(sm_moyen)} €/mois`")
+    st.write(f"- Maximum Mensuel : `{int(sm_max)} €/mois`")
+
+    st.markdown("### 🧮 Conversion ramenée au JOUR (Entiers) :")
+    st.success(f"**- Tarif Minimum :** `{int(sj_min)} € / jour`")
+    st.success(f"**- Tarif Moyen :** `{int(sj_moyen)} € / jour`")
+    st.success(f"**- Tarif Maximum :** `{int(sj_max)} € / jour`")
+
+    st.write("Voulez-vous appliquer ces tarifs journaliers entiers sur le cloud ?")
+
+    c_p1, c_p2 = st.columns(2)
+    with c_p1:
+        if st.button("✅ ENREGISTRER SUR FIREBASE", type="primary", use_container_width=True, key=f"btn_save_cloud_{metier}"):
+            grille_actuelle = dict(salaires_db_dict)
+            
+            grille_actuelle[f"{metier}_Min"] = int(sj_min)
+            grille_actuelle[f"{metier}_Moyen"] = int(sj_moyen)
+            grille_actuelle[f"{metier}_Max"] = int(sj_max)
+            grille_actuelle[metier] = int(sj_moyen)
+
+            db.db.collection("configuration_salaires").document("grille").set(grille_actuelle)
+            st.toast(f"🚀 Tarifs journaliers enregistrés en entiers pour les {metier}s !")
+            st.rerun()
+    with c_p2:
+        if st.button("❌ ANNULER", use_container_width=True, key=f"btn_cancel_cloud_{metier}"):
+            st.rerun()
+
+# ==============================================================================
+# --- 2. L'ONGLET DIRECTION PRINCIPAL ---
+# ==============================================================================
 def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
     st.subheader("🔑 Connexion Administrateur Direction")
     mot_de_passe = st.text_input("Veuillez saisir le code d'accès :", type="password")
@@ -24,7 +77,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
             with c_st3: st.metric(label="📉 Dépenses Totales", value=f"{somme_depenses:,.0f}".replace(",", " ") + " €")
             with c_st4: st.metric(label="📈 Résultat Net / Bénéfice", value=f"{somme_benefices:,.0f}".replace(",", " ") + " €")
             
-            # --- ZONE DE SÉCURITÉ ET NETTOYAGE CIBLÉ ---
             st.markdown("<br>", unsafe_allow_html=True)
             with st.expander("🚨 Zone de Danger : Réinitialisation et Nettoyage des Tables"):
                 st.warning("Attention : Ces actions suppriment définitivement les données stockées sur Firebase.")
@@ -144,7 +196,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                         compteur_total += 1
                     if compteur_total > 0: st.success(f"🟢 {compteur_total} fiche(s) injectée(s) !"); st.rerun()
 
-        # --- 4.2 CONFIGURATION GRILLE SALARIALE AVEC POP-UP DE VALIDATION ET DÉTAIL DES CALCULS ---
+        # --- 4.2 CONFIGURATION GRILLE SALARIALE (RECRUTEMENT) ---
         with sub_tab2:
             st.markdown("### 👥 Extracteur et Calculateur de Salaires par Métier")
             st.write("Sélectionnez le poste concerné, puis collez le tableau brut de vos recrues potentielles.")
@@ -156,84 +208,10 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
 
             texte_recrutement_brut = st.text_area(
                 f"Collez le tableau des recrues pour le poste [{metier_cible}] ici :",
-                value="",
-                height=250,
-                key="zone_texte_recrutement_brut",
+                value="", height=250, key="zone_texte_recrutement_brut",
                 placeholder="Betty\t48 ans\t1 622 €\tEngager\nJean-pierre\t45 ans\t1 623 €\tEngager"
             )
 
-            # --- POP-UP DIALOG EN ENTIERS (SANS DÉCIMALES) ---
-            @st.dialog("📊 Rapport d'Analyse et de Calcul des Paliers")
-            def pop_up_validation_recrutement(salaires_mensuels, metier):
-                st.write(f"Voici le détail de l'analyse et la conversion au jour pour le poste de **{metier}** :")
-                
-                # 1. Calculs statistiques sur les valeurs mensuelles
-                sm_min = min(salaires_mensuels)
-                sm_max = max(salaires_mensuels)
-                sm_somme = sum(salaires_mensuels)
-                sm_nb = len(salaires_mensuels)
-                sm_moyen = sm_somme / sm_nb
-
-                # 2. Conversion à la journée arrondie à l'entier supérieur (1 mois = 7 jours)
-                sj_min = math.ceil(sm_min / 7.0)
-                sj_moyen = math.ceil(sm_moyen / 7.0)
-                sj_max = math.ceil(sm_max / 7.0)
-
-                # 3. Affichage sans aucune décimale
-                st.info(f"🔍 **Analyse :** **{sm_nb} recrues** détectées.")
-                
-                st.markdown("### 🏬 Valeurs Mensuelles lues :")
-                st.write(f"- Minimum Mensuel : `{int(sm_min)} €/mois`")
-                st.write(f"- Moyen Mensuel : `{int(sm_moyen)} €/mois`")
-                st.write(f"- Maximum Mensuel : `{int(sm_max)} €/mois`")
-
-                st.markdown("### 🧮 Conversion ramenée au JOUR (Entiers) :")
-                st.success(f"**- Tarif Minimum :** `{int(sj_min)} € / jour`")
-                st.success(f"**- Tarif Moyen :** `{int(sj_moyen)} € / jour`")
-                st.success(f"**- Tarif Maximum :** `{int(sj_max)} € / jour`")
-
-                st.write("Voulez-vous appliquer ces tarifs journaliers entiers sur le cloud ?")
-
-                # Boutons de décision finale
-                c_p1, c_p2 = st.columns(2)
-                with c_p1:
-                    if st.button("✅ ENREGISTRER SUR FIREBASE", type="primary", use_container_width=True):
-                        grille_actuelle = dict(SALAIRES_DB)
-                        
-                        # Stockage en entiers stricts dans Firebase
-                        grille_actuelle[f"{metier}_Min"] = int(sj_min)
-                        grille_actuelle[f"{metier}_Moyen"] = int(sj_moyen)
-                        grille_actuelle[f"{metier}_Max"] = int(sj_max)
-                        grille_actuelle[metier] = int(sj_moyen)
-
-                        db.db.collection("configuration_salaires").document("grille").set(grille_actuelle)
-                        st.toast(f"🚀 Tarifs journaliers enregistrés en entiers pour les {metier}s !")
-                        st.rerun()
-                with c_p2:
-                    if st.button("❌ ANNULER", use_container_width=True):
-                        st.rerun()
-
-                # Boutons de décision finale avec clés uniques dynamiques
-                c_p1, c_p2 = st.columns(2)
-                with c_p1:
-                    # Ajout d'une key unique basée sur le métier pour éviter le doublon
-                    if st.button("✅ ENREGISTRER SUR FIREBASE", type="primary", use_container_width=True, key=f"btn_save_cloud_{metier}"):
-                        grille_actuelle = dict(SALAIRES_DB)
-                        
-                        grille_actuelle[f"{metier}_Min"] = int(sj_min)
-                        grille_actuelle[f"{metier}_Moyen"] = int(sj_moyen)
-                        grille_actuelle[f"{metier}_Max"] = int(sj_max)
-                        grille_actuelle[metier] = int(sj_moyen)
-
-                        db.db.collection("configuration_salaires").document("grille").set(grille_actuelle)
-                        st.toast(f"🚀 Tarifs journaliers enregistrés en entiers pour les {metier}s !")
-                        st.rerun()
-                with c_p2:
-                    # Ajout d'une key unique ici aussi
-                    if st.button("❌ ANNULER", use_container_width=True, key=f"btn_cancel_cloud_{metier}"):
-                        st.rerun()
-
-            # --- LE BOUTON PRINCIPAL D'ANALYSE CORRIGÉ ---
             if st.button("📊 ANALYSER LES SALAIRES SOUMIS"):
                 if not texte_recrutement_brut.strip():
                     st.error("❌ La zone de texte est vide.")
@@ -248,34 +226,25 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                         
                         elements = l_clean.split("\t") if "\t" in l_clean else l_clean.split()
                         
-                        # --- STRATÉGIE DE LECTURE DU COMPAGNON DU JEU ---
                         salaire_trouve = None
-                        
-                        # Étape 1 : On cherche d'abord la case qui contient STRICTEMENT le symbole €
                         for el in elements:
                             if "€" in el:
                                 chiffre_net = "".join(c for c in el if c.isdigit())
-                                if chiffre_net:
-                                    salaire_trouve = float(chiffre_net)
-                                    break
+                                if chiffre_net: salaire_trouve = float(chiffre_net); break
                         
-                        # Étape 2 : Si pas de €, on cherche de droite à gauche (l'âge est au début, le salaire à la fin)
                         if salaire_trouve is None:
                             for el in reversed(elements):
                                 if any(c.isdigit() for c in el) and "an" not in el.lower():
                                     chiffre_net = "".join(c for c in el if c.isdigit())
-                                    if chiffre_net:
-                                        salaire_trouve = float(chiffre_net)
-                                        break
+                                    if chiffre_net: salaire_trouve = float(chiffre_net); break
                                         
                         if salaire_trouve is not None:
                             liste_salaires_extraits.append(salaire_trouve)
 
                     if len(liste_salaires_extraits) > 0:
-                        # Si l'extraction fonctionne, on ouvre la boîte de dialogue avec les vrais salaires
-                        pop_up_validation_recrutement(liste_salaires_extraits, metier_cible)
+                        pop_up_validation_recrutement(liste_salaires_extraits, metier_cible, SALAIRES_DB)
                     else:
-                        st.error("❌ Aucun montant de salaire valide n'a pu être extrait. Vérifiez le format de votre texte.")
+                        st.error("❌ Aucun montant de salaire valide n'a pu être extrait.")
 
             st.markdown("---")
             st.write("⚙️ **Grille tarifaire enregistrée en base :**")
@@ -311,7 +280,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
             st.markdown("### 🗂️ Consultation brute")
             choix_table = st.selectbox("Choisir la table :", ["Modèles de Chantiers Pré-configurés", "Grille Salariale Actuelle", "Prix des Matériaux de base", "Catalogue de Location des Engins"])
             if choix_table == "Modèles de Chantiers Pré-configurés":
-                docs = db.db.collection("modeles_chantiers").stream(); res = [d.to_dict() for d in docs]
+                docs = db.collection("modeles_chantiers").stream(); res = [d.to_dict() for d in docs]
                 if res: st.dataframe(pd.DataFrame(res)[["nom_modele", "revenus", "jours", "jh_chef", "jh_ouvrier", "jh_cond"]], use_container_width=True)
                 else: st.info("Aucun modèle.")
             elif choix_table == "Grille Salariale Actuelle": st.json(SALAIRES_DB)
@@ -323,3 +292,4 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                 else: st.info("Catalogue vide.")
     elif mot_de_passe != "":
         st.error("🔒 Code d'accès incorrect.")
+
