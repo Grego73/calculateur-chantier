@@ -59,17 +59,35 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         
     with col2:
         st.markdown("### --- GRILLE SALARIALE & INTERIM (RÈGLES DU JEU) ---")
-        st.caption("💡 Rappel : Chefs, Ouvriers et Conducteurs sont payés au mois (1 mois = 7 jours de jeu). Les Intérimaires sont payés à la journée.")
         
-        px_chef = st.number_input("Salaire MENSUEL Chef (€/mois) :", value=float(SALAIRES_DB.get("Chef", 230)))
+        # Récupération des paliers calculés depuis l'analyse des recrues
+        p_min = float(SALAIRES_DB.get("Jeu_Palier_Min", 230.0))
+        p_moyen = float(SALAIRES_DB.get("Jeu_Palier_Moyen", 230.0))
+        p_max = float(SALAIRES_DB.get("Jeu_Palier_Max", 230.0))
+        
+        # Choix de la stratégie par le joueur
+        strategie_recrutement = st.radio(
+            "💼 Choisir le profil de salaire à appliquer pour ce chantier :",
+            [f"Économique (Min : {p_min:.0f} €)", f"Standard (Moyen : {p_moyen:.0f} €)", f"Premium (Max : {p_max:.0f} €)"]
+        )
+        
+        # Attribution automatique du coût journalier selon le choix coché
+        if "Économique" in strategie_recrutement:
+            tarif_applique = p_min
+        elif "Standard" in strategie_recrutement:
+            tarif_applique = p_moyen
+        else:
+            tarif_applique = p_max
+
+        # Tes variables de coûts journaliers se synchronisent automatiquement sur le choix
+        px_chef = st.number_input("Salaire MENSUEL Chef (€/mois) :", value=tarif_applique)
         jh_chef = st.number_input("Total Jours-Homme Chef :", value=float(donnees_modele["jh_chef"]))
-        px_ouvrier = st.number_input("Salaire MENSUEL Ouvrier (€/mois) :", value=float(SALAIRES_DB.get("Ouvrier", 230)))
+        
+        px_ouvrier = st.number_input("Salaire MENSUEL Ouvrier (€/mois) :", value=tarif_applique)
         jh_ouvrier = st.number_input("Total Jours-Homme Ouvrier :", value=float(donnees_modele["jh_ouvrier"]))
-        px_cond = st.number_input("Salaire MENSUEL Conducteur (€/mois) :", value=float(SALAIRES_DB.get("Conducteur", 230)))
+        
+        px_cond = st.number_input("Salaire MENSUEL Conducteur (€/mois) :", value=tarif_applique)
         jh_cond = st.number_input("Total Jours-Homme Conducteur :", value=float(donnees_modele["jh_cond"]))
-        st.caption("⚙️ Option Intérim (Contrat à la journée)")
-        px_interim = st.number_input("Coût JOURNALIER d'un Intérimaire (€/jour) :", value=float(SALAIRES_DB.get("Intérim", 220)))
-        jh_interim = st.number_input("Total Jours-Homme requis en Intérim :", value=0.0)
 
         st.markdown("### --- TABLE DES ENGINS NÉCESSAIRES ---")
         engins_bruts_modele = []
