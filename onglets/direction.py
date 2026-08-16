@@ -203,7 +203,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
 
             metier_cible = st.selectbox(
                 "💼 Pour quel poste analysez-vous ces salaires ?",
-                ["Conducteur", "Chef", "Ouvrier", "Intérim"]
+                ["Conducteur", "Chef", "Ouvrier"]
             )
 
             texte_recrutement_brut = st.text_area(
