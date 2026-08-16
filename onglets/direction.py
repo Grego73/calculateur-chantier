@@ -161,47 +161,52 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                 placeholder="Betty\t48 ans\t1 622 €\tEngager\nJean-pierre\t45 ans\t1 623 €\tEngager"
             )
 
-            # --- POP-UP DIALOG POUR LE DÉTAIL DES CALCULS DE RECRUTEMENT ---
+            # --- POP-UP DIALOG CORRIGÉ POUR RAMENER LE CALCUL AU JOUR (1 MOIS = 7 JOURS) ---
             @st.dialog("📊 Rapport d'Analyse et de Calcul des Paliers")
-            def pop_up_validation_recrutement(salaires, metier):
-                st.write(f"Voici le détail de l'analyse textuelle pour le poste de **{metier}** :")
+            def pop_up_validation_recrutement(salaires_mensuels, metier):
+                st.write(f"Voici le détail de l'analyse et la conversion au jour pour le poste de **{metier}** :")
                 
-                # 1. Calculs statistiques
-                s_min = min(salaires)
-                s_max = max(salaires)
-                s_somme = sum(salaires)
-                s_nb = len(salaires)
-                s_moyen = s_somme / s_nb
+                # 1. Calculs statistiques sur les valeurs mensuelles du tableau
+                sm_min = min(salaires_mensuels)
+                sm_max = max(salaires_mensuels)
+                sm_somme = sum(salaires_mensuels)
+                sm_nb = len(salaires_mensuels)
+                sm_moyen = sm_somme / sm_nb
 
-                # 2. Affichage des coulisses du calcul
-                st.info(f"🔍 **Données extraites :** L'algorithme a trouvé **{s_nb} salaires valides** dans votre texte brut.")
+                # 2. Conversion à la journée (Règle du jeu : 1 mois = 7 jours)
+                sj_min = sm_min / 7.0
+                sj_moyen = sm_moyen / 7.0
+                sj_max = sm_max / 7.0
+
+                # 3. Affichage pédagogique des coulisses du calcul
+                st.info(f"🔍 **Analyse :** **{sm_nb} recrues** détectées.")
                 
-                with st.expander("📄 Voir la liste complète des prix détectés"):
-                    st.write(", ".join([f"{s:.0f} €" for s in salaires]))
+                st.markdown("### 🏬 Valeurs Mensuelles lues (Base) :")
+                st.write(f"- Minimum Mensuel : `{sm_min:.0f} €/mois`")
+                st.write(f"- Moyen Mensuel : `{sm_moyen:.2f} €/mois`")
+                st.write(f"- Maximum Mensuel : `{sm_max:.0f} €/mois`")
 
-                st.markdown("### 🧮 Formules et Paliers calculés :")
-                st.markdown(f"- **Prix Minimum détecté :** `{s_min:.0f} €`")
-                st.markdown(f"- **Prix Maximum détecté :** `{s_max:.0f} €`")
-                st.markdown(f"- **Prix Moyen calculé :** `Somme ({s_somme:,.0f} €) / Nombre ({s_nb})` = `{s_moyen:.2f} €`")
+                st.markdown("### 🧮 Conversion ramenée au JOUR de jeu (Divisé par 7) :")
+                st.success(f"**- Tarif Minimum :** `{sj_min:.2f} € / jour` *(soit {sm_min:.0f} / 7)*")
+                st.success(f"**- Tarif Moyen :** `{sj_moyen:.2f} € / jour` *(soit {sm_moyen:.1f} / 7)*")
+                st.success(f"**- Tarif Maximum :** `{sj_max:.2f} € / jour` *(soit {sm_max:.0f} / 7)*")
 
-                st.write("Voulez-vous écraser la grille actuelle du jeu avec ces nouvelles valeurs sur le cloud ?")
+                st.write("Voulez-vous appliquer ces tarifs journaliers sur le cloud pour votre grille de calcul ?")
 
                 # Boutons de décision finale
                 c_p1, c_p2 = st.columns(2)
                 with c_p1:
                     if st.button("✅ ENREGISTRER SUR FIREBASE", type="primary", use_container_width=True):
-                        # Lecture de la grille pour ne pas effacer les autres métiers
                         grille_actuelle = dict(SALAIRES_DB)
                         
-                        # Injection des nouveaux paliers
-                        grille_actuelle[f"{metier}_Min"] = float(s_min)
-                        grille_actuelle[f"{metier}_Moyen"] = float(round(s_moyen, 2))
-                        grille_actuelle[f"{metier}_Max"] = float(s_max)
-                        grille_actuelle[metier] = float(round(s_moyen, 2))
+                        # IMPORTANT : On enregistre directement les valeurs ramenées AU JOUR pour que l'onglet 1 n'ait plus de division complexe à faire !
+                        grille_actuelle[f"{metier}_Min"] = float(round(sj_min, 2))
+                        grille_actuelle[f"{metier}_Moyen"] = float(round(sj_moyen, 2))
+                        grille_actuelle[f"{metier}_Max"] = float(round(sj_max, 2))
+                        grille_actuelle[metier] = float(round(sj_moyen, 2))
 
-                        # Envoi cloud
                         db.db.collection("configuration_salaires").document("grille").set(grille_actuelle)
-                        st.toast(f"🚀 Grille mise à jour pour les {metier}s !")
+                        st.toast(f"🚀 Tarifs journaliers enregistrés pour les {metier}s !")
                         st.rerun()
                 with c_p2:
                     if st.button("❌ ANNULER", use_container_width=True):
