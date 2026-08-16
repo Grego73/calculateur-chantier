@@ -182,10 +182,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         )
 
 
-    # ==============================================================================
-    # --- LOGIQUE DE CALCUL DU JEU (ARRONDI AU JOUR SUPÉRIEUR POUR LOC/INTÉRIM) ---
-    # ==============================================================================
-    # Règle du jeu : toute journée entamée est entièrement due pour la location et l'intérim
+    # --- LOGIQUE DE CALCUL DU JEU (SÉCURISÉE) ---
     jours_factures_jeu = math.ceil(jours_totaux)
 
     # 1. Calcul des Matériaux
@@ -197,14 +194,21 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         df_propres_direct = engins_edites.dropna(subset=["Sélection de l'engin / Modèle"])
         total_location_recap = float((df_propres_direct["Quantité"] * df_propres_direct["Prix Location (€/jour)"] * jours_factures_jeu).sum())
 
-    # 3. Calcul de la Grille Salariale
-    # Fixes (Mensuels) : au prorata réel du temps de jeu du chantier (1 semaine = 7 jours = 1 mois)
-    cout_chefs = jh_chef * (px_chef / 7.0) * jours_totaux
-    cout_ouvriers = jh_ouvrier * (px_ouvrier / 7.0) * jours_totaux
-    cout_cond = jh_cond * (px_cond / 7.0) * jours_totaux
-    # Intérimaires (Journaliers) : payés à la journée entamée (arrondi supérieur)
-    cout_interim = jh_interim * px_interim * jours_factures_jeu
+    # 3. Calcul de la Grille Salariale (Règle : 1 semaine de jeu = 7 jours = 1 mois complet)
+    # On calcule d'abord le coût d'une seule journée de travail pour chaque métier
+    tarif_jour_chef = px_chef / 7.0
+    tarif_jour_ouvrier = px_ouvrier / 7.0
+    tarif_jour_cond = px_cond / 7.0
 
+    # Coût total = (Nombre d'employés * Tarif journalier) * Durée exacte du chantier
+    cout_chefs = float(jh_chef * tarif_jour_chef * jours_totaux)
+    cout_ouvriers = float(jh_ouvrier * tarif_jour_ouvrier * jours_totaux)
+    cout_cond = float(jh_cond * tarif_jour_cond * jours_totaux)
+    
+    # Intérimaires : payés à la journée complète entamée (arrondi supérieur)
+    cout_interim = float(jh_interim * px_interim * jours_factures_jeu)
+
+    # Somme globale de la main d'œuvre
     total_salaires_recap = float(cout_chefs + cout_ouvriers + cout_cond + cout_interim)
 
     # 4. Synthèse financière globale
