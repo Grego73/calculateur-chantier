@@ -223,65 +223,72 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                 if not texte_recrutement_brut.strip():
                     st.error("❌ La zone de texte est vide.")
                 else:
+                    # Découpage par ligne
                     lignes_recrues = texte_recrutement_brut.split("\n")
                     liste_salaires_extraits = []
 
                     for ligne in lignes_recrues:
                         l_clean = ligne.strip()
-                        if not l_clean or "salaire" in l_clean.lower(): 
+                        
+                        # Sécurités : On ignore les lignes vides ou les boutons d'action du jeu
+                        if not l_clean or l_clean.lower() == "engager" or "salaire" in l_clean.lower(): 
                             continue 
                         
+                        # Si la ligne parle de la durée (ex: "3 jours"), on l'ignore pour ne pas fausser la moyenne
+                        if "jour" in l_clean.lower() and "€" not in l_clean:
+                            continue
+                            
+                        # Découpage des éléments de la ligne (tabulations ou espaces)
                         elements = l_clean.split("\t") if "\t" in l_clean else l_clean.split()
                         
+                        # --- ALGORITHME DE RECHERCHE DU SALAIRE DU JEU ---
                         salaire_trouve = None
                         for el in elements:
+                            # Priorité absolue : on cherche la case qui contient le symbole de l'argent (€ ou €/jour)
                             if "€" in el:
                                 chiffre_net = "".join(c for c in el if c.isdigit())
-                                if chiffre_net: salaire_trouve = float(chiffre_net); break
+                                if chiffre_net: 
+                                    salaire_trouve = float(chiffre_net)
+                                    break
                         
-                        if salaire_trouve is None:
-                            for el in reversed(elements):
-                                if any(c.isdigit() for c in el) and "an" not in el.lower():
-                                    chiffre_net = "".join(c for c in el if c.isdigit())
-                                    if chiffre_net: salaire_trouve = float(chiffre_net); break
-                                        
+                        # Si on a extrait un salaire valide, on l'ajoute à la liste des recrues
                         if salaire_trouve is not None:
                             liste_salaires_extraits.append(salaire_trouve)
 
                     if len(liste_salaires_extraits) > 0:
-                        # --- TRAITEMENT ET CONVERSION DES ENTIERS SELON LE CONTRAT ---
+                        # --- CALCUL ET ARCHIVAGE SUR FIREBASE ---
                         sm_min = min(liste_salaires_extraits)
                         sm_max = max(liste_salaires_extraits)
                         sm_moyen = sum(liste_salaires_extraits) / len(liste_salaires_extraits)
 
-                        # Si c'est du CDI, on divise par 7 pour trouver le jour. Si c'est du CDD, on garde brut !
+                        # Logique CDI vs CDD
                         if "CDI" in type_contrat_cible:
                             sj_min = math.ceil(sm_min / 7.0)
                             sj_moyen = math.ceil(sm_moyen / 7.0)
                             sj_max = math.ceil(sm_max / 7.0)
                             prefixe_cle = f"{metier_cible}_CDI"
-                            st.info(f"💡 Rappel : Conversion CDI mensuelle ramenée au jour (Salaire moyen lu : {int(sm_moyen)} €/mois)")
+                            st.info(f"💡 Conversion CDI mensuelle ramenée au jour. (Moyenne : {int(sm_moyen)} €/mois)")
                         else:
+                            # C'est du CDD : on garde le montant brut par jour, pas de division par 7 !
                             sj_min = math.ceil(sm_min)
                             sj_moyen = math.ceil(sm_moyen)
                             sj_max = math.ceil(sm_max)
                             prefixe_cle = f"{metier_cible}_CDD"
-                            st.info(f"💡 Rappel : Enregistrement CDD direct au jour (Salaire moyen lu : {int(sm_moyen)} €/jour)")
+                            st.info(f"💡 Enregistrement CDD direct au jour. (Moyenne : {int(sm_moyen)} €/jour)")
 
-                        # Sauvegarde dans Firebase
+                        # Sauvegarde cloud sur ton document Firebase
                         grille_actuelle = dict(SALAIRES_DB)
                         grille_actuelle[f"{prefixe_cle}_Min"] = int(sj_min)
                         grille_actuelle[f"{prefixe_cle}_Moyen"] = int(sj_moyen)
                         grille_actuelle[f"{prefixe_cle}_Max"] = int(sj_max)
-                        
-                        # Sécurité pour éviter les bugs d'anciennes versions
                         grille_actuelle[metier_cible] = int(sj_moyen)
 
                         db.db.collection("configuration_salaires").document("grille").set(grille_actuelle)
-                        st.success(f"🚀 Tarifs journaliers mis à jour pour {metier_cible} en format {type_contrat_cible.split()[0]} !")
+                        st.success(f"🎉 Grille synchronisée ! {len(liste_salaires_extraits)} fiches de recrues analysées avec succès.")
                         st.rerun()
                     else:
-                        st.error("❌ Aucun montant de salaire valide n'a pu être extrait.")
+                        st.error("❌ Aucun montant de salaire contenant un symbole '€' n'a pu être extrait. Vérifiez votre saisie.")
+
 
             st.markdown("---")
             st.write("⚙ Honoraires journaliers en base de données :")
