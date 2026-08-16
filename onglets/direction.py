@@ -148,11 +148,12 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
             st.markdown("### 👥 Extracteur et Calculateur de Salaires par Métier")
             st.write("Sélectionnez le poste concerné, puis collez le tableau brut de vos recrues potentielles.")
 
-            # --- NOUVEAU : MENU DÉROULANT DE SÉLECTION DU MÉTIER ---
+            # L'ordre du menu déroulant respecte maintenant la logique de saisie
             metier_cible = st.selectbox(
                 "💼 Pour quel poste analysez-vous ces salaires ?",
-                ["Ouvrier", "Chef", "Conducteur", "Intérim"]
+                ["Conducteur", "Chef", "Ouvrier", "Intérim"]
             )
+
 
             # Zone de saisie brute pour coller le tableau du jeu
             texte_recrutement_brut = st.text_area(
