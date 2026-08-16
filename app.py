@@ -171,7 +171,7 @@ with onglet1:
     with col1:
         st.markdown("### --- PARAMÈTRES GÉNÉRAUX ---")
         revenus = st.number_input("Revenus prévus du chantier (€) :", value=float(donnees_modele["revenus"]))
-                st.markdown("### --- PARAMÈTRES GÉNÉRAUX ---")
+        st.markdown("### --- PARAMÈTRES GÉNÉRAUX ---")
         revenus = st.number_input("Revenus prévus du chantier (€) :", value=float(donnees_modele["revenus"]))
         
         st.label("Durée totale du chantier :")
