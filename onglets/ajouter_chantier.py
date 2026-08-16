@@ -79,7 +79,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         else:
             tarif_applique = p_max
 
-        # Tes variables de coûts journaliers se synchronisent automatiquement sur le choix
+        # Synchronisation des coûts journaliers sur le choix du palier
         px_chef = st.number_input("Salaire MENSUEL Chef (€/mois) :", value=tarif_applique)
         jh_chef = st.number_input("Total Jours-Homme Chef :", value=float(donnees_modele["jh_chef"]))
         
@@ -88,6 +88,10 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         
         px_cond = st.number_input("Salaire MENSUEL Conducteur (€/mois) :", value=tarif_applique)
         jh_cond = st.number_input("Total Jours-Homme Conducteur :", value=float(donnees_modele["jh_cond"]))
+        
+        st.caption("⚙️ Option Intérim (Contrat à la journée)")
+        px_interim = st.number_input("Coût JOURNALIER d'un Intérimaire (€/jour) :", value=float(SALAIRES_DB.get("Intérim", 220)))
+        jh_interim = st.number_input("Total Jours-Homme requis en Intérim :", value=0.0)
 
         st.markdown("### --- TABLE DES ENGINS NÉCESSAIRES ---")
         engins_bruts_modele = []
@@ -98,7 +102,8 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                     "Type d'engin requis": item.get("Type d'engin requis", "Pelleteuses"), "Niveau requis": item.get("Niveau requis", "N1"), "À louer ?": False
                 })
         df_besoins_init = pd.DataFrame(engins_bruts_modele)
-        if df_besoins_init.empty: df_besoins_init = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "Type d'engin requis", "Niveau requis", "À louer ?"])
+        if df_besoins_init.empty: 
+            df_besoins_init = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "Type d'engin requis", "Niveau requis", "À louer ?"])
         
         engins_necessaires = st.data_editor(
             df_besoins_init, num_rows="dynamic", use_container_width=True, key="table_engins_necessaires",
@@ -155,6 +160,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                 "Jours de Location": st.column_config.NumberColumn("Jours à louer", min_value=1, max_value=365, step=1)
             }
         )
+
 
     # ==============================================================================
     # --- LOGIQUE DE CALCUL DU JEU (ARRONDI AU JOUR SUPÉRIEUR POUR LOC/INTÉRIM) ---
