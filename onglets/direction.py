@@ -161,37 +161,56 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                 placeholder="Betty\t48 ans\t1 622 €\tEngager\nJean-pierre\t45 ans\t1 623 €\tEngager"
             )
 
-            # --- POP-UP DIALOG CORRIGÉ POUR RAMENER LE CALCUL AU JOUR (1 MOIS = 7 JOURS) ---
+            # --- POP-UP DIALOG EN ENTIERS (SANS DÉCIMALES) ---
             @st.dialog("📊 Rapport d'Analyse et de Calcul des Paliers")
             def pop_up_validation_recrutement(salaires_mensuels, metier):
                 st.write(f"Voici le détail de l'analyse et la conversion au jour pour le poste de **{metier}** :")
                 
-                # 1. Calculs statistiques sur les valeurs mensuelles du tableau
+                # 1. Calculs statistiques sur les valeurs mensuelles
                 sm_min = min(salaires_mensuels)
                 sm_max = max(salaires_mensuels)
                 sm_somme = sum(salaires_mensuels)
                 sm_nb = len(salaires_mensuels)
                 sm_moyen = sm_somme / sm_nb
 
-                # 2. Conversion à la journée (Règle du jeu : 1 mois = 7 jours)
-                sj_min = sm_min / 7.0
-                sj_moyen = sm_moyen / 7.0
-                sj_max = sm_max / 7.0
+                # 2. Conversion à la journée arrondie à l'entier supérieur (1 mois = 7 jours)
+                sj_min = math.ceil(sm_min / 7.0)
+                sj_moyen = math.ceil(sm_moyen / 7.0)
+                sj_max = math.ceil(sm_max / 7.0)
 
-                # 3. Affichage pédagogique des coulisses du calcul
+                # 3. Affichage sans aucune décimale
                 st.info(f"🔍 **Analyse :** **{sm_nb} recrues** détectées.")
                 
-                st.markdown("### 🏬 Valeurs Mensuelles lues (Base) :")
-                st.write(f"- Minimum Mensuel : `{sm_min:.0f} €/mois`")
-                st.write(f"- Moyen Mensuel : `{sm_moyen:.2f} €/mois`")
-                st.write(f"- Maximum Mensuel : `{sm_max:.0f} €/mois`")
+                st.markdown("### 🏬 Valeurs Mensuelles lues :")
+                st.write(f"- Minimum Mensuel : `{int(sm_min)} €/mois`")
+                st.write(f"- Moyen Mensuel : `{int(sm_moyen)} €/mois`")
+                st.write(f"- Maximum Mensuel : `{int(sm_max)} €/mois`")
 
-                st.markdown("### 🧮 Conversion ramenée au JOUR de jeu (Divisé par 7) :")
-                st.success(f"**- Tarif Minimum :** `{sj_min:.2f} € / jour` *(soit {sm_min:.0f} / 7)*")
-                st.success(f"**- Tarif Moyen :** `{sj_moyen:.2f} € / jour` *(soit {sm_moyen:.1f} / 7)*")
-                st.success(f"**- Tarif Maximum :** `{sj_max:.2f} € / jour` *(soit {sm_max:.0f} / 7)*")
+                st.markdown("### 🧮 Conversion ramenée au JOUR (Entiers) :")
+                st.success(f"**- Tarif Minimum :** `{int(sj_min)} € / jour`")
+                st.success(f"**- Tarif Moyen :** `{int(sj_moyen)} € / jour`")
+                st.success(f"**- Tarif Maximum :** `{int(sj_max)} € / jour`")
 
-                st.write("Voulez-vous appliquer ces tarifs journaliers sur le cloud pour votre grille de calcul ?")
+                st.write("Voulez-vous appliquer ces tarifs journaliers entiers sur le cloud ?")
+
+                # Boutons de décision finale
+                c_p1, c_p2 = st.columns(2)
+                with c_p1:
+                    if st.button("✅ ENREGISTRER SUR FIREBASE", type="primary", use_container_width=True):
+                        grille_actuelle = dict(SALAIRES_DB)
+                        
+                        # Stockage en entiers stricts dans Firebase
+                        grille_actuelle[f"{metier}_Min"] = int(sj_min)
+                        grille_actuelle[f"{metier}_Moyen"] = int(sj_moyen)
+                        grille_actuelle[f"{metier}_Max"] = int(sj_max)
+                        grille_actuelle[metier] = int(sj_moyen)
+
+                        db.db.collection("configuration_salaires").document("grille").set(grille_actuelle)
+                        st.toast(f"🚀 Tarifs journaliers enregistrés en entiers pour les {metier}s !")
+                        st.rerun()
+                with c_p2:
+                    if st.button("❌ ANNULER", use_container_width=True):
+                        st.rerun()
 
                 # Boutons de décision finale
                 c_p1, c_p2 = st.columns(2)
