@@ -287,16 +287,23 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
             st.markdown("### 🗂️ Consultation brute")
             choix_table = st.selectbox("Choisir la table :", ["Modèles de Chantiers Pré-configurés", "Grille Salariale Actuelle", "Prix des Matériaux de base", "Catalogue de Location des Engins"])
             if choix_table == "Modèles de Chantiers Pré-configurés":
-                docs = db.collection("modeles_chantiers").stream(); res = [d.to_dict() for d in docs]
+                docs = db.db.collection("modeles_chantiers").stream() # <- Doit être db.db
+                res = [d.to_dict() for d in docs]
                 if res: st.dataframe(pd.DataFrame(res)[["nom_modele", "revenus", "jours", "jh_chef", "jh_ouvrier", "jh_cond"]], use_container_width=True)
                 else: st.info("Aucun modèle.")
-            elif choix_table == "Grille Salariale Actuelle": st.json(SALAIRES_DB)
-            elif choix_table == "Prix des Matériaux de base": st.json(MATERIAUX_DB)
+                
+            elif choix_table == "Grille Salariale Actuelle":
+                st.json(SALAIRES_DB)
+                
+            elif choix_table == "Prix des Matériaux de base":
+                st.json(MATERIAUX_DB)
+                
             elif choix_table == "Catalogue de Location des Engins":
-                docs = db.db.collection("catalogue_engins").stream()
+                docs = db.db.collection("catalogue_engins").stream() # <- Doit être db.db
                 res = [{"Engin Modèle": d.id, "Catégorie": d.to_dict().get("type_brut"), "Prix/j (€)": d.to_dict().get("prix_jour")} for d in docs]
                 if res: st.dataframe(pd.DataFrame(res), use_container_width=True)
                 else: st.info("Catalogue vide.")
+
     elif mot_de_passe != "":
         st.error("🔒 Code d'accès incorrect.")
 
