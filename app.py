@@ -416,7 +416,35 @@ with onglet3:
             with c_st2: st.metric(label="💰 Chiffre d'Affaires Cumulé", value=f"{somme_revenus:,.0f}".replace(",", " ") + " €")
             with c_st3: st.metric(label="📉 Dépenses Totales", value=f"{somme_depenses:,.0f}".replace(",", " ") + " €")
             with c_st4: st.metric(label="📈 Résultat Net / Bénéfice", value=f"{somme_benefices:,.0f}".replace(",", " ") + " €")
+            
+            # --- NOUVEAU : ZONE DE SÉCURITÉ ET NETTOYAGE CIBLÉ DES TABLES ---
+            st.markdown("<br>", unsafe_allow_html=True)
+            with st.expander("🚨 Zone de Danger : Réinitialisation et Nettoyage des Tables"):
+                st.warning("Attention : Ces actions suppriment définitivement les données stockées sur Firebase.")
+                
+                col_del1, col_del2, col_del3 = st.columns(3)
+                
+                with col_del1:
+                    if st.button("🗑️ Vider l'Historique des Chantiers", type="secondary", use_container_width=True):
+                        docs = db.collection("chantiers").stream()
+                        for d in docs: d.reference.delete()
+                        st.toast("Historique des chantiers supprimé !")
+                        st.rerun()
+                        
+                with col_del2:
+                    if st.button("🗑️ Vider les Modèles Préfabriqués", type="secondary", use_container_width=True):
+                        docs = db.collection("modeles_chantiers").stream()
+                        for d in docs: d.reference.delete()
+                        st.toast("Catalogue des modèles vidé !")
+                        st.rerun()
+                        
+                with col_del3:
+                    if st.button("💥 TOUT RÉINITIALISER (Configuration incluse)", type="primary", use_container_width=True):
+                        reinitialiser_db()
+                        st.rerun()
+            
             st.markdown("---")
+
 
         st.markdown("## ⚙️ Administration Suprême des Bases NoSQL")
         sub_tab1, sub_tab2, sub_tab3, sub_tab4, sub_tab5 = st.tabs([
