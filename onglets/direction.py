@@ -196,11 +196,12 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                         compteur_total += 1
                     if compteur_total > 0: st.success(f"🟢 {compteur_total} fiche(s) injectée(s) !"); st.rerun()
 
-        # --- 4.2 CONFIGURATION GRILLE SALARIALE (RECRUTEMENT) ---
+        # --- 4.2 CONFIGURATION GRILLE SALARIALE (RECRUTEMENT MIS À JOUR SANS INTÉRIM) ---
         with sub_tab2:
             st.markdown("### 👥 Extracteur et Calculateur de Salaires par Métier")
-            st.write("Sélectionnez le poste concerné, puis collez le tableau brut de vos recrues potentielles.")
+            st.write("Sélectionnez le poste concerné (Conducteur, Chef ou Ouvrier), puis collez le tableau brut de vos recrues.")
 
+            # Menu déroulant mis à jour : l'intérim est supprimé
             metier_cible = st.selectbox(
                 "💼 Pour quel poste analysez-vous ces salaires ?",
                 ["Conducteur", "Chef", "Ouvrier"]
@@ -212,8 +213,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                 placeholder="Betty\t48 ans\t1 622 €\tEngager\nJean-pierre\t45 ans\t1 623 €\tEngager"
             )
 
-            # --- LE BOUTON PRINCIPAL D'ANALYSE NETTOYÉ ---
-            if st.button("📊 ANALYSER LES SALAIRES SOUMIS", key="btn_declencher_analyse_unique"):
+            if st.button("📊 ANALYSER LES SALAIRES SOUMIS"):
                 if not texte_recrutement_brut.strip():
                     st.error("❌ La zone de texte est vide.")
                 else:
@@ -231,31 +231,35 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                         for el in elements:
                             if "€" in el:
                                 chiffre_net = "".join(c for c in el if c.isdigit())
-                                if chiffre_net: 
-                                    salaire_trouve = float(chiffre_net)
-                                    break
+                                if chiffre_net: salaire_trouve = float(chiffre_net); break
                         
                         if salaire_trouve is None:
                             for el in reversed(elements):
                                 if any(c.isdigit() for c in el) and "an" not in el.lower():
                                     chiffre_net = "".join(c for c in el if c.isdigit())
-                                    if chiffre_net: 
-                                        salaire_trouve = float(chiffre_net)
-                                        break
+                                    if chiffre_net: salaire_trouve = float(chiffre_net); break
                                         
                         if salaire_trouve is not None:
                             liste_salaires_extraits.append(salaire_trouve)
 
                     if len(liste_salaires_extraits) > 0:
-                        # On vide le cache d'affichage des boutons en forçant un dictionnaire propre
-                        st.session_state["paliers_prets_a_valider"] = True
+                        # Appel du pop-up d'analyse en transmettant le dictionnaire global
                         pop_up_validation_recrutement(liste_salaires_extraits, metier_cible, SALAIRES_DB)
                     else:
                         st.error("❌ Aucun montant de salaire valide n'a pu être extrait.")
 
+            # --- AFFICHAGE FILTRÉ DE LA GRILLE ACTUELLE POUR TON JEU ---
             st.markdown("---")
-            st.write("⚙️ **Grille tarifaire enregistrée en base :**")
-            st.dataframe(pd.DataFrame(list(SALAIRES_DB.items()), columns=["Poste / Palier", "Montant (€)"]), use_container_width=True, hide_index=True)
+            st.write("⚙️ **Grille tarifaire enregistrée en base (Hors anciens profils) :**")
+            
+            # On nettoie l'affichage pour masquer les anciennes clés "Intérim" obsolètes de la base Firebase
+            lignes_propres = [
+                (poste, mt) for poste, mt in SALAIRES_DB.items() 
+                if "Intérim" not in poste and "Intérim_Min" not in poste and "Intérim_Moyen" not in poste and "Intérim_Max" not in poste
+            ]
+            
+            salaires_actuels_df = pd.DataFrame(lignes_propres, columns=["Poste / Palier de Jeu", "Montant / jour (€)"])
+            st.dataframe(salaires_actuels_df, use_container_width=True, hide_index=True)
 
         # --- 4.3 CONFIGURATION DES MATÉRIAUX ---
         with sub_tab3:
