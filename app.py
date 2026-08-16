@@ -11,91 +11,78 @@ st.title("Gestion et Rentabilité des Chantiers")
 # --- 1. INITIALISATION DE FIREBASE & FIRESTORE (SÉCURISÉE) ---
 # ==============================================================================
 if not firebase_admin._apps:
-    # On récupère les accès directement depuis les Secrets configurés dans Streamlit
     firebase_info = dict(st.secrets["firebase"])
-    
-    # Firebase a besoin de conserver les retours à la ligne du certificat privé
     if "private_key" in firebase_info:
         firebase_info["private_key"] = firebase_info["private_key"].replace("\\n", "\n")
-        
     cred = credentials.Certificate(firebase_info)
     firebase_admin.initialize_app(cred)
 
 db = firestore.client()
 
-def init_db():
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    
-    # Table des chantiers réels enregistrés (Historique)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS chantiers (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nom_chantier TEXT, revenus REAL, cout_materiaux REAL, cout_location REAL, 
-            cout_salaires REAL, depenses_totales REAL, benefice_net REAL, roi REAL, 
-            jours INTEGER, gain_par_jour REAL, roi_par_jour REAL
-        )
-    """)
-    
-    # Table d'administration 1 : Modèles de chantiers pré-configurés
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS modeles_chantiers (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, nom_modele TEXT UNIQUE, revenus REAL, jours INTEGER,
-            sable REAL, terre REAL, enrobe REAL, armature REAL, tole REAL, beton REAL, panneaux REAL,
-            tuyaux REAL, canalisations REAL, poutres REAL, jh_chef REAL, jh_ouvrier REAL, jh_cond REAL,
-            engins_requis TEXT
-        )
-    """)
-    
-    # Table d'administration 2 : Grille tarifaire de la main d'œuvre et intérim
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS configuration_salaires (
-            poste TEXT PRIMARY KEY, tarif_jour REAL
-        )
-    """)
-    
-    # Table d'administration 3 : Catalogue des prix des matériaux
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS configuration_materiaux (
-            materiau TEXT PRIMARY KEY, prix_unitaire REAL
-        )
-    """)
-    
-    # Table d'administration 4 : Catalogue des engins et tarifs journaliers de location
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS catalogue_engins (
-            nom_engin TEXT PRIMARY KEY, type_brut TEXT, prix_jour REAL
-        )
-    """)
-    
-    # --- INJECTION DES DONNÉES DE BASE (SI LA BASE EST NEUVE OU VIDE) ---
-    cursor.execute("SELECT COUNT(*) FROM configuration_salaires")
-    if cursor.fetchone()[0] == 0:
-        cursor.executemany("INSERT INTO configuration_salaires VALUES (?, ?)", [
-            ("Chef", 230.0), ("Ouvrier", 230.0), ("Conducteur", 230.0), ("Intérim", 220.0)
-        ])
+# ==============================================================================
+# --- 2. FONCTIONS DE CHARGEMENT ET SAUVEGARDE DYNAMIQUES (FIREBASE) ---
+# ==============================================================================
+
+def charger_salaires_config():
+    doc_ref = db.collection("configuration_salaires").document("grille")
+    doc = doc_ref.get()
+    if doc.exists:
+        return doc.to_dict()
+    else:
+        data_defaut = {"Chef": 230.0, "Ouvrier": 230.0, "Conducteur": 230.0, "Intérim": 220.0}
+        doc_ref.set(data_defaut)
+        return data_defaut
+
+def charger_materiaux_config():
+    doc_ref = db.collection("configuration_materiaux").document("catalogue")
+    doc = doc_ref.get()
+    if doc.exists:
+        return doc.to_dict()
+    else:
+        data_defaut = {
+            "Sable": 12.0, "Terre": 16.0, "Enrobé": 42.0, "Armature": 70.0, "Tôle": 55.0,
+            "Béton": 45.0, "Panneaux": 90.0, "Tuyaux": 32.0, "Canalisations": 35.0, "Poutres": 70.0
+        }
+        doc_ref.set(data_defaut)
+        return data_defaut
+
+def charger_catalogue_engins():
+    docs = db.collection("catalogue_engins").stream()
+    catalogue = {}
+    for doc in docs:
+        catalogue[doc.id] = doc.to_dict().get("prix_jour", 0.0)
+    if not catalogue:
+        engins_base = {
+            "Camion Benne N3 - Renault Trucks K 430 (430 cv)": {"type_brut": "Camions Benne", "prix_jour": 420.0},
+            "Pelleteuse N2 - Takeuchi TB2150 (85.0 kW)": {"type_brut": "Pelleteuses", "prix_jour": 200.0},
+            "Niveleuse N2 - CAT 14 (178 kW)": {"type_brut": "Niveleuse", "prix_jour": 580.0},
+            "Finisseur N3 - CAT AP600 (129 kW)": {"type_brut": "Finisseur", "prix_jour": 490.0},
+            "Compacteur Enrobé N3 - Dynapac CC4200 VI (100 kW)": {"type_brut": "Compacteur pour enrobé", "prix_jour": 340.0},
+            "Fraiseuse N2 - CAT PM312 (256 kW)": {"type_brut": "Fraiseuse", "prix_jour": 380.0}
+        }
+        for k, v in engins_base.items():
+            db.collection("catalogue_engins").document(k).set(v)
+            catalogue[k] = v["prix_jour"]
+    return catalogue
+
+def charger_types_engins_bruts():
+    docs = db.collection("catalogue_engins").stream()
+    types = set()
+    for doc in docs:
+        types.add(doc.to_dict().get("type_brut", "Autre"))
+    return sorted(list(types)) if types else ["Pelleteuses", "Camions Benne", "Niveleuse", "Finisseur", "Compacteur pour enrobé", "Fraiseuse"]
+
+def charger_catalogue_chantiers():
+    docs = db.collection("modeles_chantiers").stream()
+    catalogue = {"Choisir un chantier pré-configuré...": {
+        "revenus": 0.0, "jours": 0, "sable": 0.0, "terre": 0.0, "enrobe": 0.0, "armature": 0.0, "tole": 0.0,
+        "beton": 0.0, "panneaux": 0.0, "tuyaux": 0.0, "canalisations": 0.0, "poutres": 0.0,
+        "jh_chef": 0.0, "jh_ouvrier": 0.0, "jh_cond": 0.0, "engins_requis": []
+    }}
+    for doc in docs:
+        catalogue[doc.id] = doc.to_dict()
         
-    cursor.execute("SELECT COUNT(*) FROM configuration_materiaux")
-    if cursor.fetchone()[0] == 0:
-        cursor.executemany("INSERT INTO configuration_materiaux VALUES (?, ?)", [
-            ("Sable", 12.0), ("Terre", 16.0), ("Enrobé", 42.0), ("Armature", 70.0), ("Tôle", 55.0),
-            ("Béton", 45.0), ("Panneaux", 90.0), ("Tuyaux", 32.0), ("Canalisations", 35.0), ("Poutres", 70.0)
-        ])
-        
-    cursor.execute("SELECT COUNT(*) FROM catalogue_engins")
-    if cursor.fetchone()[0] == 0:
-        engins_base = [
-            ("Camion Benne N3 - Renault Trucks K 430 (430 cv)", "Camions Benne", 420.0),
-            ("Pelleteuse N2 - Takeuchi TB2150 (85.0 kW)", "Pelleteuses", 200.0),
-            ("Niveleuse N2 - CAT 14 (178 kW)", "Niveleuse", 580.0),
-            ("Finisseur N3 - CAT AP600 (129 kW)", "Finisseur", 490.0),
-            ("Compacteur Enrobé N3 - Dynapac CC4200 VI (100 kW)", "Compacteur pour enrobé", 340.0),
-            ("Fraiseuse N2 - CAT PM312 (256 kW)", "Fraiseuse", 380.0)
-        ]
-        cursor.executemany("INSERT INTO catalogue_engins VALUES (?, ?, ?)", engins_base)
-        
-    cursor.execute("SELECT COUNT(*) FROM modeles_chantiers")
-    if cursor.fetchone()[0] == 0:
+    if len(catalogue) == 1:
         engins_demo = [
             {"N° Étape": 1, "Durée Étape (jours)": 4, "Type d'engin requis": "Pelleteuses", "Niveau requis": "N2"},
             {"N° Étape": 1, "Durée Étape (jours)": 4, "Type d'engin requis": "Camions Benne", "Niveau requis": "N3"},
@@ -105,92 +92,45 @@ def init_db():
             {"N° Étape": 3, "Durée Étape (jours)": 4, "Type d'engin requis": "Finisseur", "Niveau requis": "N3"},
             {"N° Étape": 4, "Durée Étape (jours)": 4, "Type d'engin requis": "Compacteur pour enrobé", "Niveau requis": "N3"}
         ]
-        cursor.execute("""
-            INSERT INTO modeles_chantiers VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, ("Goudronnage d'une route (Grande surface) (214 599 €)", 214599, 16, 488, 0, 618, 0, 0, 0, 6, 0, 0, 0, 16, 48, 28, json.dumps(engins_demo)))
-
-    conn.commit()
-    conn.close()
-
-init_db()
-
-# ==============================================================================
-# --- 2. FONCTIONS DE CHARGEMENT DYNAMIQUE DEPUIS SQLITE ---
-# ==============================================================================
-def charger_salaires_config():
-    conn = sqlite3.connect(DB_NAME)
-    df = pd.read_sql_query("SELECT * FROM configuration_salaires", conn)
-    conn.close()
-    return dict(zip(df["poste"], df["tarif_jour"]))
-
-def charger_materiaux_config():
-    conn = sqlite3.connect(DB_NAME)
-    df = pd.read_sql_query("SELECT * FROM configuration_materiaux", conn)
-    conn.close()
-    return dict(zip(df["materiau"], df["prix_unitaire"]))
-
-def charger_catalogue_engins():
-    conn = sqlite3.connect(DB_NAME)
-    df = pd.read_sql_query("SELECT nom_engin, prix_jour FROM catalogue_engins", conn)
-    conn.close()
-    return dict(zip(df["nom_engin"], df["prix_jour"]))
-
-def charger_types_engins_bruts():
-    conn = sqlite3.connect(DB_NAME)
-    df = pd.read_sql_query("SELECT DISTINCT type_brut FROM catalogue_engins", conn)
-    conn.close()
-    return sorted(df["type_brut"].tolist())
-
-def charger_catalogue_chantiers():
-    conn = sqlite3.connect(DB_NAME)
-    df = pd.read_sql_query("SELECT * FROM modeles_chantiers", conn)
-    conn.close()
-    
-    catalogue = {"Choisir un chantier pré-configuré...": {
-        "revenus": 0.0, "jours": 0, "sable": 0.0, "terre": 0.0, "enrobe": 0.0, "armature": 0.0, "tole": 0.0,
-        "beton": 0.0, "panneaux": 0.0, "tuyaux": 0.0, "canalisations": 0.0, "poutres": 0.0,
-        "jh_chef": 0.0, "jh_ouvrier": 0.0, "jh_cond": 0.0, "engins_requis": []
-    }}
-    
-    for _, r in df.iterrows():
-        catalogue[r["nom_modele"]] = {
-            "revenus": r["revenus"], "jours": r["jours"], "sable": r["sable"], "terre": r["terre"],
-            "enrobe": r["enrobe"], "armature": r["armature"], "tole": r["tole"], "beton": r["beton"],
-            "panneaux": r["panneaux"], "tuyaux": r["tuyaux"], "canalisations": r["canalisations"], "poutres": r["poutres"],
-            "jh_chef": r["jh_chef"], "jh_ouvrier": r["jh_ouvrier"], "jh_cond": r["jh_cond"],
-            "engins_requis": json.loads(r["engins_requis"]) if r["engins_requis"] else []
-        }
+        demo_data = {"nom_modele": "Goudronnage d'une route (Grande surface) (214 599 €)", "revenus": 214599.0, "jours": 16, "sable": 488.0, "terre": 0.0, "enrobe": 618.0, "armature": 0.0, "tole": 0.0, "beton": 0.0, "panneaux": 6.0, "tuyaux": 0.0, "canalisations": 0.0, "poutres": 0.0, "jh_chef": 16.0, "jh_ouvrier": 48.0, "jh_cond": 28.0, "engins_requis": engins_demo}
+        db.collection("modeles_chantiers").document(demo_data["nom_modele"]).set(demo_data)
+        catalogue[demo_data["nom_modele"]] = demo_data
     return catalogue
 
 def charger_donnees():
-    conn = sqlite3.connect(DB_NAME)
-    df = pd.read_sql_query("""
-        SELECT nom_chantier AS 'Nom du Chantier', revenus AS 'Revenus (€)', jours AS 'Durée (Jours)',
-               cout_materiaux AS 'Coût Matériaux (€)', cout_location AS 'Coût Location Engins (€)', 
-               cout_salaires AS 'Coût Salaires + Intérim (€)', depenses_totales AS 'Dépenses Totales (€)', 
-               benefice_net AS 'Bénéfice Net (€)', gain_par_jour AS 'Gain / Jour (€)', roi AS 'ROI (%)', roi_par_jour AS 'ROI / Jour (%)'
-        FROM chantiers
-    """, conn)
-    conn.close()
-    return df
+    docs = db.collection("chantiers").stream()
+    liste_chantiers = []
+    for doc in docs:
+        d = doc.to_dict()
+        liste_chantiers.append({
+            'Nom du Chantier': doc.id,
+            'Revenus (€)': d.get('revenus', 0.0),
+            'Durée (Jours)': d.get('jours', 0),
+            'Coût Matériaux (€)': d.get('cout_materiaux', 0.0),
+            'Coût Location Engins (€)': d.get('cout_location', 0.0),
+            'Coût Salaires (€)': d.get('cout_salaires', 0.0),
+            'Dépenses Totales (€)': d.get('depenses_totales', 0.0),
+            'Bénéfice Net (€)': d.get('benefice_net', 0.0),
+            'Gain / Jour (€)': d.get('gain_par_jour', 0.0),
+            'ROI (%)': d.get('roi', 0.0),
+            'ROI / Jour (%)': d.get('roi_par_jour', 0.0)
+        })
+    return pd.DataFrame(liste_chantiers) if liste_chantiers else pd.DataFrame(columns=["Nom du Chantier", "Revenus (€)", "Durée (Jours)", "Coût Matériaux (€)", "Coût Location Engins (€)", "Coût Salaires (€)", "Dépenses Totales (€)", "Bénéfice Net (€)", "Gain / Jour (€)", "ROI (%)", "ROI / Jour (%)"])
 
 def inserer_chantier(nom, rev, mats, loc, sal, total, net, roi, jours, gpj, rpj):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO chantiers (nom_chantier, revenus, cout_materiaux, cout_location, cout_salaires, depenses_totales, benefice_net, roi, jours, gain_par_jour, roi_par_jour)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (nom, rev, mats, loc, sal, total, net, roi, jours, gpj, rpj))
-    conn.commit()
-    conn.close()
+    db.collection("chantiers").document(nom).set({
+        "revenus": rev, "cout_materiaux": mats, "cout_location": loc, "cout_salaires": sal,
+        "depenses_totales": total, "benefice_net": net, "roi": roi, "jours": jours,
+        "gain_par_jour": gpj, "roi_par_jour": rpj
+    })
 
 def reinitialiser_db():
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("DROP TABLE IF EXISTS chantiers")
-    conn.commit()
-    conn.close()
-    init_db()
+    collections = ["chantiers", "modeles_chantiers", "configuration_salaires", "configuration_materiaux", "catalogue_engins"]
+    for col_name in collections:
+        docs = db.collection(col_name).stream()
+        for doc in docs:
+            doc.reference.delete()
+    st.toast("Base Firebase réinitialisée ! Rechargement...")
 
 # Chargement initial des configurations dynamiques
 SALAIRES_DB = charger_salaires_config()
@@ -204,7 +144,7 @@ CATALOGUE_CHANTIERS = charger_catalogue_chantiers()
 # ==============================================================================
 onglet1, onglet2, onglet3 = st.tabs(["➕ Ajouter un Chantier", "📊 Historique & Classement", "🔒 Espace Direction"])
 
-# --- ONGLET 1 : FORMULAIRE DE SAISIE PRINCIPAL SANS CODE EN DUR ---
+# --- ONGLET 1 : FORMULAIRE DE SAISIE PRINCIPAL ---
 with onglet1:
     st.subheader("Formulaire de saisie")
     liste_triee = ["Choisir un chantier pré-configuré..."] + sorted([k for k in CATALOGUE_CHANTIERS.keys() if k != "Choisir un chantier pré-configuré..."])
@@ -234,7 +174,6 @@ with onglet1:
             qte_eaux_usees = st.number_input("Unités de Canalisations eaux usées :", value=float(donnees_modele["canalisations"]))
             qte_poutres = st.number_input("Unités de Poutres en acier :", value=float(donnees_modele["poutres"]))
         with c_px:
-            # Branchement dynamique des prix unitaires sur les configurations de la base administrable
             prix_sable = st.number_input("Prix Sable (€/t) :", value=float(MATERIAUX_DB.get("Sable", 12)))
             prix_terre = st.number_input("Prix Terre (€/t) :", value=float(MATERIAUX_DB.get("Terre", 16)))
             prix_enrobe = st.number_input("Prix Enrobé (€/t) :", value=float(MATERIAUX_DB.get("Enrobé", 42)))
@@ -246,13 +185,13 @@ with onglet1:
             prix_eaux_usees = st.number_input("Prix Canalisations (€/u) :", value=float(MATERIAUX_DB.get("Canalisations", 35)))
             prix_poutres = st.number_input("Prix Poutres acier (€/u) :", value=float(MATERIAUX_DB.get("Poutres", 70)))
 
-        # Calcul instantané du coût de revient des fournitures avec espacement des milliers
+        # Calcul instantané du coût de revient des fournitures
         total_mats_direct = float((qte_sable*prix_sable) + (qte_terre*prix_terre) + (qte_enrobe*prix_enrobe) + (qte_armature*prix_armature) + (qte_tole*prix_tole) + (qte_beton*prix_beton) + (qte_panneaux*prix_panneaux) + (qte_tuyaux*prix_tuyaux) + (qte_eaux_usees*prix_eaux_usees) + (qte_poutres*prix_poutres))
         total_mats_formatte = f"{total_mats_direct:,.0f}".replace(",", " ")
         st.info(f"🧱 **Total estimé des matériaux :** {total_mats_formatte} €")
+        
     with col2:
         st.markdown("### --- GRILLE SALARIALE & INTERIM ---")
-        # Branchement des taux journaliers en direct sur les paramètres administrés en base
         px_chef = st.number_input("Coût journalier Chef (€/jour) :", value=float(SALAIRES_DB.get("Chef", 230)))
         jh_chef = st.number_input("Total Jours-Homme Chef :", value=float(donnees_modele["jh_chef"]))
         
@@ -292,7 +231,7 @@ with onglet1:
             }
         )
 
-        # Logique de transfert universelle
+        # Logique de transfert universelle vers la table des engins à louer
         engins_transferes_list = []
         if not engins_necessaires.empty:
             df_coches = engins_necessaires[engins_necessaires["À louer ?"] == True].dropna(subset=["Type d'engin requis"])
@@ -337,6 +276,7 @@ with onglet1:
                 "Jours de Location": st.column_config.NumberColumn("Jours à louer", min_value=1, max_value=365, step=1)
             }
         )
+        
         total_loc_engins_direct = 0.0
         if engins_edites is not None and not engins_edites.empty:
             df_propres_direct = engins_edites.dropna(subset=["Sélection de l'engin / Modèle"])
@@ -384,16 +324,16 @@ with onglet1:
         elif doublon_existe: st.error(f"Impossible d'enregistrer : ce chantier existe déjà.")
         else:
             inserer_chantier(nom_chantier, revenus, total_mats_recap, total_location_recap, total_salaires_recap, total_depenses_recap, benefice_net_recap, round(roi_recap, 2), int(jours_totaux), round(gain_par_jour_recap, 2), round(roi_par_jour_recap, 2))
-            st.toast("Chantier enregistré avec succès dans la base SQLite !")
+            st.toast("Chantier enregistré avec succès dans Firebase Firestore !")
             st.rerun()
 
 # --- ONGLET 2 : HISTORIQUE ET CLASSEMENT ---
 with onglet2:
-    st.subheader("Base de données des chantiers enregistrés")
+    st.subheader("Base de données des chantiers enregistrés en temps réel")
     df_affichage = charger_donnees()
     
     if df_affichage.empty: 
-        st.info("Aucun chantier n'a encore été enregistré.")
+        st.info("Aucun chantier n'a encore été enregistré dans Firebase.")
     else:
         critere_tri = st.selectbox("Classement initial par défaut :", ["Plus gros Bénéfice d'abord", "Plus gros ROI d'abord", "Plus de revenus d'abord"])
         if critere_tri == "Plus gros Bénéfice d'abord": 
@@ -436,9 +376,9 @@ with onglet2:
         )
         
         csv = df_affichage.to_csv(index=False).encode('utf-8')
-        st.download_button(label="📥 Télécharger la base de données (CSV)", data=csv, file_name="base_donnies_chantiers.csv", mime="text/csv")
+        st.download_button(label="📥 Télécharger la base de données cloud (CSV)", data=csv, file_name="base_donnies_chantiers.csv", mime="text/csv")
         st.markdown("---")
-        if st.button("🗑️ Vider définitivement la base de données SQLITE", type="secondary"):
+        if st.button("🗑️ Vider définitivement la base de données cloud FIREBASE", type="secondary"):
             reinitialiser_db()
             st.rerun()
 
@@ -451,29 +391,21 @@ with onglet3:
         st.success("🔓 Accès accordé au panneau de contrôle.")
         
         df_stats = charger_donnees()
-        if not df_stats.empty:
-            st.markdown("### 🏢 Bilan Général de l'Entreprise")
+        if not df_stats.empty and "Revenus (€)" in df_stats.columns:
+            st.markdown("### 🏢 Bilan Général de l'Entreprise (Consolidé Cloud)")
             total_chantiers = len(df_stats)
             somme_revenus = float(df_stats["Revenus (€)"].sum())
             somme_depenses = float(df_stats["Dépenses Totales (€)"].sum())
             somme_benefices = float(df_stats["Bénéfice Net (€)"].sum())
             
-            txt_total_rev = f"{somme_revenus:,.0f}".replace(",", " ")
-            txt_total_dep = f"{somme_depenses:,.0f}".replace(",", " ")
-            txt_total_ben = f"{somme_benefices:,.0f}".replace(",", " ")
-            
-            roi_global_entreprise = (somme_benefices / somme_depenses) * 100 if somme_depenses > 0 else 0
-            
             c_st1, c_st2, c_st3, c_st4 = st.columns(4)
             with c_st1: st.metric(label="💼 Chantiers Signés", value=f"{total_chantiers}")
-            with c_st2: st.metric(label="💰 Chiffre d'Affaires Cumulé", value=f"{txt_total_rev} €")
-            with c_st3: st.metric(label="📉 Dépenses Totales", value=f"{txt_total_dep} €")
-            with c_st4: st.metric(label="📈 Résultat Net / Bénéfice", value=f"{txt_total_ben} €")
+            with c_st2: st.metric(label="💰 Chiffre d'Affaires Cumulé", value=f"{somme_revenus:,.0f}".replace(",", " ") + " €")
+            with c_st3: st.metric(label="📉 Dépenses Totales", value=f"{somme_depenses:,.0f}".replace(",", " ") + " €")
+            with c_st4: st.metric(label="📈 Résultat Net / Bénéfice", value=f"{somme_benefices:,.0f}".replace(",", " ") + " €")
             st.markdown("---")
 
-        st.markdown("## ⚙️ Administration Suprême des Bases")
-        
-        # AJOUT DE LA 5ÈME SECTION DANS LES TABS CI-DESSOUS
+        st.markdown("## ⚙️ Administration Suprême des Bases NoSQL")
         sub_tab1, sub_tab2, sub_tab3, sub_tab4, sub_tab5 = st.tabs([
             "🏗️ Saisie Multi-Chantiers en Bloc", 
             "👥 Éditer Grille Salariale", 
@@ -482,56 +414,35 @@ with onglet3:
             "🗂️ Consulter les Bases Données"
         ])
         
-        # --- 4.1 INTERFACES D'IMPORTATION UNIQUE EN BLOC ---
+        # --- 4.1 INTERFACES D'IMPORTATION EN BLOC ---
         with sub_tab1:
             st.markdown("### 📥 Extracteur de Fiches Chantiers Multi-Étapes")
-            st.write("Collez vos fiches descriptives complètes à la suite les unes des autres. L'algorithme se charge de découper, nettoyer et indexer chaque chantier au format requis.")
-            
-            # Zone de texte unique suprême
             texte_fiches_brutes = st.text_area(
                 "Collez vos fiches de chantiers détaillées ici (Une ou plusieurs à la suite) :",
-                value="",
-                height=350,
-                key="zone_texte_import_unique_fusionne",
-                placeholder='Pose de tuyaux d\'eau potable (niveau 2)\t240 840 euros\nNombre d\'étapes : 4 étape(s)\nRevenus : 240 840 euros\nSurface du chantier : 4 km\nDurée du chantier : 3 jour(s)'
+                value="", height=350, key="zone_texte_import_unique_fusionne"
             )
             
             if st.button("🏗️ ANALYSER, NETTOYER ET IMPORTER EN BLOC", type="primary"):
                 if not texte_fiches_brutes.strip():
-                    st.error("❌ La zone de texte est vide. Veuillez y coller vos données chantiers.")
+                    st.error("❌ La zone de texte est vide.")
                 else:
-                    conn = sqlite3.connect(DB_NAME)
-                    cursor = conn.cursor()
-                    
-                    # Découpage du texte par ligne
                     lignes = texte_fiches_brutes.split("\n")
-                    
                     chantiers_detectes = {}
                     nom_courant = None
                     
                     for ligne in lignes:
                         l_clean = ligne.strip()
-                        if not l_clean:
-                            continue
+                        if not l_clean: continue
                         
-                        # --- 1. DÉTECTION DE LA LIGNE DE TITRE ET PREMIER PRIX ---
-                        # Exemple : "Pose de tuyaux d'eau potable (niveau 2)  240 840 euros"
                         if "euros" in l_clean.lower() and not l_clean.lower().startswith("revenus"):
                             mots = l_clean.split()
                             mots_sans_euro = [m for m in mots if m.lower() not in ["euros", "euro", "€"]]
-                            
                             if len(mots_sans_euro) >= 2:
-                                # Extraction et recollement des milliers (ex: 240 et 840)
                                 p1 = "".join(c for c in mots_sans_euro[-1] if c.isdigit())
                                 p2 = "".join(c for c in mots_sans_euro[-2] if c.isdigit()) if len(mots_sans_euro) > 2 else ""
-                                
                                 try:
-                                    if p2 and p1 and len(p1) == 3:
-                                        prix_ch = float(p2 + p1)
-                                        nom_ch = " ".join(mots_sans_euro[:-2])
-                                    else:
-                                        prix_ch = float(p1)
-                                        nom_ch = " ".join(mots_sans_euro[:-1])
+                                    prix_ch = float(p2 + p1) if (p2 and p1 and len(p1) == 3) else float(p1)
+                                    nom_ch = " ".join(mots_sans_euro[:-2]) if (p2 and p1 and len(p1) == 3) else " ".join(mots_sans_euro[:-1])
                                 except ValueError:
                                     prix_ch = 0.0
                                     nom_ch = l_clean
@@ -544,56 +455,39 @@ with onglet3:
                                         "beton": 0.0, "panneaux": 0.0, "tuyaux": 0.0, "canalisations": 0.0, "poutres": 0.0,
                                         "jh_chef": 0.0, "jh_ouvrier": 0.0, "jh_cond": 0.0, "engins_requis": []
                                     }
-                        
-                        # Sécurité : Si aucune fiche n'est active, on passe à la ligne suivante
-                        if not nom_courant:
                             continue
+
+                        if not nom_courant: continue
                             
-                        # --- 2. EXTRACTION DU BUDGET DE REVENUS EXPLICITE ---
                         if l_clean.lower().startswith("revenus"):
-                            # Filtre tous les chiffres pour recréer le montant exact (ex: "240 840" -> 240840)
                             num_part = "".join(c for c in l_clean if c.isdigit())
-                            if num_part:
-                                chantiers_detectes[nom_courant]["revenus"] = float(num_part)
-                                
-                        # --- 3. EXTRACTION DU NOMBRE D'ÉTAPES PLANIFIÉES ---
+                            if num_part: chantiers_detectes[nom_courant]["revenus"] = float(num_part)
                         if "nombre d'étapes" in l_clean.lower() or "nb ombre" in l_clean.lower():
                             partie_etape = l_clean.split(":")[-1] if ":" in l_clean else l_clean
-                            num_etapes = "".join(c for c in partie_etape.split()[0] if c.isdigit()) if partie_etape.split() else ""
-                            if not num_etapes:
-                                num_etapes = "".join(c for c in partie_etape if c.isdigit())
-                            if num_etapes:
-                                chantiers_detectes[nom_courant]["nb_etapes"] = int(num_etapes)
+                            num_etapes = "".join(c for c in partie_etape.split() if c.isdigit()) if partie_etape.split() else ""
+                            if not num_etapes: num_etapes = "".join(c for c in partie_etape if c.isdigit())
+                            if num_etapes: chantiers_detectes[nom_courant]["nb_etapes"] = int(num_etapes)
                                 
-                        # --- 4. EXTRACTION DE LA DURÉE DU CHANTIER ---
                         if "durée du chantier" in l_clean.lower() or "duree du chantier" in l_clean.lower():
                             partie_droite = l_clean.split(":")[-1] if ":" in l_clean else l_clean
-                            # Extraction du premier chiffre (les jours) avant le mot "jour"
                             mots_jours = partie_droite.split()
                             num_jours = ""
                             for mj in mots_jours:
                                 if any(c.isdigit() for c in mj):
                                     num_jours = "".join(c for c in mj if c.isdigit())
                                     break
-                            if num_jours:
-                                chantiers_detectes[nom_courant]["jours"] = int(num_jours)
+                            if num_jours: chantiers_detectes[nom_courant]["jours"] = int(num_jours)
                                 
-                        # --- 5. EXTRACTION DE LA SURFACE ET DES MATÉRIAUX ---
                         if "surface du chantier" in l_clean.lower():
                             partie_mats = l_clean.split(":")[-1].lower() if ":" in l_clean else l_clean.lower()
                             mots_mats = partie_mats.split()
                             if mots_mats:
-                                qte_txt = "".join(c for c in mots_mats[0] if c.isdigit())
-                                if not qte_txt:
-                                    qte_txt = "".join(c for c in partie_mats if c.isdigit())
+                                qte_txt = "".join(c for c in mots_mats if c.isdigit())
+                                if not qte_txt: qte_txt = "".join(c for c in partie_mats if c.isdigit())
                                 if qte_txt:
                                     qte_val = float(qte_txt)
                                     type_mat = " ".join(mots_mats[1:])
-                                    
-                                    # Routage intelligent basé sur l'intitulé de votre fiche
-                                    if "tuyau" in type_mat or "km" in type_mat: 
-                                        # Si c'est écrit en kilomètres ("4 km"), on indexe dans les tuyaux ou canalisations par défaut
-                                        chantiers_detectes[nom_courant]["tuyaux"] = qte_val
+                                    if "tuyau" in type_mat or "km" in type_mat: chantiers_detectes[nom_courant]["tuyaux"] = qte_val
                                     elif "panneau" in type_mat: chantiers_detectes[nom_courant]["panneaux"] = qte_val
                                     elif "sable" in type_mat: chantiers_detectes[nom_courant]["sable"] = qte_val
                                     elif "terre" in type_mat: chantiers_detectes[nom_courant]["terre"] = qte_val
@@ -604,122 +498,101 @@ with onglet3:
                                     elif "canal" in type_mat: chantiers_detectes[nom_courant]["canalisations"] = qte_val
                                     elif "poutre" in type_mat: chantiers_detectes[nom_courant]["poutres"] = qte_val
 
-                    # --- ENREGISTREMENT COMPACTÉ DANS LA BASE SQLITE ---
                     compteur_total = 0
                     for name, data in chantiers_detectes.items():
-                        # Initialisation par défaut de la main-d'œuvre basée sur la durée totale extraite
                         if data["jh_chef"] == 0 and data["jh_ouvrier"] == 0:
                             data["jh_chef"] = float(data["jours"])
-                            data["jh_ouvrier"] = float(data["jours"] * 3) # Allocation moyenne de base
+                            data["jh_ouvrier"] = float(data["jours"] * 3)
                         
-                        # Génération dynamique des X lignes d'étapes dans la table des besoins
                         if not data["engins_requis"]:
                             for e_num in range(1, data["nb_etapes"] + 1):
                                 data["engins_requis"].append({
-                                    "N° Étape": e_num, 
-                                    "Durée Étape (jours)": max(1, int(data["jours"] / data["nb_etapes"])),
-                                    "Type d'engin requis": "Pelleteuses" if e_num == 1 else "Camions Benne", 
-                                    "Niveau requis": "N2"
+                                    "N° Étape": e_num, "Durée Étape (jours)": max(1, int(data["jours"] / data["nb_etapes"])),
+                                    "Type d'engin requis": "Pelleteuses" if e_num == 1 else "Camions Benne", "Niveau requis": "N2"
                                 })
-                        # --- BLOC D'INSERTION DIRECT ET SÉCURISÉ ---
-                        cursor.execute("INSERT OR REPLACE INTO modeles_chantiers VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (
-                            name, data["revenus"], data["jours"],
-                            data["sable"], data["terre"], data["enrobe"], data["armature"], data["tole"],
-                            data["beton"], data["panneaux"], data["tuyaux"], data["canalisations"], data["poutres"],
-                            data["jh_chef"], data["jh_ouvrier"], data["jh_cond"],
-                            json.dumps(data["engins_requis"])
-                        ))
+                        
+                        db.collection("modeles_chantiers").document(name).set({
+                            "nom_modele": name, "revenus": data["revenus"], "jours": data["jours"],
+                            "sable": data["sable"], "terre": data["terre"], "enrobe": data["enrobe"], "armature": data["armature"], "tole": data["tole"],
+                            "beton": data["beton"], "panneaux": data["panneaux"], "tuyaux": data["tuyaux"], "canalisations": data["canalisations"], "poutres": data["poutres"],
+                            "jh_chef": data["jh_chef"], "jh_ouvrier": data["jh_ouvrier"], "jh_cond": data["jh_cond"], "engins_requis": data["engins_requis"]
+                        })
                         compteur_total += 1
                         
-                    conn.commit()
-                    conn.close()
-                    
                     if compteur_total > 0:
                         st.success(f"🟢 Traitement terminé ! {compteur_total} fiche(s) injectée(s) ! Rechargement...")
                         st.rerun()
+
         # --- 4.2 CONFIGURATION GRILLE SALARIALE ---
         with sub_tab2:
             st.write("Modifiez le coût d'une journée de travail.")
-            conn = sqlite3.connect(DB_NAME)
-            df_salaires = pd.read_sql_query("SELECT * FROM configuration_salaires", conn)
-            conn.close()
-            salaires_edites = st.data_editor(df_salaires, use_container_width=True, key="editeur_salaires_db", num_rows="fixed")
+            salaires_edites = st.data_editor(pd.DataFrame(list(SALAIRES_DB.items()), columns=["poste", "tarif_jour"]), use_container_width=True, key="editeur_salaires_db", num_rows="fixed")
             if st.button("METTRE À JOUR LA GRILLE SALARIALE"):
-                conn = sqlite3.connect(DB_NAME)
-                cursor = conn.cursor()
-                for _, r in salaires_edites.iterrows():
-                    cursor.execute("UPDATE configuration_salaires SET tarif_jour = ? WHERE poste = ?", (float(r["tarif_jour"]), str(r["poste"])))
-                conn.commit()
-                conn.close()
-                st.success("Grille salariale enregistrée !")
+                nouveau_dict = dict(zip(salaires_edites["poste"], salaires_edites["tarif_jour"].astype(float)))
+                db.collection("configuration_salaires").document("grille").set(nouveau_dict)
+                st.success("Grille salariale synchronisée sur Firebase !")
                 st.rerun()
 
         # --- 4.3 CONFIGURATION DES MATÉRIAUX ---
         with sub_tab3:
             st.write("Ajustez le prix unitaire de vos matières premières.")
-            conn = sqlite3.connect(DB_NAME)
-            df_mats = pd.read_sql_query("SELECT * FROM configuration_materiaux", conn)
-            conn.close()
-            mats_edites = st.data_editor(df_mats, use_container_width=True, key="editeur_mats_db", num_rows="fixed")
+            mats_edites = st.data_editor(pd.DataFrame(list(MATERIAUX_DB.items()), columns=["materiau", "prix_unitaire"]), use_container_width=True, key="editeur_mats_db", num_rows="fixed")
             if st.button("METTRE À JOUR LE COÛT DES MATÉRIAUX"):
-                conn = sqlite3.connect(DB_NAME)
-                cursor = conn.cursor()
-                for _, r in mats_edites.iterrows():
-                    cursor.execute("UPDATE configuration_materiaux SET prix_unitaire = ? WHERE materiau = ?", (float(r["prix_unitaire"]), str(r["materiau"])))
-                conn.commit()
-                conn.close()
-                st.success("Catalogue des tarifs matériaux actualisé !")
+                nouveau_dict = dict(zip(mats_edites["materiau"], mats_edites["prix_unitaire"].astype(float)))
+                db.collection("configuration_materiaux").document("catalogue").set(nouveau_dict)
+                st.success("Tarifs matériaux actualisés sur Firebase !")
                 st.rerun()
 
         # --- 4.4 CATALOGUE DE MACHINES ---
         with sub_tab4:
             st.write("Ajoutez ou modifiez vos engins lourds et leurs tarifs de location.")
-            conn = sqlite3.connect(DB_NAME)
-            df_engins = pd.read_sql_query("SELECT * FROM catalogue_engins", conn)
-            conn.close()
+            docs_engins = db.collection("catalogue_engins").stream()
+            liste_engins = [{"nom_engin": d.id, "type_brut": d.to_dict().get("type_brut", ""), "prix_jour": d.to_dict().get("prix_jour", 0.0)} for d in docs_engins]
+            df_engins = pd.DataFrame(liste_engins) if liste_engins else pd.DataFrame(columns=["nom_engin", "type_brut", "prix_jour"])
+            
             engins_edites_db = st.data_editor(df_engins, use_container_width=True, key="editeur_engins_db", num_rows="dynamic")
             if st.button("METTRE À JOUR LE CATALOGUE DES ENGINS"):
-                conn = sqlite3.connect(DB_NAME)
-                cursor = conn.cursor()
-                cursor.execute("DELETE FROM catalogue_engins")
+                old_docs = db.collection("catalogue_engins").stream()
+                for od in old_docs: od.reference.delete()
+                
                 for _, r in engins_edites_db.iterrows():
-                    if pd.notnull(r["nom_engin"]):
-                        cursor.execute("INSERT INTO catalogue_engins VALUES (?, ?, ?)", (str(r["nom_engin"]), str(r["type_brut"]), float(r["prix_jour"])))
-                conn.commit()
-                conn.close()
-                st.success("Parc d'engins synchronisé !")
+                    if pd.notnull(r["nom_engin"]) and str(r["nom_engin"]).strip():
+                        db.collection("catalogue_engins").document(str(r["nom_engin"]).strip()).set({
+                            "type_brut": str(r["type_brut"]), "prix_jour": float(r["prix_jour"])
+                        })
+                st.success("Parc d'engins synchronisé sur le Cloud !")
                 st.rerun()
 
-        # --- 4.5 VISUALISATION ET LECTURE DE TOUTES LES TABLES INSCRITES (NOUVEAU) ---
+        # --- 4.5 VISUALISATION EN DIRECT DES TABLES ---
         with sub_tab5:
-            st.markdown("### 🗂️ Consultation brute des tables enregistrées en base")
-            st.write("Sélectionnez la base de données spécifique que vous souhaitez inspecter en temps réel :")
-            
+            st.markdown("### 🗂️ Consultation brute des documents enregistrés en base cloud")
             choix_table = st.selectbox(
                 "Choisir la table à afficher :",
                 ["Modèles de Chantiers Pré-configurés", "Grille Salariale Actuelle", "Prix des Matériaux de base", "Catalogue de Location des Engins"]
             )
             
-            conn = sqlite3.connect(DB_NAME)
             if choix_table == "Modèles de Chantiers Pré-configurés":
-                df_table_brute = pd.read_sql_query("SELECT id, nom_modele AS 'Nom du Modèle', revenus AS 'Budget (€)', jours AS 'Durée (j)', jh_chef AS 'JH Chef', jh_ouvrier AS 'JH Ouvrier', jh_cond AS 'JH Conducteur' FROM modeles_chantiers", conn)
-                st.markdown(f"**Total : {len(df_table_brute)} modèles enregistrés**")
-                st.dataframe(df_table_brute, use_container_width=True)
+                docs = db.collection("modeles_chantiers").stream()
+                res = [d.to_dict() for d in docs]
+                if res:
+                    df_t = pd.DataFrame(res)[["nom_modele", "revenus", "jours", "jh_chef", "jh_ouvrier", "jh_cond"]]
+                    st.dataframe(df_t, use_container_width=True)
+                else: st.info("Aucun modèle de chantier disponible.")
                 
             elif choix_table == "Grille Salariale Actuelle":
-                df_table_brute = pd.read_sql_query("SELECT poste AS 'Poste', tarif_jour AS 'Tarif (€/jour)' FROM configuration_salaires", conn)
-                st.dataframe(df_table_brute, use_container_width=True)
+                st.json(SALAIRES_DB)
                 
             elif choix_table == "Prix des Matériaux de base":
-                df_table_brute = pd.read_sql_query("SELECT materiau AS 'Matériau / Fournitures', prix_unitaire AS 'Tarif Unitaire (€)' FROM configuration_materiaux", conn)
-                st.dataframe(df_table_brute, use_container_width=True)
+                st.json(MATERIAUX_DB)
                 
             elif choix_table == "Catalogue de Location des Engins":
-                df_table_brute = pd.read_sql_query("SELECT nom_engin AS 'Modèle Engin Extrait', type_brut AS 'Catégorie Technique', prix_jour AS 'Prix Location (€/jour)' FROM catalogue_engins", conn)
-                st.markdown(f"**Total : {len(df_table_brute)} machines prêtes dans le parc**")
-                st.dataframe(df_table_brute, use_container_width=True)
-            conn.close()
+                docs = db.collection("catalogue_engins").stream()
+                res = [{"Engin Modèle": d.id, "Catégorie Technique": d.to_dict().get("type_brut"), "Prix de location (€/jour)": d.to_dict().get("prix_jour")} for d in docs]
+                if res: st.dataframe(pd.DataFrame(res), use_container_width=True)
+                else: st.info("Le catalogue de machines est vide.")
                 
     elif mot_de_passe != "":
+        st.error("🔒 Code d'accès incorrect. Les privilèges d'administration restent verrouillés.")
 
-        st.error("🔒 Code d'accès incorrect. Les données financières consolidées restent verrouillées.")
+
+
