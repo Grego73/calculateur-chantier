@@ -61,33 +61,9 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         st.markdown("### --- GRILLE SALARIALE & INTERIM (PALIERS DYNAMIQUES) ---")
         st.caption("💡 Sélectionnez pour chaque profil la stratégie de rémunération recopiée depuis vos analyses de recrutement.")
         
-        # --- 1. CONFIGURATION CHEFS ---
-        st.markdown("**🧑‍💼 PROFIL : CHEFS DE CHANTIER**")
-        c_chef_strat, c_chef_jh = st.columns([2, 1])
-        with c_chef_strat:
-            p_min_c = float(SALAIRES_DB.get("Chef_Min", 230.0))
-            p_moy_c = float(SALAIRES_DB.get("Chef_Moyen", 230.0))
-            p_max_c = float(SALAIRES_DB.get("Chef_Max", 230.0))
-            strat_chef = st.selectbox("Salaire Chef :", [f"Économique ({p_min_c:.0f} €)", f"Standard ({p_moy_c:.0f} €)", f"Premium ({p_max_c:.0f} €)"], key="sel_strat_chef")
-            px_chef = p_min_c if "Économique" in strat_chef else (p_moy_c if "Standard" in strat_chef else p_max_c)
-        with c_chef_jh:
-            jh_chef = st.number_input("Jours-Homme", value=float(donnees_modele["jh_chef"]), key="jh_input_chef")
-
-        # --- 2. CONFIGURATION OUVRIERS ---
-        st.markdown("**👷 PROFIL : OUVRIERS QUALIFIÉS**")
-        c_ouv_strat, c_ouv_jh = st.columns([2, 1])
-        with c_ouv_strat:
-            p_min_o = float(SALAIRES_DB.get("Ouvrier_Min", 230.0))
-            p_moy_o = float(SALAIRES_DB.get("Ouvrier_Moyen", 230.0))
-            p_max_o = float(SALAIRES_DB.get("Ouvrier_Max", 230.0))
-            strat_ouv = st.selectbox("Salaire Ouvrier :", [f"Économique ({p_min_o:.0f} €)", f"Standard ({p_moy_o:.0f} €)", f"Premium ({p_max_o:.0f} €)"], key="sel_strat_ouv")
-            px_ouvrier = p_min_o if "Économique" in strat_ouv else (p_moy_o if "Standard" in strat_ouv else p_max_o)
-        with c_ouv_jh:
-            jh_ouvrier = st.number_input("Jours-Homme", value=float(donnees_modele["jh_ouvrier"]), key="jh_input_ouv")
-
-        # --- 3. CONFIGURATION CONDUCTEURS ---
+        # --- 1. CONFIGURATION CONDUCTEURS (Nouveau : Affiché en 1er) ---
         st.markdown("**🕹️ PROFIL : CONDUCTEURS D'ENGINS**")
-        c_cond_strat, c_cond_jh = st.columns([2, 1])
+        c_cond_strat, c_cond_jh = st.columns()
         with c_cond_strat:
             p_min_co = float(SALAIRES_DB.get("Conducteur_Min", 230.0))
             p_moy_co = float(SALAIRES_DB.get("Conducteur_Moyen", 230.0))
@@ -97,9 +73,33 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         with c_cond_jh:
             jh_cond = st.number_input("Jours-Homme", value=float(donnees_modele["jh_cond"]), key="jh_input_cond")
 
+        # --- 2. CONFIGURATION CHEFS ---
+        st.markdown("**🧑‍💼 PROFIL : CHEFS DE CHANTIER**")
+        c_chef_strat, c_chef_jh = st.columns()
+        with c_chef_strat:
+            p_min_c = float(SALAIRES_DB.get("Chef_Min", 230.0))
+            p_moy_c = float(SALAIRES_DB.get("Chef_Moyen", 230.0))
+            p_max_c = float(SALAIRES_DB.get("Chef_Max", 230.0))
+            strat_chef = st.selectbox("Salaire Chef :", [f"Économique ({p_min_c:.0f} €)", f"Standard ({p_moy_c:.0f} €)", f"Premium ({p_max_c:.0f} €)"], key="sel_strat_chef")
+            px_chef = p_min_c if "Économique" in strat_chef else (p_moy_c if "Standard" in strat_chef else p_max_c)
+        with c_chef_jh:
+            jh_chef = st.number_input("Jours-Homme", value=float(donnees_modele["jh_chef"]), key="jh_input_chef")
+
+        # --- 3. CONFIGURATION OUVRIERS ---
+        st.markdown("**👷 PROFIL : OUVRIERS QUALIFIÉS**")
+        c_ouv_strat, c_ouv_jh = st.columns()
+        with c_ouv_strat:
+            p_min_o = float(SALAIRES_DB.get("Ouvrier_Min", 230.0))
+            p_moy_o = float(SALAIRES_DB.get("Ouvrier_Moyen", 230.0))
+            p_max_o = float(SALAIRES_DB.get("Ouvrier_Max", 230.0))
+            strat_ouv = st.selectbox("Salaire Ouvrier :", [f"Économique ({p_min_o:.0f} €)", f"Standard ({p_moy_o:.0f} €)", f"Premium ({p_max_o:.0f} €)"], key="sel_strat_ouv")
+            px_ouvrier = p_min_o if "Économique" in strat_ouv else (p_moy_o if "Standard" in strat_ouv else p_max_o)
+        with c_ouv_jh:
+            jh_ouvrier = st.number_input("Jours-Homme", value=float(donnees_modele["jh_ouvrier"]), key="jh_input_ouv")
+
         # --- 4. CONFIGURATION INTÉRIMAIRES ---
         st.markdown("**⏱️ PROFIL : INTÉRIMAIRES EXTERNES**")
-        c_int_strat, c_int_jh = st.columns([2, 1])
+        c_int_strat, c_int_jh = st.columns()
         with c_int_strat:
             p_min_i = float(SALAIRES_DB.get("Intérim_Min", 220.0))
             p_moy_i = float(SALAIRES_DB.get("Intérim_Moyen", 220.0))
@@ -108,8 +108,6 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
             px_interim = p_min_i if "Économique" in strat_int else (p_moy_i if "Standard" in strat_int else p_max_i)
         with c_int_jh:
             jh_interim = st.number_input("Nombre d'Intérimaires", value=0.0, key="jh_input_int")
-
-        st.markdown("### --- TABLE DES ENGINS NÉCESSAIRES ---")
 
         st.markdown("### --- TABLE DES ENGINS NÉCESSAIRES ---")
         engins_bruts_modele = []
