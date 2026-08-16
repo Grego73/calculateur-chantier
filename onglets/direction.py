@@ -212,7 +212,8 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                 placeholder="Betty\t48 ans\t1 622 €\tEngager\nJean-pierre\t45 ans\t1 623 €\tEngager"
             )
 
-            if st.button("📊 ANALYSER LES SALAIRES SOUMIS"):
+            # --- LE BOUTON PRINCIPAL D'ANALYSE NETTOYÉ ---
+            if st.button("📊 ANALYSER LES SALAIRES SOUMIS", key="btn_declencher_analyse_unique"):
                 if not texte_recrutement_brut.strip():
                     st.error("❌ La zone de texte est vide.")
                 else:
@@ -230,18 +231,24 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                         for el in elements:
                             if "€" in el:
                                 chiffre_net = "".join(c for c in el if c.isdigit())
-                                if chiffre_net: salaire_trouve = float(chiffre_net); break
+                                if chiffre_net: 
+                                    salaire_trouve = float(chiffre_net)
+                                    break
                         
                         if salaire_trouve is None:
                             for el in reversed(elements):
                                 if any(c.isdigit() for c in el) and "an" not in el.lower():
                                     chiffre_net = "".join(c for c in el if c.isdigit())
-                                    if chiffre_net: salaire_trouve = float(chiffre_net); break
+                                    if chiffre_net: 
+                                        salaire_trouve = float(chiffre_net)
+                                        break
                                         
                         if salaire_trouve is not None:
                             liste_salaires_extraits.append(salaire_trouve)
 
                     if len(liste_salaires_extraits) > 0:
+                        # On vide le cache d'affichage des boutons en forçant un dictionnaire propre
+                        st.session_state["paliers_prets_a_valider"] = True
                         pop_up_validation_recrutement(liste_salaires_extraits, metier_cible, SALAIRES_DB)
                     else:
                         st.error("❌ Aucun montant de salaire valide n'a pu être extrait.")
