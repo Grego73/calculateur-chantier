@@ -290,10 +290,32 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                         st.error("❌ Aucun montant de salaire contenant un symbole '€' n'a pu être extrait. Vérifiez votre saisie.")
 
 
+            # --- AFFICHAGE INTERACTIF TRlABLE SUR LES 2 COLONNES ---
             st.markdown("---")
-            st.write("⚙ Honoraires journaliers en base de données :")
-            lignes_propres = [(poste, mt) for poste, mt in SALAIRES_DB.items() if "Intérim" not in poste]
-            st.dataframe(pd.DataFrame(lignes_propres, columns=["Clé de Grille", "Montant / jour (€)"]), use_container_width=True, hide_index=True)
+            st.write("⚙️ **Grille tarifaire enregistrée en base (Cliquez sur l'en-tête d'une colonne pour la classer) :**")
+            
+            # 1. Extraction et nettoyage de la grille
+            lignes_propres = [
+                (poste, mt) for poste, mt in SALAIRES_DB.items() 
+                if "Intérim" not in poste and "Intérim_Min" not in poste and "Intérim_Moyen" not in poste and "Intérim_Max" not in poste
+            ]
+            
+            # 2. Tri initial par défaut (par ordre alphabétique)
+            lignes_propres.sort(key=lambda x: x[0])
+            
+            # 3. Création du DataFrame
+            salaires_actuels_df = pd.DataFrame(lignes_propres, columns=["Poste / Palier de Jeu", "Montant / jour (€)"])
+            
+            # 4. Affichage Streamlit avec tri interactif activé nativement sur les deux colonnes
+            st.dataframe(
+                salaires_actuels_df, 
+                use_container_width=True, 
+                hide_index=True,
+                column_config={
+                    "Poste / Palier de Jeu": st.column_config.TextColumn("Poste / Palier de Jeu", help="Cliquez pour trier de A à Z"),
+                    "Montant / jour (€)": st.column_config.NumberColumn("Montant / jour (€)", format="%d €", help="Cliquez pour trier par prix")
+                }
+            )
 
         # --- 4.3 CONFIGURATION DES MATÉRIAUX ---
         with sub_tab3:
