@@ -250,14 +250,62 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
 
     st.markdown("<br>", unsafe_allow_html=True) 
 
-    # --- BOUTON DE SAUVEGARDE ET LIEN VERS DATABASE.PY ---
-    if st.button("LANCER LE CALCUL & ENREGISTRER", type="primary"):
+    # ==============================================================================
+    # --- FENÊTRE DE VALIDATION INTERACTIVE (POP-UP DIALOG) ---
+    # ==============================================================================
+    
+    # On définit la fonction de la fenêtre pop-up de validation
+    @st.dialog("🏗️ Validation et Envoi du Chantier sur Firebase")
+    def confirmer_enregistrement_chantier():
+        st.write("Vérifiez les données de calcul avant de valider l'insertion définitive dans la base cloud :")
+        
+        # Affichage des valeurs clés sous forme de tableau propre
+        donnees_popup = {
+            "Indicateur": ["Nom du Projet", "Budget / Revenus", "Durée du Contrat", "Dépenses Matériaux", "Dépenses Location Machines", "Masse Salariale", "Bénéfice Net Estimé", "ROI Global"],
+            "Valeur à insérer": [
+                nom_chantier,
+                f"{revenus:,.2f} €".replace(",", " "),
+                txt_duree_precise,
+                f"{total_mats_recap:,.2f} €".replace(",", " "),
+                f"{total_location_recap:,.2f} €".replace(",", " "),
+                f"{total_salaires_recap:,.2f} €".replace(",", " "),
+                f"{benefice_net_recap:,.2f} €".replace(",", " "),
+                f"{roi_recap:.2f} %"
+            ]
+        }
+        st.table(pd.DataFrame(donnees_popup))
+        
+        st.warning("⚠️ Une fois validé, ce chantier sera visible par toute l'entreprise dans l'historique.")
+        
+        # Les boutons d'action à l'intérieur du pop-up
+        col_pop1, col_del2 = st.columns(2)
+        with col_pop1:
+            if st.button("✅ CONFIRMER ET ENVOYER", type="primary", use_container_width=True):
+                # Appel de la fonction Firebase pour écrire la donnée
+                db.inserer_chantier(
+                    nom_chantier, revenus, total_mats_recap, total_location_recap, 
+                    total_salaires_recap, total_depenses_recap, benefice_net_recap, 
+                    round(roi_recap, 2), float(jours_totaux), round(gain_par_jour_recap, 2), 
+                    round(roi_par_jour_recap, 2)
+                )
+                st.toast("🚀 Données envoyées avec succès sur Firestore !")
+                st.rerun()
+                
+        with col_del2:
+            if st.button("❌ ANNULER", use_container_width=True):
+                st.rerun()
+
+    # --- LE BOUTON PRINCIPAL DU FORMULAIRE ---
+    # Quand on clique dessus, au lieu d'enregistrer direct, il ouvre la boîte de dialogue
+    if st.button("LANCER LE CALCUL & ENREGISTRER", type="primary", use_container_width=True):
         df_actuel = db.charger_donnees()
         doublon_existe = False if df_actuel.empty else not df_actuel[(df_actuel["Nom du Chantier"] == nom_chantier) & (df_actuel["Revenus (€)"] == revenus)].empty
         
-        if not nom_chantier: st.error("Veuillez donner un nom ou un numéro valide.")
-        elif doublon_existe: st.error(f"Impossible d'enregistrer : ce chantier existe déjà.")
+        if not nom_chantier: 
+            st.error("⚠️ Veuillez donner un nom ou un numéro valide avant de lancer le calcul.")
+        elif doublon_existe: 
+            st.error(f"❌ Impossible de continuer : le chantier '{nom_chantier}' existe déjà dans la base.")
         else:
-            db.inserer_chantier(nom_chantier, revenus, total_mats_recap, total_location_recap, total_salaires_recap, total_depenses_recap, benefice_net_recap, round(roi_recap, 2), float(jours_totaux), round(gain_par_jour_recap, 2), round(roi_par_jour_recap, 2))
-            st.toast("Chantier enregistré avec succès dans Firebase !")
-            st.rerun()
+            # Si tout est OK, on déclenche l'ouverture du pop-up
+            confirmer_enregistrement_chantier()
+
