@@ -61,58 +61,53 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         st.info(f"🧱 **Total est. matériaux :** {total_mats_direct:,.0f}".replace(",", " ") + " €")
         
     with col2:
-        st.markdown("### --- GRILLE SALARIALE & INTERIM (PALIERS DYNAMIQUES) ---")
-        st.caption("💡 Sélectionnez pour chaque profil la stratégie de rémunération recopiée depuis vos analyses de recrutement.")
+        st.markdown("### --- GRILLE SALARIALE (PALIERS & CONTRATS D'ÉQUIPE) ---")
+        st.caption("💡 Règles RH : Les CDI sont payés au prorata exact (1 mois = 7j). Les CDD sont payés à la journée entamée (arrondi supérieur).")
         
         # --- 1. CONFIGURATION CONDUCTEURS ---
         st.markdown("**🕹️ PROFIL : CONDUCTEURS D'ENGINS**")
-        c_cond_strat, c_cond_jh = st.columns(2)  # Ajout du chiffre 2 ici
+        c_cond_strat, c_cond_type, c_cond_jh = st.columns(3) # Divisé en 3 colonnes désorrmais
         with c_cond_strat:
             p_min_co = float(SALAIRES_DB.get("Conducteur_Min", 230.0))
             p_moy_co = float(SALAIRES_DB.get("Conducteur_Moyen", 230.0))
             p_max_co = float(SALAIRES_DB.get("Conducteur_Max", 230.0))
-            strat_cond = st.selectbox("Salaire Conducteur :", [f"Économique ({p_min_co:.0f} €)", f"Standard ({p_moy_co:.0f} €)", f"Premium ({p_max_co:.0f} €)"], key="sel_strat_cond")
+            strat_cond = st.selectbox("Salaire :", [f"Économique ({p_min_co:.0f} €)", f"Standard ({p_moy_co:.0f} €)", f"Premium ({p_max_co:.0f} €)"], key="sel_strat_cond")
             px_cond = p_min_co if "Économique" in strat_cond else (p_moy_co if "Standard" in strat_cond else p_max_co)
+        with c_cond_type:
+            type_contrat_cond = st.selectbox("Contrat :", ["CDI (Au mois)", "CDD (À la journée)"], key="type_contrat_cond")
         with c_cond_jh:
-            jh_cond = st.number_input("Jours-Homme", value=float(donnees_modele["jh_cond"]), key="jh_input_cond")
+            jh_cond = st.number_input("Nombre d'employés", min_value=0.0, value=float(donnees_modele.get("jh_cond", 0.0)), key="jh_input_cond")
 
         # --- 2. CONFIGURATION CHEFS ---
         st.markdown("**🧑‍💼 PROFIL : CHEFS DE CHANTIER**")
-        c_chef_strat, c_chef_jh = st.columns(2)  # Ajout du chiffre 2 ici
+        c_chef_strat, c_chef_type, c_chef_jh = st.columns(3)
         with c_chef_strat:
             p_min_c = float(SALAIRES_DB.get("Chef_Min", 230.0))
             p_moy_c = float(SALAIRES_DB.get("Chef_Moyen", 230.0))
             p_max_c = float(SALAIRES_DB.get("Chef_Max", 230.0))
-            strat_chef = st.selectbox("Salaire Chef :", [f"Économique ({p_min_c:.0f} €)", f"Standard ({p_moy_c:.0f} €)", f"Premium ({p_max_c:.0f} €)"], key="sel_strat_chef")
+            strat_chef = st.selectbox("Salaire :", [f"Économique ({p_min_c:.0f} €)", f"Standard ({p_moy_c:.0f} €)", f"Premium ({p_max_c:.0f} €)"], key="sel_strat_chef")
             px_chef = p_min_c if "Économique" in strat_chef else (p_moy_c if "Standard" in strat_chef else p_max_c)
+        with c_chef_type:
+            type_contrat_chef = st.selectbox("Contrat :", ["CDI (Au mois)", "CDD (À la journée)"], key="type_contrat_chef")
         with c_chef_jh:
-            jh_chef = st.number_input("Jours-Homme", value=float(donnees_modele["jh_chef"]), key="jh_input_chef")
+            jh_chef = st.number_input("Nombre d'employés", min_value=0.0, value=float(donnees_modele.get("jh_chef", 0.0)), key="jh_input_chef")
 
         # --- 3. CONFIGURATION OUVRIERS ---
         st.markdown("**👷 PROFIL : OUVRIERS QUALIFIÉS**")
-        c_ouv_strat, c_ouv_jh = st.columns(2)  # Ajout du chiffre 2 ici
+        c_ouv_strat, c_ouv_type, c_ouv_jh = st.columns(3)
         with c_ouv_strat:
             p_min_o = float(SALAIRES_DB.get("Ouvrier_Min", 230.0))
             p_moy_o = float(SALAIRES_DB.get("Ouvrier_Moyen", 230.0))
             p_max_o = float(SALAIRES_DB.get("Ouvrier_Max", 230.0))
-            strat_ouv = st.selectbox("Salaire Ouvrier :", [f"Économique ({p_min_o:.0f} €)", f"Standard ({p_moy_o:.0f} €)", f"Premium ({p_max_o:.0f} €)"], key="sel_strat_ouv")
+            strat_ouv = st.selectbox("Salaire :", [f"Économique ({p_min_o:.0f} €)", f"Standard ({p_moy_o:.0f} €)", f"Premium ({p_max_o:.0f} €)"], key="sel_strat_ouv")
             px_ouvrier = p_min_o if "Économique" in strat_ouv else (p_moy_o if "Standard" in strat_ouv else p_max_o)
+        with c_ouv_type:
+            type_contrat_ouv = st.selectbox("Contrat :", ["CDI (Au mois)", "CDD (À la journée)"], key="type_contrat_ouv")
         with c_ouv_jh:
-            jh_ouvrier = st.number_input("Jours-Homme", value=float(donnees_modele["jh_ouvrier"]), key="jh_input_ouv")
-
-        # --- 4. CONFIGURATION INTÉRIMAIRES ---
-        st.markdown("**⏱️ PROFIL : INTÉRIMAIRES EXTERNES**")
-        c_int_strat, c_int_jh = st.columns(2)  # Ajout du chiffre 2 ici
-        with c_int_strat:
-            p_min_i = float(SALAIRES_DB.get("Intérim_Min", 220.0))
-            p_moy_i = float(SALAIRES_DB.get("Intérim_Moyen", 220.0))
-            p_max_i = float(SALAIRES_DB.get("Intérim_Max", 220.0))
-            strat_int = st.selectbox("Tarif Intérim :", [f"Économique ({p_min_i:.0f} €)", f"Standard ({p_moy_i:.0f} €)", f"Premium ({p_max_i:.0f} €)"], key="sel_strat_int")
-            px_interim = p_min_i if "Économique" in strat_int else (p_moy_i if "Standard" in strat_int else p_max_i)
-        with c_int_jh:
-            jh_interim = st.number_input("Nombre d'Intérimaires", value=0.0, key="jh_input_int")
+            jh_ouvrier = st.number_input("Nombre d'employés", min_value=0.0, value=float(donnees_modele.get("jh_ouvrier", 0.0)), key="jh_input_ouv")
 
         st.markdown("### --- TABLE DES ENGINS NÉCESSAIRES ---")
+
 
         engins_bruts_modele = []
         if "engins_requis" in donnees_modele and len(donnees_modele["engins_requis"]) > 0:
@@ -194,22 +189,32 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         df_propres_direct = engins_edites.dropna(subset=["Sélection de l'engin / Modèle"])
         total_location_recap = float((df_propres_direct["Quantité"] * df_propres_direct["Prix Location (€/jour)"] * jours_factures_jeu).sum())
 
-    # 3. Calcul de la Grille Salariale (Règle : 1 semaine de jeu = 7 jours = 1 mois complet)
-    # On calcule d'abord le coût d'une seule journée de travail pour chaque métier
-    tarif_jour_chef = px_chef / 7.0
-    tarif_jour_ouvrier = px_ouvrier / 7.0
-    tarif_jour_cond = px_cond / 7.0
+    # ==============================================================================
+    # --- 3. CALCUL DE LA MASSE SALARIALE (RÈGLES DYNAMIQUES CDI / CDD) ---
+    # ==============================================================================
+    # Jours facturés pour les CDD (arrondi au jour supérieur)
+    jours_factures_jeu = math.ceil(jours_totaux)
 
-    # Coût total = (Nombre d'employés * Tarif journalier) * Durée exacte du chantier
-    cout_chefs = float(jh_chef * tarif_jour_chef * jours_totaux)
-    cout_ouvriers = float(jh_ouvrier * tarif_jour_ouvrier * jours_totaux)
-    cout_cond = float(jh_cond * tarif_jour_cond * jours_totaux)
-    
-    # Intérimaires : payés à la journée complète entamée (arrondi supérieur)
-    cout_interim = float(jh_interim * px_interim * jours_factures_jeu)
+    # --- CALCUL ENGINS CONDUCTEURS ---
+    if "CDI" in type_contrat_cond:
+        cout_cond = jh_cond * (px_cond / 7.0) * jours_totaux # Prorata exact au mois
+    else:
+        cout_cond = jh_cond * px_cond * jours_factures_jeu # Journée complète due
 
-    # Somme globale de la main d'œuvre
-    total_salaires_recap = float(cout_chefs + cout_ouvriers + cout_cond + cout_interim)
+    # --- CALCUL CHEFS DE CHANTIER ---
+    if "CDI" in type_contrat_chef:
+        cout_chefs = jh_chef * (px_chef / 7.0) * jours_totaux
+    else:
+        cout_chefs = jh_chef * px_chef * jours_factures_jeu
+
+    # --- CALCUL OUVRIERS ---
+    if "CDI" in type_contrat_ouv:
+        cout_ouvriers = jh_ouvrier * (px_ouvrier / 7.0) * jours_totaux
+    else:
+        cout_ouvriers = jh_ouvrier * px_ouvrier * jours_factures_jeu
+
+    # Somme finale de la main d'œuvre du jeu
+    total_salaires_recap = float(cout_chefs + cout_ouvriers + cout_cond)
 
     # 4. Synthèse financière globale
     total_depenses_recap = float(total_mats_recap + total_location_recap + total_salaires_recap)
