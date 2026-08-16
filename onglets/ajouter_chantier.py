@@ -61,9 +61,9 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         st.markdown("### --- GRILLE SALARIALE & INTERIM (PALIERS DYNAMIQUES) ---")
         st.caption("💡 Sélectionnez pour chaque profil la stratégie de rémunération recopiée depuis vos analyses de recrutement.")
         
-        # --- 1. CONFIGURATION CONDUCTEURS (Nouveau : Affiché en 1er) ---
+        # --- 1. CONFIGURATION CONDUCTEURS ---
         st.markdown("**🕹️ PROFIL : CONDUCTEURS D'ENGINS**")
-        c_cond_strat, c_cond_jh = st.columns()
+        c_cond_strat, c_cond_jh = st.columns(2)  # Ajout du chiffre 2 ici
         with c_cond_strat:
             p_min_co = float(SALAIRES_DB.get("Conducteur_Min", 230.0))
             p_moy_co = float(SALAIRES_DB.get("Conducteur_Moyen", 230.0))
@@ -75,7 +75,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
 
         # --- 2. CONFIGURATION CHEFS ---
         st.markdown("**🧑‍💼 PROFIL : CHEFS DE CHANTIER**")
-        c_chef_strat, c_chef_jh = st.columns()
+        c_chef_strat, c_chef_jh = st.columns(2)  # Ajout du chiffre 2 ici
         with c_chef_strat:
             p_min_c = float(SALAIRES_DB.get("Chef_Min", 230.0))
             p_moy_c = float(SALAIRES_DB.get("Chef_Moyen", 230.0))
@@ -87,7 +87,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
 
         # --- 3. CONFIGURATION OUVRIERS ---
         st.markdown("**👷 PROFIL : OUVRIERS QUALIFIÉS**")
-        c_ouv_strat, c_ouv_jh = st.columns()
+        c_ouv_strat, c_ouv_jh = st.columns(2)  # Ajout du chiffre 2 ici
         with c_ouv_strat:
             p_min_o = float(SALAIRES_DB.get("Ouvrier_Min", 230.0))
             p_moy_o = float(SALAIRES_DB.get("Ouvrier_Moyen", 230.0))
@@ -99,7 +99,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
 
         # --- 4. CONFIGURATION INTÉRIMAIRES ---
         st.markdown("**⏱️ PROFIL : INTÉRIMAIRES EXTERNES**")
-        c_int_strat, c_int_jh = st.columns()
+        c_int_strat, c_int_jh = st.columns(2)  # Ajout du chiffre 2 ici
         with c_int_strat:
             p_min_i = float(SALAIRES_DB.get("Intérim_Min", 220.0))
             p_moy_i = float(SALAIRES_DB.get("Intérim_Moyen", 220.0))
@@ -110,6 +110,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
             jh_interim = st.number_input("Nombre d'Intérimaires", value=0.0, key="jh_input_int")
 
         st.markdown("### --- TABLE DES ENGINS NÉCESSAIRES ---")
+
         engins_bruts_modele = []
         if "engins_requis" in donnees_modele and len(donnees_modele["engins_requis"]) > 0:
             for item in donnees_modele["engins_requis"]:
