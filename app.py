@@ -1,16 +1,28 @@
 import streamlit as st
 import pandas as pd
-import sqlite3
+import firebase_admin
+from firebase_admin import credentials, firestore
 import json
 
 st.set_page_config(page_title="Gestion des Chantiers", page_icon="🏗️", layout="wide")
 st.title("Gestion et Rentabilité des Chantiers")
 
-DB_NAME = "chantiers.db"
+# ==============================================================================
+# --- 1. INITIALISATION DE FIREBASE & FIRESTORE (SÉCURISÉE) ---
+# ==============================================================================
+if not firebase_admin._apps:
+    # On récupère les accès directement depuis les Secrets configurés dans Streamlit
+    firebase_info = dict(st.secrets["firebase"])
+    
+    # Firebase a besoin de conserver les retours à la ligne du certificat privé
+    if "private_key" in firebase_info:
+        firebase_info["private_key"] = firebase_info["private_key"].replace("\\n", "\n")
+        
+    cred = credentials.Certificate(firebase_info)
+    firebase_admin.initialize_app(cred)
 
-# ==============================================================================
-# --- 1. INITIALISATION DE LA BASE DE DONNÉES (STRUCTURE CENTRALE AUTOMATIQUE) ---
-# ==============================================================================
+db = firestore.client()
+
 def init_db():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
