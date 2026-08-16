@@ -391,9 +391,6 @@ with onglet2:
         csv = df_affichage.to_csv(index=False).encode('utf-8')
         st.download_button(label="📥 Télécharger la base de données cloud (CSV)", data=csv, file_name="base_donnies_chantiers.csv", mime="text/csv")
         st.markdown("---")
-        if st.button("🗑️ Vider définitivement la base de données cloud FIREBASE", type="secondary"):
-            reinitialiser_db()
-            st.rerun()
 
 # --- PANNEAU DE CONTRÔLE SUPRÊME (🔒 ESPACE DIRECTION) ---
 with onglet3:
