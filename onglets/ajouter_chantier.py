@@ -212,6 +212,9 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
     txt_gain_jour = f"{gain_par_jour_recap:,.0f}".replace(",", " ")
     txt_benefice = f"{abs(benefice_net_recap):,.0f}".replace(",", " ")
 
+    # ==============================================================================
+    # --- AFFICHAGE DU RÉCAPITULATIF FINANCIER VISUEL ---
+    # ==============================================================================
     st.markdown("---")
     st.markdown("### 📊 Récapitulatif Global Estimé (Règles du Jeu)")
     if jours_totaux > 0 and jours_totaux != jours_factures_jeu:
@@ -235,32 +238,89 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
     st.markdown("<br>", unsafe_allow_html=True) 
 
     # ==============================================================================
-    # --- POP-UP DIALOG DE VALIDATION AVANT INSCRIPTION FIREBASE ---
+    # --- POP-UP DIALOG INTERACTIF : DÉTAIL DES COULISSES DU CALCUL ---
     # ==============================================================================
-    @st.dialog("🏗️ Validation et Envoi du Chantier sur Firebase")
-    def confirmer_enregistrement_chantier():
-        st.write("Vérifiez les données de calcul avant de valider l'insertion définitive dans la base cloud :")
+    @st.dialog("🔍 Rapport de Calcul et Feuille d'Insertion NoSQL")
+    def confirmer_enregistrement_chantier_detaill():
+        st.write("Voici la transparence complète des calculs et formules appliqués selon les règles de l'économie du jeu :")
+        
+        # 1. Détail de la Logique du Temps
+        st.markdown("#### ⏱️ 1. Décomposition du Temps")
+        st.write(f"- **Durée réelle saisie :** `{jours_saisis} jours, {heures_saisies} heures, {minutes_saisies} minutes`")
+        st.write(f"- **Équivalent décimal exact :** `{jours_totaux:.4f} jours` de jeu (base 24h)")
+        st.write(f"- **Forfait facturé (Location & CDD) :** `{jours_factures_jeu} jours` (Toute journée entamée est due)")
+
+        # 2. Détail des Formules de la Masse Salariale
+        st.markdown("#### 👥 2. Formules appliquées pour la Main-d'œuvre")
+        st.write(f"- **Conducteurs d'engins ({type_contrat_cond}) :**")
+        if "CDI" in type_contrat_cond:
+            st.code(f"{jh_cond} employé(s) × ({px_cond} € / 7j) × {jours_totaux:.2f}j = {cout_cond:,.0f} €")
+        else:
+            st.code(f"{jh_cond} employé(s) × {px_cond} €/jour × {jours_factures_jeu}j due(s) = {cout_cond:,.0f} €")
+
+        st.write(f"- **Chefs de chantier ({type_contrat_chef}) :**")
+        if "CDI" in type_contrat_chef:
+            st.code(f"{jh_chef} employé(s) × ({px_chef} € / 7j) × {jours_totaux:.2f}j = {cout_chefs:,.0f} €")
+        else:
+            st.code(f"{jh_chef} employé(s) × {px_chef} €/jour × {jours_factures_jeu}j due(s) = {cout_chefs:,.0f} €")
+
+        st.write(f"- **Ouvriers qualifiés ({type_contrat_ouv}) :**")
+        if "CDI" in type_contrat_ouv:
+            st.code(f"{jh_ouvrier} employé(s) × ({px_ouvrier} € / 7j) × {jours_totaux:.2f}j = {cout_ouvriers:,.0f} €")
+        else:
+            st.code(f"{jh_ouvrier} employé(s) × {px_ouvrier} €/jour × {jours_factures_jeu}j due(s) = {cout_ouvriers:,.0f} €")
+
+        # 3. Tableau Récapitulatif des variables envoyées à Firestore
+        st.markdown("#### 🗂️ 3. Structure finale de la ligne NoSQL (Firebase)")
         donnees_popup = {
-            "Indicateur": ["Nom du Projet", "Budget / Revenus", "Durée du Contrat", "Dépenses Matériaux", "Dépenses Location Machines", "Masse Salariale", "Bénéfice Net Estimé", "ROI Global"],
-            "Valeur à insérer": [nom_chantier, f"{revenus:,.0f} €".replace(",", " "), txt_duree_precise, f"{total_mats_recap:,.0f} €".replace(",", " "), f"{total_location_recap:,.0f} €".replace(",", " "), f"{total_salaires_recap:,.0f} €".replace(",", " "), f"{benefice_net_recap:,.0f} €".replace(",", " "), f"{roi_recap:.2f} %"]
+            "Champ technique (Firestore)": [
+                "nom_chantier", "revenus", "cout_materiaux", "cout_location", 
+                "cout_salaires", "depenses_totales", "benefice_net", "roi", 
+                "jours (exact)", "gain_par_jour", "roi_par_jour"
+            ],
+            "Valeur brute insérée": [
+                nom_chantier,
+                f"{revenus:,.0f} €".replace(",", " "),
+                f"{total_mats_recap:,.0f} €".replace(",", " "),
+                f"{total_location_recap:,.0f} €".replace(",", " "),
+                f"{total_salaires_recap:,.0f} €".replace(",", " "),
+                f"{total_depenses_recap:,.0f} €".replace(",", " "),
+                f"{benefice_net_recap:,.0f} €".replace(",", " "),
+                f"{roi_recap:.2f} %",
+                f"{jours_totaux:.4f} jours",
+                f"{gain_par_jour_recap:,.0f} €/j".replace(",", " "),
+                f"{roi_par_jour_recap:.2f} %/j"
+            ]
         }
         st.table(pd.DataFrame(donnees_popup))
-        st.warning("⚠️ Une fois validé, ce chantier sera visible par toute l'entreprise dans l'historique.")
+        
+        st.warning("🚨 Confirmez-vous l'envoi de cette simulation vers l'Historique cloud de l'entreprise ?")
         
         col_pop1, col_pop2 = st.columns(2)
         with col_pop1:
-            if st.button("✅ CONFIRMER ET ENVOYER", type="primary", use_container_width=True, key="btn_popup_confirm_final_send"):
-                db.inserer_chantier(nom_chantier, revenus, total_mats_recap, total_location_recap, total_salaires_recap, total_depenses_recap, benefice_net_recap, round(roi_recap, 2), float(jours_totaux), round(gain_par_jour_recap, 2), round(roi_par_jour_recap, 2))
-                st.toast("🚀 Données envoyées avec succès sur Firestore !")
+            if st.button("✅ ACCEPTER & ENREGISTRER", type="primary", use_container_width=True, key="btn_popup_confirm_final_send_complet"):
+                # Envoi des variables brutes et propres sur Firestore
+                db.inserer_chantier(
+                    nom_chantier, revenus, total_mats_recap, total_location_recap, 
+                    total_salaires_recap, total_depenses_recap, benefice_net_recap, 
+                    round(roi_recap, 2), float(jours_totaux), round(gain_par_jour_recap, 2), 
+                    round(roi_par_jour_recap, 2)
+                )
+                st.toast("🚀 Simulation enregistrée avec succès sur le Cloud Firestore !")
                 st.rerun()
         with col_pop2:
-            if st.button("❌ ANNULER", use_container_width=True, key="btn_popup_cancel_final_send"): st.rerun()
+            if st.button("❌ ANNULER & MODIFIER", use_container_width=True, key="btn_popup_cancel_final_send_complet"):
+                st.rerun()
 
-    if st.button("LANCER LE CALCUL & ENREGISTRER", type="primary", use_container_width=True):
+    # --- ENCLENCHEMENT DE LA SÉCURITÉ DU FORMULAIRE ---
+    if st.button("LANCER LE CALCUL & ENREGISTRER", type="primary", use_container_width=True, key="btn_principal_declencher_calcul_rentabilite"):
         df_actuel = db.charger_donnees()
         doublon_existe = False if df_actuel.empty else not df_actuel[(df_actuel["Nom du Chantier"] == nom_chantier) & (df_actuel["Revenus (€)"] == revenus)].empty
         
-        if not nom_chantier: st.error("⚠️ Veuillez donner un nom ou un numéro valide avant de lancer le calcul.")
-        elif doublon_existe: st.error(f"❌ Le chantier '{nom_chantier}' existe déjà dans la base.")
-        else: confirmer_enregistrement_chantier()
-
+        if not nom_chantier: 
+            st.error("⚠️ Erreur : Saisissez un nom ou un numéro de chantier valide avant d'exécuter l'insertion.")
+        elif doublon_existe: 
+            st.error(f"❌ Erreur NoSQL : Une fiche identique au nom de '{nom_chantier}' existe déjà dans l'historique cloud.")
+        else: 
+            # Si le formulaire passe les contrôles, on déploie le pop-up détaillé
+            confirmer_enregistrement_chantier_detaill()
