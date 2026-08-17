@@ -75,6 +75,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
             strat_cond = st.selectbox("Salaire :", [f"Économique ({p_min_co:.0f} €/j)", f"Standard ({p_moy_co:.0f} €/j)", f"Premium ({p_max_co:.0f} €/j)"], key="sel_strat_cond")
             px_cond = p_min_co if "Économique" in strat_cond else (p_moy_co if "Standard" in strat_cond else p_max_co)
         with c_cond_jh:
+            # Correction : On utilise explicitement la clé 'jh_cond' extraite par le décodeur
             jh_cond = st.number_input("Nombre d'employés", min_value=0.0, value=float(donnees_modele.get("jh_cond", 0.0)), key="jh_input_cond")
 
         # --- 2. CONFIGURATION CHEFS ---
@@ -89,6 +90,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
             strat_chef = st.selectbox("Salaire :", [f"Économique ({p_min_c:.0f} €/j)", f"Standard ({p_moy_c:.0f} €/j)", f"Premium ({p_max_c:.0f} €/j)"], key="sel_strat_chef")
             px_chef = p_min_c if "Économique" in strat_chef else (p_moy_c if "Standard" in strat_chef else p_max_c)
         with c_chef_jh:
+            # Correction : On utilise explicitement la clé 'jh_chef' extraite par le décodeur
             jh_chef = st.number_input("Nombre d'employés", min_value=0.0, value=float(donnees_modele.get("jh_chef", 0.0)), key="jh_input_chef")
 
         # --- 3. CONFIGURATION OUVRIERS ---
@@ -103,6 +105,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
             strat_ouv = st.selectbox("Salaire :", [f"Économique ({p_min_o:.0f} €/j)", f"Standard ({p_moy_o:.0f} €/j)", f"Premium ({p_max_o:.0f} €/j)"], key="sel_strat_ouv")
             px_ouvrier = p_min_o if "Économique" in strat_ouv else (p_moy_o if "Standard" in strat_ouv else p_max_o)
         with c_ouv_jh:
+            # Correction : On utilise explicitement la clé 'jh_ouvrier' extraite par le décodeur
             jh_ouvrier = st.number_input("Nombre d'employés", min_value=0.0, value=float(donnees_modele.get("jh_ouvrier", 0.0)), key="jh_input_ouv")
 
         st.markdown("### --- TABLE DES ENGINS NÉCESSAIRES ---")
