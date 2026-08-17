@@ -47,7 +47,7 @@ def pop_up_validation_recrutement(salaires_mensuels, metier, type_contrat, salai
         st.rerun()
 
 # ==============================================================================
-# --- 2. POP-UP DE VALIDATION POUR L'EXTRACTEUR DE FICHES CHANTIERS (MIS À JOUR) ---
+# --- 2. POP-UP DE VALIDATION POUR L'EXTRACTEUR DE FICHES CHANTIERS (ALIGNE) ---
 # ==============================================================================
 @st.dialog("🔍 Rapport d'Analyse et d'Importation des Modèles")
 def pop_up_validation_fiches_chantiers(chantiers_detectes):
@@ -76,17 +76,9 @@ def pop_up_validation_fiches_chantiers(chantiers_detectes):
         else:
             st.write("*Aucun matériau requis pour ce modèle.*")
             
-        # Affichage des étapes de machines reconstruites AVEC LE PERSONNEL PAR ÉTAPE
         st.markdown("**🚜 Étapes techniques, Engins & Employés détectés à l'étape :**")
         df_engins_preview = pd.DataFrame(data["engins_requis"])
-        
-        # --- REMPLACE LE BLOC ST.DATAFRAME PAR CELUI-CI ---
-        st.markdown("**🚜 Étapes techniques, Engins & Employés détectés à l'étape :**")
-        df_engins_preview = pd.DataFrame(data["engins_requis"])
-        
-        # Affichage direct de toutes les colonnes présentes dans le dictionnaire
         st.dataframe(df_engins_preview, use_container_width=True, hide_index=True)
-
         st.markdown("---")
         
     st.warning("🚨 Confirmez-vous l'injection de ces structures NoSQL dans votre catalogue de modèles ?")
@@ -96,14 +88,26 @@ def pop_up_validation_fiches_chantiers(chantiers_detectes):
         if st.button("✅ CONFIRMER L'IMPORTATION", type="primary", use_container_width=True, key="btn_confirm_cloud_import_fiches"):
             compteur = 0
             for name, data in chantiers_detectes.items():
+                # ALIGNEMENT DES CLÉS ICI POUR CORRIGER LE COMPTEUR À 0 DU FORMULAIRE
                 db.db.collection("modeles_chantiers").document(name).set({
-                    "nom_modele": name, "revenus": float(data["revenus"]), 
-                    "jours": int(data["jours"]), "heures": int(data["heures"]), "minutes": int(data["minutes"]),
-                    "sable": float(data["sable"]), "terre": float(data["terre"]), "enrobe": float(data["enrobe"]), 
-                    "armature": float(data["armature"]), "tole": float(data["tole"]), "beton": float(data["beton"]), 
-                    "panneaux": float(data["panneaux"]), "tuyaux": float(data["tuyaux"]), 
-                    "canalisations": float(data["canalisations"]), "poutres": float(data["poutres"]),
-                    "jh_cond": float(data["max_cond"]), "jh_chef": float(data["max_chef"]), "jh_ouvrier": float(data["max_ouvrier"]), 
+                    "nom_modele": name, 
+                    "revenus": float(data["revenus"]), 
+                    "jours": int(data["jours"]), 
+                    "heures": int(data["heures"]), 
+                    "minutes": int(data["minutes"]),
+                    "sable": float(data["sable"]), 
+                    "terre": float(data["terre"]), 
+                    "enrobe": float(data["enrobe"]), 
+                    "armature": float(data["armature"]), 
+                    "tole": float(data["tole"]), 
+                    "beton": float(data["beton"]), 
+                    "panneaux": float(data["panneaux"]), 
+                    "tuyaux": float(data["tuyaux"]), 
+                    "canalisations": float(data["canalisations"]), 
+                    "poutres": float(data["poutres"]),
+                    "jh_cond": float(data["max_cond"]), 
+                    "jh_chef": float(data["max_chef"]), 
+                    "jh_ouvrier": float(data["max_ouvrier"]), 
                     "engins_requis": data["engins_requis"]
                 })
                 compteur += 1
@@ -165,7 +169,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
             "🧱 Éditer Prix Matériaux", "🚜 Éditer Catalogue Engins", "🗂️ Consulter les Bases Données"
         ])
         
-        # --- 4.1 IMPORTATION EN BLOC ET DECODAGE AVEC LA FENÊTRE DE VALIDATION ---
+        # --- 4.1 IMPORTATION EN BLOC ET DECODAGE ---
         with sub_tab1:
             st.markdown("### 📥 Extracteur de Fiches Chantiers Multi-Étapes")
             texte_fiches_brutes = st.text_area("Collez vos fiches de chantiers détaillées ici :", value="", height=350, key="zone_texte_import_unique_fusionne")
@@ -183,7 +187,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                         l_clean = ligne.strip()
                         if not l_clean: continue
                         
-                        # 1. DÉTECTION DU DEBUT DU CHANTIER ET DE SON NOM
                         if "euros" in l_clean.lower() and not l_clean.lower().startswith("revenus"):
                             match_debut = re.search(r"^(.*?)\s+(\d[\d\s]+)\s+euros", l_clean, re.IGNORECASE)
                             if match_debut:
@@ -206,19 +209,16 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
 
                         if not nom_courant: continue
                         
-                        # 2. CAPTURE DES REVENUS REPETÉS
                         if l_clean.lower().startswith("revenus :"):
                             prix_txt = "".join(c for c in l_clean if c.isdigit())
                             if prix_txt: chantiers_detectes[nom_courant]["revenus"] = float(prix_txt)
                             continue
                             
-                        # 3. EXTRACTION DU NOMBRE D'ÉTAPES GLOBOALES
                         if "nombre d'étapes :" in l_clean.lower():
                             num_txt = "".join(c for c in l_clean.split(":")[-1] if c.isdigit())
                             if num_txt: chantiers_detectes[nom_courant]["nb_etapes"] = int(num_txt)
                             continue
 
-                        # 4. DECODAGE DE LA DURÉE DU CHANTIER GLOBALE
                         if "durée du chantier :" in l_clean.lower():
                             partie_duree = l_clean.split(":")[-1].lower()
                             m_j = re.search(r"(\d+)\s*jour", partie_duree)
@@ -229,55 +229,41 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             if m_m: chantiers_detectes[nom_courant]["minutes"] = int(m_m.group(1))
                             continue
 
-                        # 5. DÉTECTION ET ISOLEMENT DES ÉTAPES INDIVIDUELLES
                         if l_clean.lower().startswith("etape") and ":" in l_clean:
                             match_e = re.search(r"etape\s*(\d+)", l_clean, re.IGNORECASE)
                             if match_e:
                                 etape_courante_num = int(match_e.group(1))
-                                # On crée la structure de l'étape incluant les futurs compteurs d'employés
                                 chantiers_detectes[nom_courant]["engins_requis"].append({
-                                    "N° Étape": etape_courante_num,
-                                    "Durée Étape (jours)": 1,
-                                    "Type d'engin requis": "Pelleteuses",
-                                    "Niveau requis": "N1",
-                                    "Conducteurs requis": 0,
-                                    "Chefs requis": 0,
-                                    "Ouvriers requis": 0
+                                    "N° Étape": etape_courante_num, "Durée Étape (jours)": 1,
+                                    "Type d'engin requis": "Pelleteuses", "Niveau requis": "N1",
+                                    "Conducteurs requis": 0, "Chefs requis": 0, "Ouvriers requis": 0
                                 })
                             continue
 
-                        # 6. CAPTURE DE LA DURÉE DE CHAQUE ÉTAPE INDIVIDUELLE
                         if l_clean.lower().startswith("durée de l'étape :") or l_clean.lower().startswith("duree de l'etape :"):
                             num_txt = "".join(c for c in l_clean.split(",") if c.isdigit())
                             if num_txt and etape_courante_num is not None:
                                 chantiers_detectes[nom_courant]["engins_requis"][-1]["Durée Étape (jours)"] = int(num_txt)
-
-                        # 7. LOGIQUE RH : ENREGISTREMENT PAR ÉTAPE + CALCUL DU MAX POUR L'ONGLET 1
+                            
                         if "conducteur" in l_clean.lower():
                             match_num = re.search(r":\s*(\d+)", l_clean)
                             if match_num and etape_courante_num is not None:
                                 val_cond = int(match_num.group(1))
-                                # Insertion spécifique à l'étape en cours
                                 chantiers_detectes[nom_courant]["engins_requis"][-1]["Conducteurs requis"] = val_cond
                                 chantiers_detectes[nom_courant]["max_cond"] = max(chantiers_detectes[nom_courant]["max_cond"], float(val_cond))
-                                
                         if "chef" in l_clean.lower():
                             match_num = re.search(r":\s*(\d+)", l_clean)
                             if match_num and etape_courante_num is not None:
                                 val_chef = int(match_num.group(1))
-                                # Insertion spécifique à l'étape en cours
                                 chantiers_detectes[nom_courant]["engins_requis"][-1]["Chefs requis"] = val_chef
                                 chantiers_detectes[nom_courant]["max_chef"] = max(chantiers_detectes[nom_courant]["max_chef"], float(val_chef))
-                                
                         if "ouvrier" in l_clean.lower():
                             match_num = re.search(r":\s*(\d+)", l_clean)
                             if match_num and etape_courante_num is not None:
                                 val_ouv = int(match_num.group(1))
-                                # Insertion spécifique à l'étape en cours
                                 chantiers_detectes[nom_courant]["engins_requis"][-1]["Ouvriers requis"] = val_ouv
                                 chantiers_detectes[nom_courant]["max_ouvrier"] = max(chantiers_detectes[nom_courant]["max_ouvrier"], float(val_ouv))
 
-                        # 8. CUMUL DES MATÉRIAUX REQUIS
                         if "matériaux requis :" in l_clean.lower() or "materiaux requis :" in l_clean.lower():
                             partie_mats = l_clean.split(":")[-1].lower()
                             if "aucun" not in partie_mats:
@@ -297,19 +283,16 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                         elif "tuyau" in sub_mat: chantiers_detectes[nom_courant]["tuyaux"] += qte_val
                                         elif "poutre" in sub_mat: chantiers_detectes[nom_courant]["poutres"] += qte_val
 
-                        # 9. LECTURE DU NOM DE LA MACHINE ET DU NIVEAU REQUIS (CORRIGÉ)
                         if "requis :" in l_clean.lower() and "matériaux" not in l_clean.lower() and "materiaux" not in l_clean.lower() and "nécessite" not in l_clean.lower():
                             match_niv = re.search(r"niveau\s*(\d+)", l_clean, re.IGNORECASE)
                             niv_extrait = f"N{match_niv.group(1)}" if match_niv else "N1"
-                            
                             cat_engin = "Pelleteuses"
-                            if "camion benne" in l_clean.lower(): cat_engin = "Camions Benne"
+                                                        if "camion benne" in l_clean.lower(): cat_engin = "Camions Benne"
                             elif "niveleuse" in l_clean.lower(): cat_engin = "Niveleuse"
                             elif "finisseur" in l_clean.lower(): cat_engin = "Finisseur"
                             elif "compacteur" in l_clean.lower(): cat_engin = "Compacteur pour enrobé"
                             elif "fraiseuse" in l_clean.lower(): cat_engin = "Fraiseuse"
                             
-                            # Correction d'indexation : on met à jour la DERNIÈRE étape enregistrée
                             if nom_courant in chantiers_detectes and len(chantiers_detectes[nom_courant]["engins_requis"]) > 0:
                                 chantiers_detectes[nom_courant]["engins_requis"][-1]["Type d'engin requis"] = cat_engin
                                 chantiers_detectes[nom_courant]["engins_requis"][-1]["Niveau requis"] = niv_extrait
@@ -319,7 +302,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                     else:
                         st.error("❌ L'algorithme n'a détecté aucune fiche de chantier valide dans votre texte brut.")
 
-        # --- 4.2 CONFIGURATION GRILLE SALARIALE (SANS AUCUN FILTRE POUR SUPPRESSION DÉFINITIVE) ---
+        # --- 4.2 CONFIGURATION GRILLE SALARIALE ---
         with sub_tab2:
             st.markdown("### 👥 Extracteur et Calculateur de Salaires par Métier & Contrat")
             
@@ -346,8 +329,8 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                         salaire_trouve = None
                         for el in elements:
                             if "€" in el:
-                                chiffre_net = "".join(c for c in el if c.isdigit())
-                                if chiffre_net: salaire_trouve = float(chiffre_net); break
+                                cifra_net = "".join(c for c in el if c.isdigit())
+                                if cifra_net: salaire_trouve = float(cifra_net); break
                         if salaire_trouve is not None: liste_salaires_extraits.append(salaire_trouve)
 
                     if len(liste_salaires_extraits) > 0:
@@ -355,7 +338,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                     else:
                         st.error("❌ Aucun montant trouvé.")
 
-            # --- AFFICHAGE TOTAL SANS AUCUN FILTRE POUR NETTOYAGE ---
             st.markdown("---")
             st.write("⚙️ **Base Cloud brute (Cochez pour supprimer définitivement de Firebase) :**")
             
@@ -412,7 +394,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                         db.db.collection("catalogue_engins").document(str(r["nom_engin"]).strip()).set({"type_brut": str(r["type_brut"]), "prix_jour": float(r["prix_jour"])})
                 st.success("Parc d'engins synchronisé !"); st.rerun()
 
-        # --- 4.5 VISUALISATION EN DIRECT DES TABLES BRUTES (SANS FILTRE) ---
+        # --- 4.5 VISUALISATION EN DIRECT DES TABLES BRUTES ---
         with sub_tab5:
             st.markdown("### 🗂️ Consultation brute complète")
             choix_table = st.selectbox("Choisir la table :", ["Modèles de Chantiers Pré-configurés", "Grille Salariale Actuelle", "Prix des Matériaux de base", "Catalogue de Location des Engins"])
