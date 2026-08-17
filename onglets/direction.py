@@ -47,7 +47,7 @@ def pop_up_validation_recrutement(salaires_mensuels, metier, type_contrat, salai
         st.rerun()
 
 # ==============================================================================
-# --- 2. POP-UP DE VALIDATION POUR L'EXTRACTEUR DE FICHES CHANTIERS (NETTOYÉ) ---
+# --- 2. POP-UP DE VALIDATION POUR L'EXTRACTEUR DE FICHES CHANTIERS ---
 # ==============================================================================
 @st.dialog("🔍 Rapport d'Analyse et d'Importation des Modèles")
 def pop_up_validation_fiches_chantiers(chantiers_detectes):
@@ -86,7 +86,6 @@ def pop_up_validation_fiches_chantiers(chantiers_detectes):
         cols_employes = ["N° Étape", "Conducteurs requis", "Chefs requis", "Ouvriers requis"]
         df_employes = df_brut_etapes[[c for c in cols_employes if c in df_brut_etapes.columns]]
         
-        # Renommage des colonnes pour un affichage plus clair et compact
         df_employes_visuel = df_employes.rename(columns={
             "Conducteurs requis": "🕹️ Conducteurs",
             "Chefs requis": "🧑‍💼 Chefs",
@@ -140,6 +139,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
     if mot_de_passe == "adminBTP2026":
         st.success("🔓 Accès accordé au panneau de contrôle.")
         
+        # --- EXTRACATION INDÉPENDANTE POUR LES STATS ---
         df_stats = db.charger_donnees()
         if not df_stats.empty and "Revenus (€)" in df_stats.columns:
             st.markdown("### 🏢 Bilan Général de l'Entreprise (Consolidé Cloud)")
@@ -153,39 +153,42 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
             with c_st2: st.metric(label="💰 Chiffre d'Affaires Cumulé", value=f"{somme_revenus:,.0f}".replace(",", " ") + " €")
             with c_st3: st.metric(label="📉 Dépenses Totales", value=f"{somme_depenses:,.0f}".replace(",", " ") + " €")
             with c_st4: st.metric(label="📈 Résultat Net / Bénéfice", value=f"{somme_benefices:,.0f}".replace(",", " ") + " €")
-            
-            st.markdown("<br>", unsafe_allow_html=True)
-            with st.expander("🚨 Zone de Danger : Réinitialisation et Nettoyage des Tables"):
-                st.warning("Attention : Ces actions suppriment définitivement les données stockées sur Firebase.")
-                col_del1, col_del2, col_del3 = st.columns(3)
-                with col_del1:
-                    if st.button("🗑️ Vider l'Historique des Chantiers", type="secondary", use_container_width=True):
-                        docs = db.db.collection("chantiers").stream()
-                        for d in docs: d.reference.delete()
-                        st.toast("Historique des chantiers supprimé !")
-                        st.rerun()
-                with col_del2:
-                    if st.button("🗑️ Vider les Modèles Préfabriqués", type="secondary", use_container_width=True):
-                        docs = db.db.collection("modeles_chantiers").stream()
-                        for d in docs: d.reference.delete()
-                        st.toast("Catalogue des modèles vidé !")
-                        st.rerun()
-                with col_del3:
-                    if st.button("💥 TOUT RÉINITIALISER", type="primary", use_container_width=True):
-                        db.reinitialiser_db()
-                        st.rerun()
-            st.markdown("---")
+        else:
+            st.info("💡 Historique vierge : Aucun chantier n'est encore enregistré en base de données.")
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # --- NOUVEAU : SORTIE STRICTE DE LA CONDITION POUR RESTER TOUJOURS ACCESSIBLE ---
+        with st.expander("🚨 Zone de Danger : Réinitialisation et Nettoyage des Tables"):
+            st.warning("Attention : Ces actions suppriment définitivement les données stockées sur Firebase.")
+            col_del1, col_del2, col_del3 = st.columns(3)
+            with col_del1:
+                if st.button("🗑️ Vider l'Historique des Chantiers", type="secondary", use_container_width=True):
+                    docs = db.db.collection("chantiers").stream()
+                    for d in docs: d.reference.delete()
+                    st.toast("Historique des chantiers supprimé !")
+                    st.rerun()
+            with col_del2:
+                if st.button("🗑️ Vider les Modèles Préfabriqués", type="secondary", use_container_width=True):
+                    docs = db.db.collection("modeles_chantiers").stream()
+                    for d in docs: d.reference.delete()
+                    st.toast("Catalogue des modèles vidé !")
+                    st.rerun()
+            with col_del3:
+                if st.button("💥 TOUT RÉINITIALISER", type="primary", use_container_width=True):
+                    db.reinitialiser_db()
+                    st.rerun()
+                    
+        st.markdown("---")
 
         st.markdown("## ⚙️ Administration Suprême des Bases NoSQL")
         sub_tab1, sub_tab2, sub_tab3, sub_tab4, sub_tab5 = st.tabs([
             "🏗️ Saisie Multi-Chantiers en Bloc", "👥 Éditer Grille Salariale", 
             "🧱 Éditer Prix Matériaux", "🚜 Éditer Catalogue Engins", "🗂️ Consulter les Bases Données"
         ])
-        
-        # --- 4.1 IMPORTATION EN BLOC ET DECODAGE ---
+                # --- 4.1 IMPORTATION EN BLOC ET DECODAGE ---
         with sub_tab1:
             st.markdown("### 📥 Extracteur de Fiches Chantiers Multi-Étapes")
-            st.write("Collez vos fiches de chantiers détaillées ici :")
             texte_fiches_brutes = st.text_area("Zone de saisie des fiches :", value="", height=350, key="zone_texte_import_unique_fusionne")
             
             if st.button("🏗️ ANALYSER, NETTOYER ET IMPORTER LES MODÈLES", type="primary"):
@@ -319,6 +322,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
         # --- 4.2 CONFIGURATION GRILLE SALARIALE ---
         with sub_tab2:
             st.markdown("### 👥 Extracteur et Calculateur de Salaires par Métier & Contrat")
+            
             c_admin_poste, c_admin_contrat = st.columns(2)
             with c_admin_poste:
                 metier_cible = st.selectbox("Poste à analyser :", ["Conducteur", "Chef", "Ouvrier"])
@@ -411,20 +415,16 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
         with sub_tab5:
             st.markdown("### 🗂️ Consultation brute complète")
             choix_table = st.selectbox("Choisir la table :", ["Modèles de Chantiers Pré-configurés", "Grille Salariale Actuelle", "Prix des Matériaux de base", "Catalogue de Location des Engins"])
-            # --- CODE CORRIGÉ À METTRE À LA PLACE ---
             if choix_table == "Modèles de Chantiers Pré-configurés":
                 docs = db.db.collection("modeles_chantiers").stream()
                 res = [d.to_dict() for d in docs]
                 if res:
-                    df_aperçu = pd.DataFrame(res)
-                    # On retire la colonne complexe pour éviter le bug d'affichage Streamlit
-                    if "engins_requis" in df_aperçu.columns:
-                        df_aperçu = df_aperçu.drop(columns=["engins_requis"])
-                    
-                    st.dataframe(df_aperçu, use_container_width=True)
+                    df_apercu = pd.DataFrame(res)
+                    if "engins_requis" in df_apercu.columns:
+                        df_apercu = df_apercu.drop(columns=["engins_requis"])
+                    st.dataframe(df_apercu, use_container_width=True)
                 else:
                     st.info("Aucun modèle configuré sur votre base Firebase.")
-
             elif choix_table == "Grille Salariale Actuelle":
                 st.json(SALAIRES_DB)
             elif choix_table == "Prix des Matériaux de base":
