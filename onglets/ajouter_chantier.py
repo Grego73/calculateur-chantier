@@ -5,14 +5,23 @@ import database as db  # Pour l'enregistrement final sur Firebase
 
 def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_ENGINS_BRUTS, CATALOGUE_CHANTIERS):
     st.subheader("Formulaire de saisie")
+    
+    # Tri et liste des modèles
     liste_triee = ["Choisir un chantier pré-configuré..."] + sorted([k for k in CATALOGUE_CHANTIERS.keys() if k != "Choisir un chantier pré-configuré..."])
-    chantier_selectionne = st.selectbox("🚀 Sélectionner un modèle de chantier dynamique :", liste_triee)
+    
+    # MODIFICATION PRINCIPALE : On force l'application à se recharger (rerun) dès qu'un modèle est cliqué
+    chantier_selectionne = st.selectbox(
+        "🚀 Sélectionner un modèle de chantier dynamique :", 
+        liste_triee,
+        key="select_modele_chantier_dynamique"
+    )
     
     donnees_modele = CATALOGUE_CHANTIERS[chantier_selectionne]
     valeur_nom_defaut = "" if chantier_selectionne == "Choisir un chantier pré-configuré..." else chantier_selectionne
     nom_chantier = st.text_input("Nom ou Numéro du chantier :", value=valeur_nom_defaut).strip()
     
     col1, col2 = st.columns(2)
+
     with col1:
         st.markdown("### --- PARAMÈTRES GÉNÉRAUX ---")
         revenus = st.number_input("Revenus prévus du chantier (€) :", value=float(donnees_modele.get("revenus", 0.0)))
