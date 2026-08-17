@@ -186,7 +186,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
             "🏗️ Saisie Multi-Chantiers en Bloc", "👥 Éditer Grille Salariale", 
             "🧱 Éditer Prix Matériaux", "🚜 Éditer Catalogue Engins", "🗂️ Consulter les Bases Données"
         ])
-                # --- 4.1 IMPORTATION EN BLOC ET DECODAGE ---
+        # --- 4.1 IMPORTATION EN BLOC ET DECODAGE ---
         with sub_tab1:
             st.markdown("### 📥 Extracteur de Fiches Chantiers Multi-Étapes")
             texte_fiches_brutes = st.text_area("Zone de saisie des fiches :", value="", height=350, key="zone_texte_import_unique_fusionne")
@@ -436,4 +436,3 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                 else: st.info("Catalogue vide.")
     elif mot_de_passe != "":
         st.error("🔒 Code d'accès incorrect.")
-
