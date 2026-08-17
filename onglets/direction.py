@@ -411,10 +411,20 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
         with sub_tab5:
             st.markdown("### 🗂️ Consultation brute complète")
             choix_table = st.selectbox("Choisir la table :", ["Modèles de Chantiers Pré-configurés", "Grille Salariale Actuelle", "Prix des Matériaux de base", "Catalogue de Location des Engins"])
+            # --- CODE CORRIGÉ À METTRE À LA PLACE ---
             if choix_table == "Modèles de Chantiers Pré-configurés":
-                docs = db.db.collection("modeles_chantiers").stream(); res = [d.to_dict() for d in docs]
-                if res: st.dataframe(pd.DataFrame(res), use_container_width=True)
-                else: st.info("Aucun modèle.")
+                docs = db.db.collection("modeles_chantiers").stream()
+                res = [d.to_dict() for d in docs]
+                if res:
+                    df_aperçu = pd.DataFrame(res)
+                    # On retire la colonne complexe pour éviter le bug d'affichage Streamlit
+                    if "engins_requis" in df_aperçu.columns:
+                        df_aperçu = df_aperçu.drop(columns=["engins_requis"])
+                    
+                    st.dataframe(df_aperçu, use_container_width=True)
+                else:
+                    st.info("Aucun modèle configuré sur votre base Firebase.")
+
             elif choix_table == "Grille Salariale Actuelle":
                 st.json(SALAIRES_DB)
             elif choix_table == "Prix des Matériaux de base":
