@@ -185,7 +185,8 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
         # --- 4.1 IMPORTATION EN BLOC ET DECODAGE ---
         with sub_tab1:
             st.markdown("### 📥 Extracteur de Fiches Chantiers Multi-Étapes")
-            texte_fiches_brutes = st.text_area("Collez vos fiches de chantiers détaillées ici :", value="", height=350, key="zone_texte_import_unique_fusionne")
+            st.write("Collez vos fiches de chantiers détaillées ici :")
+            texte_fiches_brutes = st.text_area("Zone de saisie des fiches :", value="", height=350, key="zone_texte_import_unique_fusionne")
             
             if st.button("🏗️ ANALYSER, NETTOYER ET IMPORTER LES MODÈLES", type="primary"):
                 if not texte_fiches_brutes.strip():
@@ -300,7 +301,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             match_niv = re.search(r"niveau\s*(\d+)", l_clean, re.IGNORECASE)
                             niv_extrait = f"N{match_niv.group(1)}" if match_niv else "N1"
                             cat_engin = "Pelleteuses"
-                                                        if "camion benne" in l_clean.lower(): cat_engin = "Camions Benne"
+                            if "camion benne" in l_clean.lower(): cat_engin = "Camions Benne"
                             elif "niveleuse" in l_clean.lower(): cat_engin = "Niveleuse"
                             elif "finisseur" in l_clean.lower(): cat_engin = "Finisseur"
                             elif "compacteur" in l_clean.lower(): cat_engin = "Compacteur pour enrobé"
@@ -318,7 +319,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
         # --- 4.2 CONFIGURATION GRILLE SALARIALE ---
         with sub_tab2:
             st.markdown("### 👥 Extracteur et Calculateur de Salaires par Métier & Contrat")
-            
             c_admin_poste, c_admin_contrat = st.columns(2)
             with c_admin_poste:
                 metier_cible = st.selectbox("Poste à analyser :", ["Conducteur", "Chef", "Ouvrier"])
@@ -342,8 +342,8 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                         salaire_trouve = None
                         for el in elements:
                             if "€" in el:
-                                cifra_net = "".join(c for c in el if c.isdigit())
-                                if cifra_net: salaire_trouve = float(cifra_net); break
+                                chiffre_net = "".join(c for c in el if c.isdigit())
+                                if chiffre_net: salaire_trouve = float(chiffre_net); break
                         if salaire_trouve is not None: liste_salaires_extraits.append(salaire_trouve)
 
                     if len(liste_salaires_extraits) > 0:
@@ -400,7 +400,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
             
             engins_edites_db = st.data_editor(df_engins, use_container_width=True, key="editeur_engins_db", num_rows="dynamic")
             if st.button("METTRE À JOUR LE CATALOGUE DES ENGINS"):
-                old_docs = db.collection("catalogue_engins").stream()
+                old_docs = db.db.collection("catalogue_engins").stream()
                 for od in old_docs: od.reference.delete()
                 for _, r in engins_edites_db.iterrows():
                     if pd.notnull(r["nom_engin"]) and str(r["nom_engin"]).strip():
@@ -420,9 +420,10 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
             elif choix_table == "Prix des Matériaux de base":
                 st.json(MATERIAUX_DB)
             elif choix_table == "Catalogue de Location des Engins":
-                docs = db.collection("catalogue_engins").stream()
+                docs = db.db.collection("catalogue_engins").stream()
                 res = [{"Engin Modèle": d.id, "Catégorie": d.to_dict().get("type_brut"), "Prix/j (€)": d.to_dict().get("prix_jour")} for d in docs]
                 if res: st.dataframe(pd.DataFrame(res), use_container_width=True)
                 else: st.info("Catalogue vide.")
     elif mot_de_passe != "":
         st.error("🔒 Code d'accès incorrect.")
+
