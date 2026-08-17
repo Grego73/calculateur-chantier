@@ -81,12 +81,16 @@ def pop_up_validation_fiches_chantiers(chantiers_detectes):
         df_engins = df_brut_etapes[[c for c in cols_engins if c in df_brut_etapes.columns]]
         st.dataframe(df_engins, use_container_width=True, hide_index=True)
         
-        # --- TABLEAU 2 : EMPLOYÉS UNIQUEMENT ---
+        # --- TABLEAU 2 : EMPLOYÉS UNIQUEMENT (CORRIGÉ AVEC FUSION DES LIGNES FANTÔMES) ---
         st.markdown("**👥 Structure des Employés requis à l'étape :**")
         cols_employes = ["N° Étape", "Conducteurs requis", "Chefs requis", "Ouvriers requis"]
-        df_employes = df_brut_etapes[[c for c in cols_employes if c in df_brut_etapes.columns]]
+        df_employes_brut = df_brut_etapes[[c for c in cols_employes if c in df_brut_etapes.columns]]
         
-        df_employes_visuel = df_employes.rename(columns={
+        # On regroupe par "N° Étape" en gardant le maximum pour éliminer les doublons à 0
+        df_employes_fusionne = df_employes_brut.groupby("N° Étape", as_index=False).max()
+        
+        # Renommage des colonnes pour l'affichage visuel
+        df_employes_visuel = df_employes_fusionne.rename(columns={
             "Conducteurs requis": "🕹️ Conducteurs",
             "Chefs requis": "🧑‍💼 Chefs",
             "Ouvriers requis": "👷 Ouvriers"
