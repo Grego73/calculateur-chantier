@@ -307,40 +307,43 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                         elif "tuyau" in sub_mat: chantiers_detectes[nom_courant]["tuyaux"] += qte_val
                                         elif "poutre" in sub_mat: chantiers_detectes[nom_courant]["poutres"] += qte_val
 
-                        # 9. LECTURE DU NOM DE LA MACHINE ET DU NIVEAU REQUIS (FORCE LOWER & MULTI-ENGINS)
-                        if ("requis :" in l_clean.lower() or "nécessite :" in l_clean.lower()) and "matériaux" not in l_clean.lower() and "materiaux" not in l_clean.lower():
+                        # 9. LECTURE DU NOM DE LA MACHINE ET DU NIVEAU REQUIS (IGNORE LES SANS-CATEGORIES)
+                        if ("requis :" in l_clean.lower() or "nécessite :" in l_clean.lower()) and "matériaux" not in l_clean.lower() and "materiaux" not in l_clean.lower() and "employé" not in l_clean.lower():
                             match_niv = re.search(r"niveau\s*(\d+)", l_clean, re.IGNORECASE)
                             niv_extrait = f"N{match_niv.group(1)}" if match_niv else "N1"
                             
-                            # Logique d'identification en minuscules
                             ligne_minuscule = l_clean.lower()
                             
+                            # Identification stricte de la catégorie
+                            cat_engin = None
                             if "camion benne" in ligne_minuscule: cat_engin = "Camions Benne"
                             elif "niveleuse" in ligne_minuscule: cat_engin = "Niveleuse"
                             elif "finisseur" in ligne_minuscule: cat_engin = "Finisseur"
                             elif "compacteur" in ligne_minuscule: cat_engin = "Compacteur pour enrobé"
                             elif "fraiseuse" in ligne_minuscule: cat_engin = "Fraiseuse"
                             elif "chargeuse" in ligne_minuscule: cat_engin = "Chargeuse Compacte"
-                            else: cat_engin = "Pelleteuses"
+                            elif "pelleteuse" in ligne_minuscule: cat_engin = "Pelleteuses" # Devient un filtre strict
                             
-                            if nom_courant in chantiers_detectes and len(chantiers_detectes[nom_courant]["engins_requis"]) > 0:
-                                dernier_engin = chantiers_detectes[nom_courant]["engins_requis"][-1]
-                                
-                                # Si la ligne par défaut est encore vide, on la remplit avec le premier vrai engin
-                                if dernier_engin["Type d'engin requis"] is None:
-                                    dernier_engin["Type d'engin requis"] = cat_engin
-                                    dernier_engin["Niveau requis"] = niv_extrait
-                                else:
-                                    # Si la ligne est déjà prise par un engin (ex: Camion Benne), on crée une sous-ligne
-                                    chantiers_detectes[nom_courant]["engins_requis"].append({
-                                        "N° Étape": etape_courante_num,
-                                        "Durée Étape (jours)": dernier_engin["Durée Étape (jours)"],
-                                        "Type d'engin requis": cat_engin,
-                                        "Niveau requis": niv_extrait,
-                                        "Conducteurs requis": 0,
-                                        "Chefs requis": 0,
-                                        "Ouvriers requis": 0
-                                    })
+                            # SÉCURITÉ : Si la ligne contient "requis" mais ne correspond à aucun engin connu, on l'écarte
+                            if cat_engin is not None:
+                                if nom_courant in chantiers_detectes and len(chantiers_detectes[nom_courant]["engins_requis"]) > 0:
+                                    dernier_engin = chantiers_detectes[nom_courant]["engins_requis"][-1]
+                                    
+                                    # Si la ligne par défaut est encore vide, on la remplit avec le premier vrai engin
+                                    if dernier_engin["Type d'engin requis"] is None:
+                                        dernier_engin["Type d'engin requis"] = cat_engin
+                                        dernier_engin["Niveau requis"] = niv_extrait
+                                    else:
+                                        # Si la ligne est déjà occupée, on crée un engin additionnel pour cette étape
+                                        chantiers_detectes[nom_courant]["engins_requis"].append({
+                                            "N° Étape": etape_courante_num,
+                                            "Durée Étape (jours)": dernier_engin["Durée Étape (jours)"],
+                                            "Type d'engin requis": cat_engin,
+                                            "Niveau requis": niv_extrait,
+                                            "Conducteurs requis": 0,
+                                            "Chefs requis": 0,
+                                            "Ouvriers requis": 0
+                                        })
 
                     # --- NETTOYAGE CHIRURGICAL DES LIGNES RESTÉES À NONE AVANT L'OUVERTURE POP-UP ---
                     if len(chantiers_detectes) > 0:
