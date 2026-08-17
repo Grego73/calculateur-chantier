@@ -246,16 +246,23 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             if m_m: chantiers_detectes[nom_courant]["minutes"] = int(m_m.group(1))
                             continue
 
+                        # 5. DÉTECTION ET ISOLEMENT DES ÉTAPES INDIVIDUELLES (CORRIGÉ SANS ENGING PAR DÉFAUT)
                         if l_clean.lower().startswith("etape") and ":" in l_clean:
                             match_e = re.search(r"etape\s*(\d+)", l_clean, re.IGNORECASE)
                             if match_e:
                                 etape_courante_num = int(match_e.group(1))
+                                # On initialise l'étape avec Type d'engin requis à None pour détecter le premier vrai engin
                                 chantiers_detectes[nom_courant]["engins_requis"].append({
-                                    "N° Étape": etape_courante_num, "Durée Étape (jours)": 1,
-                                    "Type d'engin requis": "Pelleteuses", "Niveau requis": "N1",
-                                    "Conducteurs requis": 0, "Chefs requis": 0, "Ouvriers requis": 0
+                                    "N° Étape": etape_courante_num, 
+                                    "Durée Étape (jours)": 1,
+                                    "Type d'engin requis": None, 
+                                    "Niveau requis": None,
+                                    "Conducteurs requis": 0,
+                                    "Chefs requis": 0,
+                                    "Ouvriers requis": 0
                                 })
                             continue
+
 
                         if l_clean.lower().startswith("durée de l'étape :") or l_clean.lower().startswith("duree de l'etape :"):
                             num_txt = "".join(c for c in l_clean.split(",") if c.isdigit())
@@ -300,7 +307,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                         elif "tuyau" in sub_mat: chantiers_detectes[nom_courant]["tuyaux"] += qte_val
                                         elif "poutre" in sub_mat: chantiers_detectes[nom_courant]["poutres"] += qte_val
 
-                        # 9. LECTURE DU NOM DE LA MACHINE ET DU NIVEAU REQUIS (PRIS EN COMPTE DE NÉCESSITE)
+                        # 9. LECTURE DU NOM DE LA MACHINE ET DU NIVEAU REQUIS (REMPLISSAGE INTELLIGENT)
                         if ("requis :" in l_clean.lower() or "nécessite :" in l_clean.lower()) and "matériaux" not in l_clean.lower() and "materiaux" not in l_clean.lower():
                             match_niv = re.search(r"niveau\s*(\d+)", l_clean, re.IGNORECASE)
                             niv_extrait = f"N{match_niv.group(1)}" if match_niv else "N1"
@@ -311,18 +318,20 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             elif "finisseur" in l_clean.lower(): cat_engin = "Finisseur"
                             elif "compacteur" in l_clean.lower(): cat_engin = "Compacteur pour enrobé"
                             elif "fraiseuse" in l_clean.lower(): cat_engin = "Fraiseuse"
-                            elif "chargeuse" in l_clean.lower(): cat_engin = "Chargeuse Compacte" # <- AJOUT DE LA CATEGORIE
+                            elif "chargeuse" in l_clean.lower(): cat_engin = "Chargeuse Compacte"
                             
                             if nom_courant in chantiers_detectes and len(chantiers_detectes[nom_courant]["engins_requis"]) > 0:
-                                # Si l'étape par défaut contient l'engin générique "Pelleteuses", on le remplace par le premier trouvé
-                                if chantiers_detectes[nom_courant]["engins_requis"][-1]["Type d'engin requis"] == "Pelleteuses" and cat_engin != "Pelleteuses":
-                                    chantiers_detectes[nom_courant]["engins_requis"][-1]["Type d'engin requis"] = cat_engin
-                                    chantiers_detectes[nom_courant]["engins_requis"][-1]["Niveau requis"] = niv_extrait
+                                dernier_engin = chantiers_detectes[nom_courant]["engins_requis"][-1]
+                                
+                                # Si le premier engin de l'étape n'a pas encore été configuré, on remplit la ligne
+                                if dernier_engin["Type d'engin requis"] is None:
+                                    dernier_engin["Type d'engin requis"] = cat_engin
+                                    dernier_engin["Niveau requis"] = niv_extrait
                                 else:
-                                    # S'il y a déjà un engin (ex: le Camion Benne), on ajoute une NOUVELLE ligne d'engin pour la même étape !
+                                    # S'il y a déjà un engin configuré, on crée une NOUVELLE ligne pour cet engin supplémentaire
                                     chantiers_detectes[nom_courant]["engins_requis"].append({
                                         "N° Étape": etape_courante_num,
-                                        "Durée Étape (jours)": chantiers_detectes[nom_courant]["engins_requis"][-1]["Durée Étape (jours)"],
+                                        "Durée Étape (jours)": dernier_engin["Durée Étape (jours)"],
                                         "Type d'engin requis": cat_engin,
                                         "Niveau requis": niv_extrait,
                                         "Conducteurs requis": 0,
