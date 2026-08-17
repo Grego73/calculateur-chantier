@@ -232,15 +232,24 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             if num_txt and etape_courante_num is not None:
                                 chantiers_detectes[nom_courant]["engins_requis"][-1]["Durée Étape (jours)"] = int(num_txt)
                             
-                        if "conducteurs d'engin :" in l_clean.lower():
-                            num_txt = "".join(c for c in l_clean.split("(") if c.isdigit())
-                            if num_txt: chantiers_detectes[nom_courant]["max_cond"] = max(chantiers_detectes[nom_courant]["max_cond"], float(num_txt))
-                        if "chef de chantier :" in l_clean.lower():
-                            num_txt = "".join(c for c in l_clean.split("(") if c.isdigit())
-                            if num_txt: chantiers_detectes[nom_courant]["max_chef"] = max(chantiers_detectes[nom_courant]["max_chef"], float(num_txt))
-                        if "ouvriers :" in l_clean.lower():
-                            num_txt = "".join(c for c in l_clean.split("(") if c.isdigit())
-                            if num_txt: chantiers_detectes[nom_courant]["max_ouvrier"] = max(chantiers_detectes[nom_courant]["max_ouvrier"], float(num_txt))
+                        # 7. LOGIQUE RH D'OPTIMISATION CORRIGÉE
+                        if "conducteur" in l_clean.lower():
+                            match_num = re.search(r":\s*(\d+)", l_clean)
+                            if match_num:
+                                val_cond = float(match_num.group(1))
+                                chantiers_detectes[nom_courant]["max_cond"] = max(chantiers_detectes[nom_courant]["max_cond"], val_cond)
+                                
+                        if "chef" in l_clean.lower():
+                            match_num = re.search(r":\s*(\d+)", l_clean)
+                            if match_num:
+                                val_chef = float(match_num.group(1))
+                                chantiers_detectes[nom_courant]["max_chef"] = max(chantiers_detectes[nom_courant]["max_chef"], val_chef)
+                                
+                        if "ouvrier" in l_clean.lower():
+                            match_num = re.search(r":\s*(\d+)", l_clean)
+                            if match_num:
+                                val_ouv = float(match_num.group(1))
+                                chantiers_detectes[nom_courant]["max_ouvrier"] = max(chantiers_detectes[nom_courant]["max_ouvrier"], val_ouv)
 
                         if "matériaux requis :" in l_clean.lower() or "materiaux requis :" in l_clean.lower():
                             partie_mats = l_clean.split(":")[-1].lower()
