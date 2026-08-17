@@ -47,7 +47,7 @@ def pop_up_validation_recrutement(salaires_mensuels, metier, type_contrat, salai
         st.rerun()
 
 # ==============================================================================
-# --- 2. POP-UP DE VALIDATION POUR L'EXTRACTEUR DE FICHES CHANTIERS (ALIGNE) ---
+# --- 2. POP-UP DE VALIDATION POUR L'EXTRACTEUR DE FICHES CHANTIERS (NETTOYÉ) ---
 # ==============================================================================
 @st.dialog("🔍 Rapport d'Analyse et d'Importation des Modèles")
 def pop_up_validation_fiches_chantiers(chantiers_detectes):
@@ -61,10 +61,6 @@ def pop_up_validation_fiches_chantiers(chantiers_detectes):
         st.markdown("**⏱️ Temps configuré pour l'Onglet 1 :**")
         st.code(f"{data['jours']} jour(s), {data['heures']} heure(s), {data['minutes']} minute(s)")
         
-        # Affichage de l'équipe maximale retenue pour le dimensionnement global
-        st.markdown("**👥 Structure de l'équipe globale (Maximum requis) :**")
-        st.write(f"- 🕹️ Conducteurs d'engins : `{int(data['max_cond'])}` | - 🧑‍💼 Chefs de chantier : `{int(data['max_chef'])}` | - 👷 Ouvriers : `{int(data['max_ouvrier'])}`")
-        
         # Affichage du cumul des matériaux
         st.markdown("**🧱 Approvisionnement Matériaux Cumulés :**")
         mats_list = []
@@ -76,9 +72,27 @@ def pop_up_validation_fiches_chantiers(chantiers_detectes):
         else:
             st.write("*Aucun matériau requis pour ce modèle.*")
             
-        st.markdown("**🚜 Étapes techniques, Engins & Employés détectés à l'étape :**")
-        df_engins_preview = pd.DataFrame(data["engins_requis"])
-        st.dataframe(df_engins_preview, use_container_width=True, hide_index=True)
+        # Conversion des données brutes en DataFrame pour manipulation
+        df_brut_etapes = pd.DataFrame(data["engins_requis"])
+        
+        # --- TABLEAU 1 : ENGINS UNIQUEMENT ---
+        st.markdown("**🚜 Étapes techniques & Engins détectés :**")
+        cols_engins = ["N° Étape", "Durée Étape (jours)", "Type d'engin requis", "Niveau requis"]
+        df_engins = df_brut_etapes[[c for c in cols_engins if c in df_brut_etapes.columns]]
+        st.dataframe(df_engins, use_container_width=True, hide_index=True)
+        
+        # --- TABLEAU 2 : EMPLOYÉS UNIQUEMENT ---
+        st.markdown("**👥 Structure des Employés requis à l'étape :**")
+        cols_employes = ["N° Étape", "Conducteurs requis", "Chefs requis", "Ouvriers requis"]
+        df_employes = df_brut_etapes[[c for c in cols_employes if c in df_brut_etapes.columns]]
+        
+        # Renommage des colonnes pour un affichage plus clair et compact
+        df_employes_visuel = df_employes.rename(columns={
+            "Conducteurs requis": "🕹️ Conducteurs",
+            "Chefs requis": "🧑‍💼 Chefs",
+            "Ouvriers requis": "👷 Ouvriers"
+        })
+        st.dataframe(df_employes_visuel, use_container_width=True, hide_index=True)
         st.markdown("---")
         
     st.warning("🚨 Confirmez-vous l'injection de ces structures NoSQL dans votre catalogue de modèles ?")
@@ -88,7 +102,6 @@ def pop_up_validation_fiches_chantiers(chantiers_detectes):
         if st.button("✅ CONFIRMER L'IMPORTATION", type="primary", use_container_width=True, key="btn_confirm_cloud_import_fiches"):
             compteur = 0
             for name, data in chantiers_detectes.items():
-                # ALIGNEMENT DES CLÉS ICI POUR CORRIGER LE COMPTEUR À 0 DU FORMULAIRE
                 db.db.collection("modeles_chantiers").document(name).set({
                     "nom_modele": name, 
                     "revenus": float(data["revenus"]), 
