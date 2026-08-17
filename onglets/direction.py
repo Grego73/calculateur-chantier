@@ -47,7 +47,7 @@ def pop_up_validation_recrutement(salaires_mensuels, metier, type_contrat, salai
         st.rerun()
 
 # ==============================================================================
-# --- 2. NOUVEAU : POP-UP DE VALIDATION POUR L'EXTRACTEUR DE FICHES CHANTIERS ---
+# --- 2. POP-UP DE VALIDATION POUR L'EXTRACTEUR DE FICHES CHANTIERS (MIS À JOUR) ---
 # ==============================================================================
 @st.dialog("🔍 Rapport d'Analyse et d'Importation des Modèles")
 def pop_up_validation_fiches_chantiers(chantiers_detectes):
@@ -61,8 +61,8 @@ def pop_up_validation_fiches_chantiers(chantiers_detectes):
         st.markdown("**⏱️ Temps configuré pour l'Onglet 1 :**")
         st.code(f"{data['jours']} jour(s), {data['heures']} heure(s), {data['minutes']} minute(s)")
         
-        # Affichage de l'équipe maximale retenue
-        st.markdown("**👥 Structure de l'équipe requise (Maximum retenu) :**")
+        # Affichage de l'équipe maximale retenue pour le dimensionnement global
+        st.markdown("**👥 Structure de l'équipe globale (Maximum requis) :**")
         st.write(f"- 🕹️ Conducteurs d'engins : `{int(data['max_cond'])}` | - 🧑‍💼 Chefs de chantier : `{int(data['max_chef'])}` | - 👷 Ouvriers : `{int(data['max_ouvrier'])}`")
         
         # Affichage du cumul des matériaux
@@ -76,10 +76,23 @@ def pop_up_validation_fiches_chantiers(chantiers_detectes):
         else:
             st.write("*Aucun matériau requis pour ce modèle.*")
             
-        # Affichage des étapes de machines reconstruites
-        st.markdown("**🚜 Étapes techniques et Engins détectés :**")
+        # Affichage des étapes de machines reconstruites AVEC LE PERSONNEL PAR ÉTAPE
+        st.markdown("**🚜 Étapes techniques, Engins & Employés détectés à l'étape :**")
         df_engins_preview = pd.DataFrame(data["engins_requis"])
-        st.dataframe(df_engins_preview, use_container_width=True, hide_index=True)
+        
+        # Reformatage des colonnes pour un affichage propre dans l'interface
+        st.dataframe(
+            df_engins_preview, use_container_width=True, hide_index=True,
+            column_config={
+                "N° Étape": st.column_config.NumberColumn("N° Étape"),
+                "Durée Étape (jours)": st.column_config.NumberColumn("Durée (j)"),
+                "Type d'engin requis": st.column_config.TextColumn("Type d'engin"),
+                "Niveau requis": st.column_config.TextColumn("Niveau"),
+                "Conducteurs requis": st.column_config.NumberColumn("🕹️ Cond."),
+                "Chefs requis": st.column_config.NumberColumn("🧑‍💼 Chefs"),
+                "Ouvriers requis": st.column_config.NumberColumn("👷 Ouvriers")
+            }
+        )
         st.markdown("---")
         
     st.warning("🚨 Confirmez-vous l'injection de ces structures NoSQL dans votre catalogue de modèles ?")
