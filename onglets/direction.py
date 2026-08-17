@@ -208,6 +208,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                         l_clean = ligne.strip()
                         if not l_clean: continue
                         
+                        # 1. DÉTECTION DU DEBUT DU CHANTIER ET DE SON NOM
                         if "euros" in l_clean.lower() and not l_clean.lower().startswith("revenus"):
                             match_debut = re.search(r"^(.*?)\s+(\d[\d\s]+)\s+euros", l_clean, re.IGNORECASE)
                             if match_debut:
@@ -230,16 +231,19 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
 
                         if not nom_courant: continue
                         
+                        # 2. CAPTURE DES REVENUS REPETÉS
                         if l_clean.lower().startswith("revenus :"):
                             prix_txt = "".join(c for c in l_clean if c.isdigit())
                             if prix_txt: chantiers_detectes[nom_courant]["revenus"] = float(prix_txt)
                             continue
                             
+                        # 3. EXTRACTION DU NOMBRE D'ÉTAPES GLOBOALES
                         if "nombre d'étapes :" in l_clean.lower():
                             num_txt = "".join(c for c in l_clean.split(":")[-1] if c.isdigit())
                             if num_txt: chantiers_detectes[nom_courant]["nb_etapes"] = int(num_txt)
                             continue
 
+                        # 4. DECODAGE DE LA DURÉE DU CHANTIER GLOBALE
                         if "durée du chantier :" in l_clean.lower():
                             partie_duree = l_clean.split(":")[-1].lower()
                             m_j = re.search(r"(\d+)\s*jour", partie_duree)
@@ -250,48 +254,51 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             if m_m: chantiers_detectes[nom_courant]["minutes"] = int(m_m.group(1))
                             continue
 
-                        # 5. DÉTECTION ET ISOLEMENT DES ÉTAPES INDIVIDUELLES (CORRIGÉ SANS ENGING PAR DÉFAUT)
+                        # 5. DÉTECTION ET ISOLEMENT DES ÉTAPES INDIVIDUELLES
                         if l_clean.lower().startswith("etape") and ":" in l_clean:
                             match_e = re.search(r"etape\s*(\d+)", l_clean, re.IGNORECASE)
                             if match_e:
                                 etape_courante_num = int(match_e.group(1))
-                                # On initialise l'étape avec Type d'engin requis à None pour détecter le premier vrai engin
                                 chantiers_detectes[nom_courant]["engins_requis"].append({
-                                    "N° Étape": etape_courante_num, 
-                                    "Durée Étape (jours)": 1,
-                                    "Type d'engin requis": None, 
-                                    "Niveau requis": None,
-                                    "Conducteurs requis": 0,
-                                    "Chefs requis": 0,
-                                    "Ouvriers requis": 0
+                                    "N° Étape": etape_courante_num, "Durée Étape (jours)": 1,
+                                    "Type d'engin requis": None, "Niveau requis": None,
+                                    "Conducteurs requis": 0, "Chefs requis": 0, "Ouvriers requis": 0
                                 })
                             continue
 
-
+                        # 6. CAPTURE DE LA DURÉE DE CHAQUE ÉTAPE INDIVIDUELLE
                         if l_clean.lower().startswith("durée de l'étape :") or l_clean.lower().startswith("duree de l'etape :"):
                             num_txt = "".join(c for c in l_clean.split(",") if c.isdigit())
                             if num_txt and etape_courante_num is not None:
-                                chantiers_detectes[nom_courant]["engins_requis"][-1]["Durée Étape (jours)"] = int(num_txt)
+                                # On met à jour toutes les lignes correspondant à cette étape pour éviter les conflits
+                                for e in chantiers_detectes[nom_courant]["engins_requis"]:
+                                    if e["N° Étape"] == etape_courante_num:
+                                        e["Durée Étape (jours)"] = int(num_txt)
                             
+                        # 7. LOGIQUE RH D'OPTIMISATION
                         if "conducteur" in l_clean.lower():
                             match_num = re.search(r":\s*(\d+)", l_clean)
                             if match_num and etape_courante_num is not None:
                                 val_cond = int(match_num.group(1))
-                                chantiers_detectes[nom_courant]["engins_requis"][-1]["Conducteurs requis"] = val_cond
+                                for e in chantiers_detectes[nom_courant]["engins_requis"]:
+                                    if e["N° Étape"] == etape_courante_num: e["Conducteurs requis"] = val_cond
                                 chantiers_detectes[nom_courant]["max_cond"] = max(chantiers_detectes[nom_courant]["max_cond"], float(val_cond))
                         if "chef" in l_clean.lower():
                             match_num = re.search(r":\s*(\d+)", l_clean)
                             if match_num and etape_courante_num is not None:
                                 val_chef = int(match_num.group(1))
-                                chantiers_detectes[nom_courant]["engins_requis"][-1]["Chefs requis"] = val_chef
+                                for e in chantiers_detectes[nom_courant]["engins_requis"]:
+                                    if e["N° Étape"] == etape_courante_num: e["Chefs requis"] = val_chef
                                 chantiers_detectes[nom_courant]["max_chef"] = max(chantiers_detectes[nom_courant]["max_chef"], float(val_chef))
                         if "ouvrier" in l_clean.lower():
                             match_num = re.search(r":\s*(\d+)", l_clean)
                             if match_num and etape_courante_num is not None:
                                 val_ouv = int(match_num.group(1))
-                                chantiers_detectes[nom_courant]["engins_requis"][-1]["Ouvriers requis"] = val_ouv
+                                for e in chantiers_detectes[nom_courant]["engins_requis"]:
+                                    if e["N° Étape"] == etape_courante_num: e["Ouvriers requis"] = val_ouv
                                 chantiers_detectes[nom_courant]["max_ouvrier"] = max(chantiers_detectes[nom_courant]["max_ouvrier"], float(val_ouv))
 
+                        # 8. CUMUL DES MATÉRIAUX REQUIS (RÉINITIALISÉ DE MANIÈRE STABLE SANS DOUBLONS)
                         if "matériaux requis :" in l_clean.lower() or "materiaux requis :" in l_clean.lower():
                             partie_mats = l_clean.split(":")[-1].lower()
                             if "aucun" not in partie_mats:
@@ -300,6 +307,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                     qte_txt = "".join(c for c in sub_mat if c.isdigit())
                                     if qte_txt:
                                         qte_val = float(qte_txt)
+                                        # On isole le cumul sur le dictionnaire de base directement pour bloquer les faux doublons
                                         if "canalisation" in sub_mat: chantiers_detectes[nom_courant]["canalisations"] += qte_val
                                         elif "armature" in sub_mat: chantiers_detectes[nom_courant]["armature"] += qte_val
                                         elif "enrob" in sub_mat: chantiers_detectes[nom_courant]["enrobe"] += qte_val
@@ -311,14 +319,12 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                         elif "tuyau" in sub_mat: chantiers_detectes[nom_courant]["tuyaux"] += qte_val
                                         elif "poutre" in sub_mat: chantiers_detectes[nom_courant]["poutres"] += qte_val
 
-                        # 9. LECTURE DU NOM DE LA MACHINE ET DU NIVEAU REQUIS (IGNORE LES SANS-CATEGORIES)
+                        # 9. LECTURE DU NOM DE LA MACHINE ET DU NIVEAU REQUIS
                         if ("requis :" in l_clean.lower() or "nécessite :" in l_clean.lower()) and "matériaux" not in l_clean.lower() and "materiaux" not in l_clean.lower() and "employé" not in l_clean.lower():
                             match_niv = re.search(r"niveau\s*(\d+)", l_clean, re.IGNORECASE)
                             niv_extrait = f"N{match_niv.group(1)}" if match_niv else "N1"
                             
                             ligne_minuscule = l_clean.lower()
-                            
-                            # Identification stricte de la catégorie
                             cat_engin = None
                             if "camion benne" in ligne_minuscule: cat_engin = "Camions Benne"
                             elif "niveleuse" in ligne_minuscule: cat_engin = "Niveleuse"
