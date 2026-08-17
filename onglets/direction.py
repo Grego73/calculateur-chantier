@@ -307,28 +307,31 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                         elif "tuyau" in sub_mat: chantiers_detectes[nom_courant]["tuyaux"] += qte_val
                                         elif "poutre" in sub_mat: chantiers_detectes[nom_courant]["poutres"] += qte_val
 
-                        # 9. LECTURE DU NOM DE LA MACHINE ET DU NIVEAU REQUIS (REMPLISSAGE INTELLIGENT)
+                        # 9. LECTURE DU NOM DE LA MACHINE ET DU NIVEAU REQUIS (FORCE LOWER & MULTI-ENGINS)
                         if ("requis :" in l_clean.lower() or "nécessite :" in l_clean.lower()) and "matériaux" not in l_clean.lower() and "materiaux" not in l_clean.lower():
                             match_niv = re.search(r"niveau\s*(\d+)", l_clean, re.IGNORECASE)
                             niv_extrait = f"N{match_niv.group(1)}" if match_niv else "N1"
                             
-                            cat_engin = "Pelleteuses"
-                            if "camion benne" in l_clean.lower(): cat_engin = "Camions Benne"
-                            elif "niveleuse" in l_clean.lower(): cat_engin = "Niveleuse"
-                            elif "finisseur" in l_clean.lower(): cat_engin = "Finisseur"
-                            elif "compacteur" in l_clean.lower(): cat_engin = "Compacteur pour enrobé"
-                            elif "fraiseuse" in l_clean.lower(): cat_engin = "Fraiseuse"
-                            elif "chargeuse" in l_clean.lower(): cat_engin = "Chargeuse Compacte"
+                            # Logique d'identification en minuscules
+                            ligne_minuscule = l_clean.lower()
+                            
+                            if "camion benne" in ligne_minuscule: cat_engin = "Camions Benne"
+                            elif "niveleuse" in ligne_minuscule: cat_engin = "Niveleuse"
+                            elif "finisseur" in ligne_minuscule: cat_engin = "Finisseur"
+                            elif "compacteur" in ligne_minuscule: cat_engin = "Compacteur pour enrobé"
+                            elif "fraiseuse" in ligne_minuscule: cat_engin = "Fraiseuse"
+                            elif "chargeuse" in ligne_minuscule: cat_engin = "Chargeuse Compacte"
+                            else: cat_engin = "Pelleteuses"
                             
                             if nom_courant in chantiers_detectes and len(chantiers_detectes[nom_courant]["engins_requis"]) > 0:
                                 dernier_engin = chantiers_detectes[nom_courant]["engins_requis"][-1]
                                 
-                                # Si le premier engin de l'étape n'a pas encore été configuré, on remplit la ligne
+                                # Si la ligne par défaut est encore vide, on la remplit avec le premier vrai engin
                                 if dernier_engin["Type d'engin requis"] is None:
                                     dernier_engin["Type d'engin requis"] = cat_engin
                                     dernier_engin["Niveau requis"] = niv_extrait
                                 else:
-                                    # S'il y a déjà un engin configuré, on crée une NOUVELLE ligne pour cet engin supplémentaire
+                                    # Si la ligne est déjà prise par un engin (ex: Camion Benne), on crée une sous-ligne
                                     chantiers_detectes[nom_courant]["engins_requis"].append({
                                         "N° Étape": etape_courante_num,
                                         "Durée Étape (jours)": dernier_engin["Durée Étape (jours)"],
@@ -339,7 +342,12 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                         "Ouvriers requis": 0
                                     })
 
+                    # --- NETTOYAGE CHIRURGICAL DES LIGNES RESTÉES À NONE AVANT L'OUVERTURE POP-UP ---
                     if len(chantiers_detectes) > 0:
+                        for name, data in chantiers_detectes.items():
+                            data["engins_requis"] = [e for e in data["engins_requis"] if e["Type d'engin requis"] is not None]
+                        
+                        # Déclenchement sécurisé du pop-up de validation
                         pop_up_validation_fiches_chantiers(chantiers_detectes)
                     else:
                         st.error("❌ L'algorithme n'a détecté aucune fiche de chantier valide dans votre texte brut.")
