@@ -80,19 +80,13 @@ def pop_up_validation_fiches_chantiers(chantiers_detectes):
         st.markdown("**🚜 Étapes techniques, Engins & Employés détectés à l'étape :**")
         df_engins_preview = pd.DataFrame(data["engins_requis"])
         
-        # Reformatage des colonnes pour un affichage propre dans l'interface
-        st.dataframe(
-            df_engins_preview, use_container_width=True, hide_index=True,
-            column_config={
-                "N° Étape": st.column_config.NumberColumn("N° Étape"),
-                "Durée Étape (jours)": st.column_config.NumberColumn("Durée (j)"),
-                "Type d'engin requis": st.column_config.TextColumn("Type d'engin"),
-                "Niveau requis": st.column_config.TextColumn("Niveau"),
-                "Conducteurs requis": st.column_config.NumberColumn("🕹️ Cond."),
-                "Chefs requis": st.column_config.NumberColumn("🧑‍💼 Chefs"),
-                "Ouvriers requis": st.column_config.NumberColumn("👷 Ouvriers")
-            }
-        )
+        # --- REMPLACE LE BLOC ST.DATAFRAME PAR CELUI-CI ---
+        st.markdown("**🚜 Étapes techniques, Engins & Employés détectés à l'étape :**")
+        df_engins_preview = pd.DataFrame(data["engins_requis"])
+        
+        # Affichage direct de toutes les colonnes présentes dans le dictionnaire
+        st.dataframe(df_engins_preview, use_container_width=True, hide_index=True)
+
         st.markdown("---")
         
     st.warning("🚨 Confirmez-vous l'injection de ces structures NoSQL dans votre catalogue de modèles ?")
@@ -303,10 +297,11 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                         elif "tuyau" in sub_mat: chantiers_detectes[nom_courant]["tuyaux"] += qte_val
                                         elif "poutre" in sub_mat: chantiers_detectes[nom_courant]["poutres"] += qte_val
 
-                        # 9. LECTURE DU NOM DE LA MACHINE ET DU NIVEAU REQUIS
+                        # 9. LECTURE DU NOM DE LA MACHINE ET DU NIVEAU REQUIS (CORRIGÉ)
                         if "requis :" in l_clean.lower() and "matériaux" not in l_clean.lower() and "materiaux" not in l_clean.lower() and "nécessite" not in l_clean.lower():
                             match_niv = re.search(r"niveau\s*(\d+)", l_clean, re.IGNORECASE)
                             niv_extrait = f"N{match_niv.group(1)}" if match_niv else "N1"
+                            
                             cat_engin = "Pelleteuses"
                             if "camion benne" in l_clean.lower(): cat_engin = "Camions Benne"
                             elif "niveleuse" in l_clean.lower(): cat_engin = "Niveleuse"
@@ -314,7 +309,8 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             elif "compacteur" in l_clean.lower(): cat_engin = "Compacteur pour enrobé"
                             elif "fraiseuse" in l_clean.lower(): cat_engin = "Fraiseuse"
                             
-                            if etape_courante_num is not None and len(chantiers_detectes[nom_courant]["engins_requis"]) > 0:
+                            # Correction d'indexation : on met à jour la DERNIÈRE étape enregistrée
+                            if nom_courant in chantiers_detectes and len(chantiers_detectes[nom_courant]["engins_requis"]) > 0:
                                 chantiers_detectes[nom_courant]["engins_requis"][-1]["Type d'engin requis"] = cat_engin
                                 chantiers_detectes[nom_courant]["engins_requis"][-1]["Niveau requis"] = niv_extrait
 
