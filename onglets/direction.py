@@ -300,19 +300,35 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                         elif "tuyau" in sub_mat: chantiers_detectes[nom_courant]["tuyaux"] += qte_val
                                         elif "poutre" in sub_mat: chantiers_detectes[nom_courant]["poutres"] += qte_val
 
-                        if "requis :" in l_clean.lower() and "matériaux" not in l_clean.lower() and "materiaux" not in l_clean.lower() and "nécessite" not in l_clean.lower():
+                        # 9. LECTURE DU NOM DE LA MACHINE ET DU NIVEAU REQUIS (PRIS EN COMPTE DE NÉCESSITE)
+                        if ("requis :" in l_clean.lower() or "nécessite :" in l_clean.lower()) and "matériaux" not in l_clean.lower() and "materiaux" not in l_clean.lower():
                             match_niv = re.search(r"niveau\s*(\d+)", l_clean, re.IGNORECASE)
                             niv_extrait = f"N{match_niv.group(1)}" if match_niv else "N1"
+                            
                             cat_engin = "Pelleteuses"
                             if "camion benne" in l_clean.lower(): cat_engin = "Camions Benne"
                             elif "niveleuse" in l_clean.lower(): cat_engin = "Niveleuse"
                             elif "finisseur" in l_clean.lower(): cat_engin = "Finisseur"
                             elif "compacteur" in l_clean.lower(): cat_engin = "Compacteur pour enrobé"
                             elif "fraiseuse" in l_clean.lower(): cat_engin = "Fraiseuse"
+                            elif "chargeuse" in l_clean.lower(): cat_engin = "Chargeuse Compacte" # <- AJOUT DE LA CATEGORIE
                             
                             if nom_courant in chantiers_detectes and len(chantiers_detectes[nom_courant]["engins_requis"]) > 0:
-                                chantiers_detectes[nom_courant]["engins_requis"][-1]["Type d'engin requis"] = cat_engin
-                                chantiers_detectes[nom_courant]["engins_requis"][-1]["Niveau requis"] = niv_extrait
+                                # Si l'étape par défaut contient l'engin générique "Pelleteuses", on le remplace par le premier trouvé
+                                if chantiers_detectes[nom_courant]["engins_requis"][-1]["Type d'engin requis"] == "Pelleteuses" and cat_engin != "Pelleteuses":
+                                    chantiers_detectes[nom_courant]["engins_requis"][-1]["Type d'engin requis"] = cat_engin
+                                    chantiers_detectes[nom_courant]["engins_requis"][-1]["Niveau requis"] = niv_extrait
+                                else:
+                                    # S'il y a déjà un engin (ex: le Camion Benne), on ajoute une NOUVELLE ligne d'engin pour la même étape !
+                                    chantiers_detectes[nom_courant]["engins_requis"].append({
+                                        "N° Étape": etape_courante_num,
+                                        "Durée Étape (jours)": chantiers_detectes[nom_courant]["engins_requis"][-1]["Durée Étape (jours)"],
+                                        "Type d'engin requis": cat_engin,
+                                        "Niveau requis": niv_extrait,
+                                        "Conducteurs requis": 0,
+                                        "Chefs requis": 0,
+                                        "Ouvriers requis": 0
+                                    })
 
                     if len(chantiers_detectes) > 0:
                         pop_up_validation_fiches_chantiers(chantiers_detectes)
