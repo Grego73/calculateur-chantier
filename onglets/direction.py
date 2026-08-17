@@ -290,56 +290,57 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                         st.error("❌ Aucun montant de salaire contenant un symbole '€' n'a pu être extrait. Vérifiez votre saisie.")
 
 
-            # --- AFFICHAGE INTERACTIF AVEC COLONNE DE SUPPRESSION ---
+            # --- NETTOYAGE COMPLET ET REMPLACEMENT PAR L'ÉDITEUR DÉFINITIF ---
             st.markdown("---")
-            st.write("⚙️ **Gestion de la Grille Tarifaire (Cochez la case ❌ pour supprimer une entrée de la base) :**")
+            st.write("⚙️ **Gestion de la Grille Tarifaire (Cochez la case pour supprimer une entrée erronée) :**")
             
-            # 1. Extraction et nettoyage de la grille depuis la mémoire Firebase
+            # 1. Extraction propre des données depuis Firebase
             lignes_propres = [
                 {"Clé": poste, "Montant / jour (€)": int(mt), "❌ Supprimer": False} 
                 for poste, mt in SALAIRES_DB.items() 
                 if "Intérim" not in poste and "Intérim_Min" not in poste and "Intérim_Moyen" not in poste and "Intérim_Max" not in poste
             ]
             
-            # 2. Tri initial par ordre alphabétique
+            # 2. Tri par ordre alphabétique
             lignes_propres.sort(key=lambda x: x["Clé"])
             
-            # 3. Création du DataFrame pour l'éditeur
+            # 3. Création du DataFrame
             df_edition_salaires = pd.DataFrame(lignes_propres)
             
-            # 4. Affichage de la table modifiable
+            # 4. L'ÉDITEUR INTERACTIF (Remplace définitivement l'ancien tableau de ton image)
             table_retour_edition = st.data_editor(
                 df_edition_salaires,
                 use_container_width=True,
                 hide_index=True,
+                key="editeur_interactif_paliers_salaires", # Clé forcée unique pour forcer la mise à jour
                 column_config={
-                    "Clé": st.column_config.TextColumn("Poste / Palier de Jeu", disabled=True, help="Cliquez pour trier de A à Z"),
-                    "Montant / jour (€)": st.column_config.NumberColumn("Montant / jour (€)", format="%d €", disabled=True, help="Cliquez pour trier par prix"),
-                    "❌ Supprimer": st.column_config.CheckboxColumn("❌ Supprimer", default=False, help="Cochez les lignes à supprimer")
+                    "Clé": st.column_config.TextColumn("Poste / Palier de Jeu", disabled=True),
+                    "Montant / jour (€)": st.column_config.NumberColumn("Montant / jour (€)", format="%d €", disabled=True),
+                    "❌ Supprimer": st.column_config.CheckboxColumn("❌ Supprimer", default=False)
                 }
             )
             
-            # 5. Détection des lignes cochées pour la suppression définitive
+            # 5. Logique d'activation du bouton de suppression
             if not table_retour_edition.empty:
                 lignes_a_supprimer = table_retour_edition[table_retour_edition["❌ Supprimer"] == True]
                 
                 if len(lignes_a_supprimer) > 0:
-                    st.warning(f"⚠️ Vous avez sélectionné {len(lignes_a_supprimer)} entrée(s) pour la suppression.")
+                    st.warning(f"⚠️ Vous allez retirer {len(lignes_a_supprimer)} ligne(s) de votre grille tarifaire.")
                     
                     if st.button("💥 CONFIRMER LA SUPPRESSION DÉFINITIVE", type="primary", use_container_width=True, key="btn_delete_paliers_selectionnes"):
-                        # Récupération de la grille cloud actuelle
                         grille_firebase = dict(SALAIRES_DB)
                         
-                        # Suppression des clés sélectionnées
+                        # Retrait des clés cochées
                         for _, row_del in lignes_a_supprimer.iterrows():
                             cle_a_retirer = row_del["Clé"]
                             if cle_a_retirer in grille_firebase:
                                 del grille_firebase[cle_a_retirer]
                         
-                        # Envoi de la grille mise à jour (nettoyée) à Firebase Firestore
+                        # Envoi de la nouvelle grille propre à Firestore
                         db.db.collection("configuration_salaires").document("grille").set(grille_firebase)
-                        st.toast("🔥 Entrée(s) supprimée(s) avec succès de Firebase !")
+                        st.toast("🔥 Grille épurée avec succès sur Firebase !")
                         st.rerun()
+
 
 
         # --- 4.3 CONFIGURATION DES MATÉRIAUX ---
