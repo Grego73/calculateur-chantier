@@ -242,14 +242,14 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                 nom_ch = l_clean.replace("euros", "").replace("Euros", "").strip()
                                 
                             nom_courant = nom_ch
-                            etape_courante_num = None  # SÉCURITÉ CRITIQUE : Réinitialisation à chaque nouveau chantier
+                            etape_courante_num = None
                             
                             if nom_courant not in chantiers_detectes:
                                 chantiers_detectes[nom_courant] = {
                                     "revenus": prix_ch, "jours": 0, "heures": 0, "minutes": 0, "nb_etapes": 1,
                                     "sable": 0.0, "terre": 0.0, "enrobe": 0.0, "armature": 0.0, "tole": 0.0,
                                     "beton": 0.0, "panneaux": 0.0, "tuyaux": 0.0, "canalisations": 0.0, "poutres": 0.0,
-                                    "max_cond": 0.0, "max_chef": 0.0, "max_ouvrier": 0.0, "engins_requis": []
+                                    "jh_cond": 0.0, "jh_chef": 0.0, "jh_ouvrier": 0.0, "engins_requis": []
                                 }
                             continue
 
@@ -261,7 +261,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             if prix_txt: chantiers_detectes[nom_courant]["revenus"] = float(prix_txt)
                             continue
                             
-                        # 3. EXTRACTION DU NOMBRE D'ÉTAPES GLOBOALES
+                        # 3. EXTRACTION DU NOMBRE D'ÉTAPES GLOBALES
                         if "nombre d'étapes :" in l_clean.lower():
                             num_txt = "".join(c for c in l_clean.split(":")[-1] if c.isdigit())
                             if num_txt: chantiers_detectes[nom_courant]["nb_etapes"] = int(num_txt)
@@ -288,30 +288,28 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                         # 6. CAPTURE DE LA DURÉE DE CHAQUE ÉTAPE INDIVIDUELLE
                         if (l_clean.lower().startswith("durée de l'étape :") or l_clean.lower().startswith("duree de l'etape :")) and etape_courante_num is not None:
                             num_txt = "".join(c for c in l_clean.split(",") if c.isdigit())
-                            # Stockage temporaire de la durée pour cette étape
                             if num_txt:
-                                self_duree = int(num_txt)
-                                st.session_state[f"duree_{nom_courant}_{etape_courante_num}"] = self_duree
+                                st.session_state[f"duree_{nom_courant}_{etape_courante_num}"] = int(num_txt)
                             continue
                             
-                        # 7. LOGIQUE RH D'OPTIMISATION
+                        # 7. LOGIQUE RH D'OPTIMISATION (SYNCHRONISÉE AVEC LES CLÉS DE L'ONGLET 1)
                         if "conducteur" in l_clean.lower() and etape_courante_num is not None:
                             match_num = re.search(r":\s*(\d+)", l_clean)
                             if match_num:
-                                val_cond = int(match_num.group(1))
-                                chantiers_detectes[nom_courant]["max_cond"] = max(chantiers_detectes[nom_courant]["max_cond"], float(val_cond))
+                                val_cond = float(match_num.group(1))
+                                chantiers_detectes[nom_courant]["jh_cond"] = max(chantiers_detectes[nom_courant]["jh_cond"], val_cond)
                             continue
                         if "chef" in l_clean.lower() and etape_courante_num is not None:
                             match_num = re.search(r":\s*(\d+)", l_clean)
                             if match_num:
-                                val_chef = int(match_num.group(1))
-                                chantiers_detectes[nom_courant]["max_chef"] = max(chantiers_detectes[nom_courant]["max_chef"], float(val_chef))
+                                val_chef = float(match_num.group(1))
+                                chantiers_detectes[nom_courant]["jh_chef"] = max(chantiers_detectes[nom_courant]["jh_chef"], val_chef)
                             continue
                         if "ouvrier" in l_clean.lower() and etape_courante_num is not None:
                             match_num = re.search(r":\s*(\d+)", l_clean)
                             if match_num:
-                                val_ouv = int(match_num.group(1))
-                                chantiers_detectes[nom_courant]["max_ouvrier"] = max(chantiers_detectes[nom_courant]["max_ouvrier"], float(val_ouv))
+                                val_ouv = float(match_num.group(1))
+                                chantiers_detectes[nom_courant]["jh_ouvrier"] = max(chantiers_detectes[nom_courant]["jh_ouvrier"], val_ouv)
                             continue
 
                         # 8. CUMUL DES MATÉRIAUX REQUIS
@@ -335,8 +333,8 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                         elif "poutre" in sub_mat: chantiers_detectes[nom_courant]["poutres"] += qte_val
                             continue
 
-                        # 9. LECTURE DU NOM DE LA MACHINE ET DU NIVEAU REQUIS (CORRIGÉE AVEC LIEN RH)
-                        if ("requis :" in l_clean.lower() or "nécessite :" in l_clean.lower()) and etape_courante_num is not None:
+                        # 9. LECTURE DU NOM DE LA MACHINE ET DU NIVEAU REQUIS (FILTRAGE STRICT DES ENGINS INVALIDES)
+                        if ("requis :" in l_clean.lower() or "nécessite :" in l_clean.lower()) and "matériaux" not in l_clean.lower() and "materiaux" not in l_clean.lower() and "employé" not in l_clean.lower():
                             match_niv = re.search(r"niveau\s*(\d+)", l_clean, re.IGNORECASE)
                             niv_extrait = f"N{match_niv.group(1)}" if match_niv else "N1"
                             
@@ -350,37 +348,30 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             elif "chargeuse" in ligne_minuscule: cat_engin = "Chargeuse Compacte"
                             elif "pelleteuse" in ligne_minuscule: cat_engin = "Pelleteuses"
                             
+                            # On bloque strictement l'écriture si aucun mot-clé d'engin n'est matché
                             if cat_engin is not None:
                                 d_etape = st.session_state.get(f"duree_{nom_courant}_{etape_courante_num}", 1)
                                 
-                                # SÉCURITÉ ANTI-DOUBLON
+                                # SÉCURITÉ COMPLÈTE ANTI-DOUBLON : On vérifie si l'engin est déjà listé à cette étape précise
                                 doublon_engin = any(
                                     e["N° Étape"] == etape_courante_num and e["Type d'engin requis"] == cat_engin 
                                     for e in chantiers_detectes[nom_courant]["engins_requis"]
                                 )
                                 
                                 if not doublon_engin:
-                                    # On récupère les effectifs max lus jusqu'ici pour cette étape
-                                    c_req = int(chantiers_detectes[nom_courant]["max_cond"])
-                                    ch_req = int(chantiers_detectes[nom_courant]["max_chef"])
-                                    o_req = int(chantiers_detectes[nom_courant]["max_ouvrier"])
-                                    
-                                    # Si le texte brut ne fournit aucun effectif (ex: chantier solo), 
-                                    # on met 1 conducteur par défaut pour manœuvrer la machine
-                                    if c_req == 0 and ch_req == 0 and o_req == 0:
-                                        c_req = 1
-
                                     chantiers_detectes[nom_courant]["engins_requis"].append({
                                         "N° Étape": etape_courante_num,
                                         "Durée Étape (jours)": d_etape,
                                         "Type d'engin requis": cat_engin,
-                                        "Niveau requis": niv_extrait,
-                                        # On ré-injecte obligatoirement ces clés pour alimenter le Tableau 2 du pop-up
-                                        "Conducteurs requis": c_req,
-                                        "Chefs requis": ch_req,
-                                        "Ouvriers requis": o_req
+                                        "Niveau requis": niv_extrait
                                     })
 
+                    # 🚨 ALIGNEMENT SÉCURISÉ : Ce bloc est placé EN DEHORS du "for ligne in lignes:"
+                    # Il s'exécute une seule fois à la fin de la lecture globale pour éviter les crashs d'ID doublons
+                    if len(chantiers_detectes) > 0:
+                        pop_up_validation_fiches_chantiers(chantiers_detectes)
+                    else:
+                        st.error("❌ L'algorithme n'a détecté aucune fiche de chantier valide dans votre texte brut.")
 
                     # 🚨 ALIGNEMENT SÉCURISÉ : Ce bloc est reculé de 4 espaces vers la gauche !
                     # Il s'exécute APRÈS la fin de la boucle de lecture "for ligne in lignes:"
