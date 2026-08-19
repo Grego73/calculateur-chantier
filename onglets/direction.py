@@ -106,6 +106,9 @@ def pop_up_validation_fiches_chantiers(chantiers_detectes):
         })
         st.dataframe(df_employes_visuel, use_container_width=True, hide_index=True)
         st.markdown("---")
+        # 🔄 FIN DU BLOC À REMPLACER
+        
+    st.warning("🚨 Confirmez-vous l'injection de ces structures NoSQL dans votre catalogue de modèles ?")
         
     st.warning("🚨 Confirmez-vous l'injection de ces structures NoSQL dans votre catalogue de modèles ?")
     
