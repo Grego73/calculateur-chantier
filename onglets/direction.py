@@ -90,23 +90,28 @@ def pop_up_validation_fiches_chantiers(chantiers_detectes):
         df_engins = df_brut_etapes[[c for c in cols_engins if c in df_brut_etapes.columns]]
         st.dataframe(df_engins, use_container_width=True, hide_index=True)
         
-        # --- TABLEAU 2 : EMPLOYÉS UNIQUEMENT (CORRIGÉ AVEC FUSION DES LIGNES FANTÔMES) ---
+        # --- TABLEAU 2 : EMPLOYÉS (SYNCHRONISÉ ET SÉCURISÉ) ---
         st.markdown("**👥 Structure des Employés requis à l'étape :**")
-        cols_employes = ["N° Étape", "Conducteurs requis", "Chefs requis", "Ouvriers requis"]
-        df_employes_brut = df_brut_etapes[[c for c in cols_employes if c in df_brut_etapes.columns]]
         
-        # On regroupe par "N° Étape" en gardant le maximum pour éliminer les doublons à 0
-        df_employes_fusionne = df_employes_brut.groupby("N° Étape", as_index=False).max()
+        lignes_emp = []
+        for e in data["engins_requis"]:
+            lignes_emp.append({
+                "N° Étape": e.get("N° Étape", 1),
+                "🕹️ Conducteurs": e.get("Conducteurs requis", e.get("jh_cond", 1)),
+                "🧑‍💼 Chefs": e.get("Chefs requis", e.get("jh_chef", 0)),
+                "👷 Ouvriers": e.get("Ouvriers requis", e.get("jh_ouvrier", 0))
+            })
+            
+        df_employes_brut = pd.DataFrame(lignes_emp)
         
-        # Renommage des colonnes pour l'affichage visuel
-        df_employes_visuel = df_employes_fusionne.rename(columns={
-            "Conducteurs requis": "🕹️ Conducteurs",
-            "Chefs requis": "🧑‍💼 Chefs",
-            "Ouvriers requis": "👷 Ouvriers"
-        })
-        st.dataframe(df_employes_visuel, use_container_width=True, hide_index=True)
+        if not df_employes_brut.empty:
+            df_employes_fusionne = df_employes_brut.groupby("N° Étape", as_index=False).max()
+            st.dataframe(df_employes_fusionne, use_container_width=True, hide_index=True)
+        else:
+            st.write("*Aucun personnel requis détecté.*")
+            
         st.markdown("---")
-        # 🔄 FIN DU BLOC À REMPLACER
+
         
     st.warning("🚨 Confirmez-vous l'injection de ces structures NoSQL dans votre catalogue de modèles ?")
         
