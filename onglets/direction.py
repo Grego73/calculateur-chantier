@@ -62,15 +62,14 @@ def pop_up_validation_recrutement(salaires_mensuels, metier, type_contrat, salai
 def pop_up_validation_fiches_chantiers(chantiers_detectes):
     st.write("Voici la transparence des données techniques extraites de vos fiches brutes avant insertion cloud :")
     
+    # 1. BOUCLE STRICTEMENT VISUELLE POUR LES DESCRIPTIONS DE CHANTIERS
     for name, data in chantiers_detectes.items():
         st.markdown(f"### 🏗️ Chantier : **{name}**")
         st.info(f"💰 **Revenus détectés :** `{int(data['revenus']):,.0f}` €".replace(",", " "))
         
-        # Affichage du temps décomposé
         st.markdown("**⏱️ Temps configuré pour l'Onglet 1 :**")
         st.code(f"{data['jours']} jour(s), {data['heures']} heure(s), {data['minutes']} minute(s)")
         
-        # Affichage du cumul des matériaux
         st.markdown("**🧱 Approvisionnement Matériaux Cumulés :**")
         mats_list = []
         for m_key in ["sable", "terre", "enrobe", "armature", "tole", "beton", "panneaux", "tuyaux", "canalisations", "poutres"]:
@@ -81,18 +80,15 @@ def pop_up_validation_fiches_chantiers(chantiers_detectes):
         else:
             st.write("*Aucun matériau requis pour ce modèle.*")
             
-        # Conversion des données brutes en DataFrame pour manipulation
-        df_brut_etapes = pd.DataFrame(data["engins_requis"])
-        
         # --- TABLEAU 1 : ENGINS UNIQUEMENT ---
         st.markdown("**🚜 Étapes techniques & Engins détectés :**")
+        df_brut_etapes = pd.DataFrame(data["engins_requis"])
         cols_engins = ["N° Étape", "Durée Étape (jours)", "Type d'engin requis", "Niveau requis"]
-        df_engins = df_brut_etapes[[c for c in cols_engins if c in df_brut_etapes.columns]]
+        df_engins = df_brut_etapes[[c for c in cols_engins if c in df_brut_etapes.columns]] if not df_brut_etapes.empty else pd.DataFrame()
         st.dataframe(df_engins, use_container_width=True, hide_index=True)
         
         # --- TABLEAU 2 : EMPLOYÉS (SYNCHRONISÉ ET SÉCURISÉ) ---
         st.markdown("**👥 Structure des Employés requis à l'étape :**")
-        
         lignes_emp = []
         for e in data["engins_requis"]:
             lignes_emp.append({
@@ -103,7 +99,6 @@ def pop_up_validation_fiches_chantiers(chantiers_detectes):
             })
             
         df_employes_brut = pd.DataFrame(lignes_emp)
-        
         if not df_employes_brut.empty:
             df_employes_fusionne = df_employes_brut.groupby("N° Étape", as_index=False).max()
             st.dataframe(df_employes_fusionne, use_container_width=True, hide_index=True)
@@ -112,9 +107,8 @@ def pop_up_validation_fiches_chantiers(chantiers_detectes):
             
         st.markdown("---")
 
-        
-    st.warning("🚨 Confirmez-vous l'injection de ces structures NoSQL dans votre catalogue de modèles ?")
-        
+    # 🚨 SORTIE FINALE DE LA BOUCLE (Tout est aligné tout à gauche de la fonction)
+    # Plus aucune duplication possible de l'alerte ou des boutons
     st.warning("🚨 Confirmez-vous l'injection de ces structures NoSQL dans votre catalogue de modèles ?")
     
     col_c1, col_c2 = st.columns(2)
@@ -146,9 +140,11 @@ def pop_up_validation_fiches_chantiers(chantiers_detectes):
                 compteur += 1
             st.toast(f"🚀 {compteur} modèle(s) synchronisé(s) avec succès !")
             st.rerun()
+            
     with col_c2:
         if st.button("❌ ANNULER", use_container_width=True, key="btn_cancel_cloud_import_fiches"):
             st.rerun()
+
 
 # ==============================================================================
 # --- 3. L'ONGLET DIRECTION PRINCIPAL ---
