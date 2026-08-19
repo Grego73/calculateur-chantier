@@ -116,6 +116,14 @@ def pop_up_validation_fiches_chantiers(chantiers_detectes):
         if st.button("✅ CONFIRMER L'IMPORTATION", type="primary", use_container_width=True, key="btn_confirm_cloud_import_fiches"):
             compteur = 0
             for name, data in chantiers_detectes.items():
+                
+                # 🚨 FILTRE SÉCURITÉ CRITIQUE ANTI-LIGNES VIDES :
+                # On ne garde que les engins qui ont un "Type d'engin requis" valide et non vide
+                engins_propres = [
+                    e for e in data["engins_requis"] 
+                    if e.get("Type d'engin requis") is not None and str(e["Type d'engin requis"]).strip() != ""
+                ]
+                
                 db.db.collection("modeles_chantiers").document(name).set({
                     "nom_modele": name, 
                     "revenus": float(data["revenus"]), 
@@ -135,11 +143,12 @@ def pop_up_validation_fiches_chantiers(chantiers_detectes):
                     "jh_cond": float(data["max_cond"]), 
                     "jh_chef": float(data["max_chef"]), 
                     "jh_ouvrier": float(data["max_ouvrier"]), 
-                    "engins_requis": data["engins_requis"]
+                    "engins_requis": engins_propres  # 🚀 On injecte la liste nettoyée ici !
                 })
                 compteur += 1
             st.toast(f"🚀 {compteur} modèle(s) synchronisé(s) avec succès !")
             st.rerun()
+
             
     with col_c2:
         if st.button("❌ ANNULER", use_container_width=True, key="btn_cancel_cloud_import_fiches"):
