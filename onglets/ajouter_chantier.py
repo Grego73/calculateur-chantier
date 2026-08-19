@@ -199,15 +199,22 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         df_propres_direct = engins_edites.dropna(subset=["Sélection de l'engin / Modèle"])
         total_location_recap = float((df_propres_direct["Quantité"] * df_propres_direct["Prix Location (€/jour)"] * jours_factures_jeu).sum())
 
-    # Formules RH spécifiques : CDI au prorata de la durée /7, CDD plein tarif x Jours facturés
-    if "CDI" in type_contrat_cond: cout_cond = jh_cond * (px_cond / 7.0) * jours_totaux
-    else: cout_cond = jh_cond * px_cond * jours_factures_jeu
+    # Formules RH spécifiques : 
+    # CDI : px_cond contient déjà le coût par jour calculé (Salaire mensuel / 7) dans l'Espace Direction. On applique le prorata exact.
+    if "CDI" in type_contrat_cond: 
+        cout_cond = jh_cond * px_cond * jours_totaux
+    else: 
+        cout_cond = jh_cond * px_cond * jours_factures_jeu
 
-    if "CDI" in type_contrat_chef: cout_chefs = jh_chef * (px_chef / 7.0) * jours_totaux
-    else: cout_chefs = jh_chef * px_chef * jours_factures_jeu
+    if "CDI" in type_contrat_chef: 
+        cout_chefs = jh_chef * px_chef * jours_totaux
+    else: 
+        cout_chefs = jh_chef * px_chef * jours_factures_jeu
 
-    if "CDI" in type_contrat_ouv: cout_ouvriers = jh_ouvrier * (px_ouvrier / 7.0) * jours_totaux
-    else: cout_ouvriers = jh_ouvrier * px_ouvrier * jours_factures_jeu
+    if "CDI" in type_contrat_ouv: 
+        cout_ouvriers = jh_ouvrier * px_ouvrier * jours_totaux
+    else: 
+        cout_ouvriers = jh_ouvrier * px_ouvrier * jours_factures_jeu
 
     total_salaires_recap = float(cout_chefs + cout_ouvriers + cout_cond)
 
@@ -269,21 +276,21 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         st.markdown("#### 👥 2. Formules appliquées pour la Main-d'œuvre")
         st.write(f"- **Conducteurs d'engins ({type_contrat_cond}) :**")
         if "CDI" in type_contrat_cond:
-            st.code(f"{jh_cond} employé(s) × ({px_cond} € / 7j) × {jours_totaux:.2f}j = {cout_cond:,.0f} €")
+            st.code(f"{jh_cond} employé(s) × {px_cond:,.2f} €/jour (prorata CDI) × {jours_totaux:.2f}j de présence = {cout_cond:,.0f} €")
         else:
-            st.code(f"{jh_cond} employé(s) × {px_cond} €/jour × {jours_factures_jeu}j due(s) = {cout_cond:,.0f} €")
+            st.code(f"{jh_cond} employé(s) × {px_cond:,.2f} €/jour × {jours_factures_jeu}j due(s) = {cout_cond:,.0f} €")
 
         st.write(f"- **Chefs de chantier ({type_contrat_chef}) :**")
         if "CDI" in type_contrat_chef:
-            st.code(f"{jh_chef} employé(s) × ({px_chef} € / 7j) × {jours_totaux:.2f}j = {cout_chefs:,.0f} €")
+            st.code(f"{jh_chef} employé(s) × {px_chef:,.2f} €/jour (prorata CDI) × {jours_totaux:.2f}j de présence = {cout_chefs:,.0f} €")
         else:
-            st.code(f"{jh_chef} employé(s) × {px_chef} €/jour × {jours_factures_jeu}j due(s) = {cout_chefs:,.0f} €")
+            st.code(f"{jh_chef} employé(s) × {px_chef:,.2f} €/jour × {jours_factures_jeu}j due(s) = {cout_chefs:,.0f} €")
 
         st.write(f"- **Ouvriers qualifiés ({type_contrat_ouv}) :**")
         if "CDI" in type_contrat_ouv:
-            st.code(f"{jh_ouvrier} employé(s) × ({px_ouvrier} € / 7j) × {jours_totaux:.2f}j = {cout_ouvriers:,.0f} €")
+            st.code(f"{jh_ouvrier} employé(s) × {px_ouvrier:,.2f} €/jour (prorata CDI) × {jours_totaux:.2f}j de présence = {cout_ouvriers:,.0f} €")
         else:
-            st.code(f"{jh_ouvrier} employé(s) × {px_ouvrier} €/jour × {jours_factures_jeu}j due(s) = {cout_ouvriers:,.0f} €")
+            st.code(f"{jh_ouvrier} employé(s) × {px_ouvrier:,.2f} €/jour × {jours_factures_jeu}j due(s) = {cout_ouvriers:,.0f} €")
 
         # 3. Tableau Récapitulatif des variables envoyées à Firestore
         st.markdown("#### 🗂️ 3. Structure finale de la ligne NoSQL (Firebase)")
