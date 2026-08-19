@@ -17,30 +17,39 @@ def pop_up_validation_recrutement(salaires_mensuels, metier, type_contrat, salai
     sm_nb = len(salaires_mensuels)
     sm_moyen = sm_somme / sm_nb
 
+    # Changement ici : On garde la valeur brute selon le contrat pour l'affichage informatif
     if "CDI" in type_contrat:
+        # 1 mois économique = 1 semaine réelle = 7 jours de chantier
         sj_min = math.ceil(sm_min / 7.0)
         sj_moyen = math.ceil(sm_moyen / 7.0)
         sj_max = math.ceil(sm_max / 7.0)
         prefixe_cle = f"{metier}_CDI"
-        st.info(f"💡 Conversion CDI mensuelle ramenée au jour (Moyenne : {int(sm_moyen)} €/mois)")
+        st.info(f"💡 Conversion CDI mensuelle (base 1 mois = 7j) ramenée au jour (Moyenne : {int(sm_moyen)} €/mois)")
+        
+        st.markdown("### 🧮 Conversion ramenée à la journée de jeu :")
+        st.success(f"**- Coût Minimum :** `{int(sj_min)} € / jour` (soit {int(sm_min)} €/mois)")
+        st.success(f"**- Coût Moyen :** `{int(sj_moyen)} € / jour` (soit {int(sm_moyen)} €/mois)")
+        st.success(f"**- Coût Maximum :** `{int(sj_max)} € / jour` (soit {int(sm_max)} €/mois)")
     else:
         sj_min = math.ceil(sm_min)
         sj_moyen = math.ceil(sm_moyen)
         sj_max = math.ceil(sm_max)
         prefixe_cle = f"{metier}_CDD"
         st.info(f"💡 Enregistrement CDD direct au jour (Moyenne : {int(sm_moyen)} €/jour)")
+        
+        st.markdown("### 🧮 Tarification au jour de jeu :")
+        st.success(f"**- Tarif Minimum :** `{int(sj_min)} € / jour`")
+        st.success(f"**- Tarif Moyen :** `{int(sj_moyen)} € / jour`")
+        st.success(f"**- Tarif Maximum :** `{int(sj_max)} € / jour`")
 
-    st.markdown("### 🧮 Conversion ramenée au JOUR :")
-    st.success(f"**- Tarif Minimum :** `{int(sj_min)} € / jour`")
-    st.success(f"**- Tarif Moyen :** `{int(sj_moyen)} € / jour`")
-    st.success(f"**- Tarif Maximum :** `{int(sj_max)} € / jour`")
 
     if st.button("✅ ENREGISTRER SUR FIREBASE", type="primary", use_container_width=True, key=f"btn_save_cloud_{metier}_{prefixe_cle}"):
         grille_actuelle = dict(salaires_db_dict)
-        grille_actuelle[f"{prefixe_cle}_Min"] = int(sj_min)
-        grille_actuelle[f"{prefixe_cle}_Moyen"] = int(sj_moyen)
-        grille_actuelle[f"{prefixe_cle}_Max"] = int(sj_max)
-        grille_actuelle[metier] = int(sj_moyen)
+        # On injecte la vraie valeur (mensuelle pour CDI, journalière pour CDD)
+        grille_actuelle[f"{prefixe_cle}_Min"] = int(sm_min)
+        grille_actuelle[f"{prefixe_cle}_Moyen"] = int(sm_moyen)
+        grille_actuelle[f"{prefixe_cle}_Max"] = int(sm_max)
+        grille_actuelle[metier] = int(sm_moyen)
 
         db.db.collection("configuration_salaires").document("grille").set(grille_actuelle)
         st.toast("🚀 Tarifs enregistrés sur Firebase !")
