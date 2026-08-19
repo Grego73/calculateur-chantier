@@ -322,7 +322,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                         elif "poutre" in sub_mat: chantiers_detectes[nom_courant]["poutres"] += qte_val
                             continue
 
-                        # 9. LECTURE DU NOM DE LA MACHINE ET DU NIVEAU REQUIS (CORRIGÉE SANS DOUBLONS)
+                        # 9. LECTURE DU NOM DE LA MACHINE ET DU NIVEAU REQUIS (CORRIGÉE AVEC LIEN RH)
                         if ("requis :" in l_clean.lower() or "nécessite :" in l_clean.lower()) and etape_courante_num is not None:
                             match_niv = re.search(r"niveau\s*(\d+)", l_clean, re.IGNORECASE)
                             niv_extrait = f"N{match_niv.group(1)}" if match_niv else "N1"
@@ -340,19 +340,34 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             if cat_engin is not None:
                                 d_etape = st.session_state.get(f"duree_{nom_courant}_{etape_courante_num}", 1)
                                 
-                                # SÉCURITÉ COMPLÈTE ANTI-DOUBLON : On vérifie si l'engin est déjà listé à cette étape précise
+                                # SÉCURITÉ ANTI-DOUBLON
                                 doublon_engin = any(
                                     e["N° Étape"] == etape_courante_num and e["Type d'engin requis"] == cat_engin 
                                     for e in chantiers_detectes[nom_courant]["engins_requis"]
                                 )
                                 
                                 if not doublon_engin:
+                                    # On récupère les effectifs max lus jusqu'ici pour cette étape
+                                    c_req = int(chantiers_detectes[nom_courant]["max_cond"])
+                                    ch_req = int(chantiers_detectes[nom_courant]["max_chef"])
+                                    o_req = int(chantiers_detectes[nom_courant]["max_ouvrier"])
+                                    
+                                    # Si le texte brut ne fournit aucun effectif (ex: chantier solo), 
+                                    # on met 1 conducteur par défaut pour manœuvrer la machine
+                                    if c_req == 0 and ch_req == 0 and o_req == 0:
+                                        c_req = 1
+
                                     chantiers_detectes[nom_courant]["engins_requis"].append({
                                         "N° Étape": etape_courante_num,
                                         "Durée Étape (jours)": d_etape,
                                         "Type d'engin requis": cat_engin,
-                                        "Niveau requis": niv_extrait
+                                        "Niveau requis": niv_extrait,
+                                        # On ré-injecte obligatoirement ces clés pour alimenter le Tableau 2 du pop-up
+                                        "Conducteurs requis": c_req,
+                                        "Chefs requis": ch_req,
+                                        "Ouvriers requis": o_req
                                     })
+
 
                     # 🚨 ALIGNEMENT SÉCURISÉ : Ce bloc est reculé de 4 espaces vers la gauche !
                     # Il s'exécute APRÈS la fin de la boucle de lecture "for ligne in lignes:"
