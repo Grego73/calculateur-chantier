@@ -24,7 +24,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
 
     with col1:
         st.markdown("### --- PARAMÈTRES GÉNÉRAUX ---")
-        revenus = st.number_input("Revenus prévus du chantier (€) :", value=float(donnees_modele.get("revenus", 0.0)))
+        revenus = st.number_input("Revenus prévus du chantier (€) :", value=float(donnees_modele.get("revenus", 0.0)), step=100.0, format="%.0f")
         
         st.write("⏱️ **Durée totale du chantier :**")
         c_j, c_h, c_m = st.columns(3)
@@ -35,7 +35,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         with c_m:
             minutes_saisies = st.number_input("Minutes", min_value=0, max_value=59, value=0, step=1)
 
-        # Logique de jeu : 1 journée = 24 heures = 1440 minutes (Parenthèses de sécurité)
+        # Logique de jeu : 1 journée = 24 heures = 1440 minutes
         heures_en_jours = heures_saisies / 24.0
         minutes_en_jours = minutes_saisies / 1440.0
         jours_totaux = float(jours_saisis + heures_en_jours + minutes_en_jours)
@@ -43,27 +43,27 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         st.markdown("### --- MATÉRIAUX ---")
         c_qte, c_px = st.columns(2)
         with c_qte:
-            qte_sable = st.number_input("Tonnes de Sable :", value=float(donnees_modele.get("sable", 0.0)))
-            qte_terre = st.number_input("Tonnes de Terre :", value=float(donnees_modele.get("terre", 0.0)))
-            qte_enrobe = st.number_input("Tonnes d'Enrobé :", value=float(donnees_modele.get("enrobe", 0.0)))
-            qte_armature = st.number_input("Unités d'Armature métallique :", value=float(donnees_modele.get("armature", 0.0)))
-            qte_tole = st.number_input("Unités de Plaque de tôle ondulée :", value=float(donnees_modele.get("tole", 0.0)))
-            qte_beton = st.number_input("Tonnes de Béton :", value=float(donnees_modele.get("beton", 0.0)))
-            qte_panneaux = st.number_input("Unités de Panneaux signalisation :", value=float(donnees_modele.get("panneaux", 0.0)))
-            qte_tuyaux = st.number_input("Unités de Tuyaux d'eau standards :", value=float(donnees_modele.get("tuyaux", 0.0)))
-            qte_eaux_usees = st.number_input("Unités de Canalisations eaux usées :", value=float(donnees_modele.get("canalisations", 0.0)))
-            qte_poutres = st.number_input("Unités de Poutres en acier :", value=float(donnees_modele.get("poutres", 0.0)))
+            qte_sable = st.number_input("Tonnes de Sable :", value=float(donnees_modele.get("sable", 0.0)), step=1.0, format="%.0f")
+            qte_terre = st.number_input("Tonnes de Terre :", value=float(donnees_modele.get("terre", 0.0)), step=1.0, format="%.0f")
+            qte_enrobe = st.number_input("Tonnes d'Enrobé :", value=float(donnees_modele.get("enrobe", 0.0)), step=1.0, format="%.0f")
+            qte_armature = st.number_input("Unités d'Armature métallique :", value=float(donnees_modele.get("armature", 0.0)), step=1.0, format="%.0f")
+            qte_tole = st.number_input("Unités de Plaque de tôle ondulée :", value=float(donnees_modele.get("tole", 0.0)), step=1.0, format="%.0f")
+            qte_beton = st.number_input("Tonnes de Béton :", value=float(donnees_modele.get("beton", 0.0)), step=1.0, format="%.0f")
+            qte_panneaux = st.number_input("Unités de Panneaux signalisation :", value=float(donnees_modele.get("panneaux", 0.0)), step=1.0, format="%.0f")
+            qte_tuyaux = st.number_input("Unités de Tuyaux d'eau standards :", value=float(donnees_modele.get("tuyaux", 0.0)), step=1.0, format="%.0f")
+            qte_eaux_usees = st.number_input("Unités de Canalisations eaux usées :", value=float(donnees_modele.get("canalisations", 0.0)), step=1.0, format="%.0f")
+            qte_poutres = st.number_input("Unités de Poutres en acier :", value=float(donnees_modele.get("poutres", 0.0)), step=1.0, format="%.0f")
         with c_px:
-            prix_sable = st.number_input("Prix Sable (€/t) :", value=float(MATERIAUX_DB.get("Sable", 12)))
-            prix_terre = st.number_input("Prix Terre (€/t) :", value=float(MATERIAUX_DB.get("Terre", 16)))
-            prix_enrobe = st.number_input("Prix Enrobé (€/t) :", value=float(MATERIAUX_DB.get("Enrobé", 42)))
-            prix_armature = st.number_input("Prix Armature (€/u) :", value=float(MATERIAUX_DB.get("Armature", 70)))
-            prix_tole = st.number_input("Prix Tôle (€/u) :", value=float(MATERIAUX_DB.get("Tôle", 55)))
-            prix_beton = st.number_input("Prix Béton (€/t) :", value=float(MATERIAUX_DB.get("Béton", 45)))
-            prix_panneaux = st.number_input("Prix Panneaux (€/u) :", value=float(MATERIAUX_DB.get("Panneaux", 90)))
-            prix_tuyaux = st.number_input("Prix Tuyaux d'eau (€/u) :", value=float(MATERIAUX_DB.get("Tuyaux", 32)))
-            prix_eaux_usees = st.number_input("Prix Canalisations (€/u) :", value=float(MATERIAUX_DB.get("Canalisations", 35)))
-            prix_poutres = st.number_input("Prix Poutres acier (€/u) :", value=float(MATERIAUX_DB.get("Poutres", 70)))
+            prix_sable = st.number_input("Prix Sable (€/t) :", value=float(MATERIAUX_DB.get("Sable", 12)), step=1.0, format="%.0f")
+            prix_terre = st.number_input("Prix Terre (€/t) :", value=float(MATERIAUX_DB.get("Terre", 16)), step=1.0, format="%.0f")
+            prix_enrobe = st.number_input("Prix Enrobé (€/t) :", value=float(MATERIAUX_DB.get("Enrobé", 42)), step=1.0, format="%.0f")
+            prix_armature = st.number_input("Prix Armature (€/u) :", value=float(MATERIAUX_DB.get("Armature", 70)), step=1.0, format="%.0f")
+            prix_tole = st.number_input("Prix Tôle (€/u) :", value=float(MATERIAUX_DB.get("Tôle", 55)), step=1.0, format="%.0f")
+            prix_beton = st.number_input("Prix Béton (€/t) :", value=float(MATERIAUX_DB.get("Béton", 45)), step=1.0, format="%.0f")
+            prix_panneaux = st.number_input("Prix Panneaux (€/u) :", value=float(MATERIAUX_DB.get("Panneaux", 90)), step=1.0, format="%.0f")
+            prix_tuyaux = st.number_input("Prix Tuyaux d'eau (€/u) :", value=float(MATERIAUX_DB.get("Tuyaux", 32)), step=1.0, format="%.0f")
+            prix_eaux_usees = st.number_input("Prix Canalisations (€/u) :", value=float(MATERIAUX_DB.get("Canalisations", 35)), step=1.0, format="%.0f")
+            prix_poutres = st.number_input("Prix Poutres acier (€/u) :", value=float(MATERIAUX_DB.get("Poutres", 70)), step=1.0, format="%.0f")
 
         total_mats_direct = float((qte_sable*prix_sable) + (qte_terre*prix_terre) + (qte_enrobe*prix_enrobe) + (qte_armature*prix_armature) + (qte_tole*prix_tole) + (qte_beton*prix_beton) + (qte_panneaux*prix_panneaux) + (qte_tuyaux*prix_tuyaux) + (qte_eaux_usees*prix_eaux_usees) + (qte_poutres*prix_poutres))
         st.info(f"🧱 **Total est. matériaux :** {total_mats_direct:,.0f}".replace(",", " ") + " €")
@@ -84,9 +84,8 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
             strat_cond = st.selectbox("Salaire :", [f"Économique ({p_min_co:.0f} €/j)", f"Standard ({p_moy_co:.0f} €/j)", f"Premium ({p_max_co:.0f} €/j)"], key="sel_strat_cond")
             px_cond = p_min_co if "Économique" in strat_cond else (p_moy_co if "Standard" in strat_cond else p_max_co)
         with c_cond_jh:
-            # Double sécurité : cherche 'jh_cond' ou 'max_cond'
             val_defaut_cond = float(donnees_modele.get("jh_cond", donnees_modele.get("max_cond", 0.0)))
-            jh_cond = st.number_input("Nombre d'employés", min_value=0.0, value=val_defaut_cond, key="jh_input_cond")
+            jh_cond = st.number_input("Nombre d'employés", min_value=0.0, value=val_defaut_cond, key="jh_input_cond", step=1.0, format="%.0f")
 
         # --- 2. CONFIGURATION CHEFS ---
         st.markdown("**🧑‍💼 PROFIL : CHEFS DE CHANTIER**")
@@ -100,9 +99,8 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
             strat_chef = st.selectbox("Salaire :", [f"Économique ({p_min_c:.0f} €/j)", f"Standard ({p_moy_c:.0f} €/j)", f"Premium ({p_max_c:.0f} €/j)"], key="sel_strat_chef")
             px_chef = p_min_c if "Économique" in strat_chef else (p_moy_c if "Standard" in strat_chef else p_max_c)
         with c_chef_jh:
-            # Double sécurité : cherche 'jh_chef' ou 'max_chef'
             val_defaut_chef = float(donnees_modele.get("jh_chef", donnees_modele.get("max_chef", 0.0)))
-            jh_chef = st.number_input("Nombre d'employés", min_value=0.0, value=val_defaut_chef, key="jh_input_chef")
+            jh_chef = st.number_input("Nombre d'employés", min_value=0.0, value=val_defaut_chef, key="jh_input_chef", step=1.0, format="%.0f")
 
         # --- 3. CONFIGURATION OUVRIERS ---
         st.markdown("**👷 PROFIL : OUVRIERS QUALIFIÉS**")
@@ -116,9 +114,8 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
             strat_ouv = st.selectbox("Salaire :", [f"Économique ({p_min_o:.0f} €/j)", f"Standard ({p_moy_o:.0f} €/j)", f"Premium ({p_max_o:.0f} €/j)"], key="sel_strat_ouv")
             px_ouvrier = p_min_o if "Économique" in strat_ouv else (p_moy_o if "Standard" in strat_ouv else p_max_o)
         with c_ouv_jh:
-            # Double sécurité : cherche 'jh_ouvrier' ou 'max_ouvrier'
             val_defaut_ouv = float(donnees_modele.get("jh_ouvrier", donnees_modele.get("max_ouvrier", 0.0)))
-            jh_ouvrier = st.number_input("Nombre d'employés", min_value=0.0, value=val_defaut_ouv, key="jh_input_ouv")
+            jh_ouvrier = st.number_input("Nombre d'employés", min_value=0.0, value=val_defaut_ouv, key="jh_input_ouv", step=1.0, format="%.0f")
 
         st.markdown("### --- TABLE DES ENGINS NÉCESSAIRES ---")
         engins_bruts_modele = []
@@ -188,7 +185,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         )
 
     # ==============================================================================
-    # --- LOGIQUE FINALE DE SYNTHÈSE ET DE CALCUL FINANCIER DU JEU ---
+    # --- LOGIQUE FINALE DE SYNTHÈSE ET DE CALCUL FINANCIER DU JEU (CORRIGÉE) ---
     # ==============================================================================
     jours_factures_jeu = math.ceil(jours_totaux)
     total_mats_recap = float(total_mats_direct)
@@ -199,8 +196,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         df_propres_direct = engins_edites.dropna(subset=["Sélection de l'engin / Modèle"])
         total_location_recap = float((df_propres_direct["Quantité"] * df_propres_direct["Prix Location (€/jour)"] * jours_factures_jeu).sum())
 
-    # Formules RH spécifiques : 
-    # CDI : px_cond contient déjà le coût par jour calculé (Salaire mensuel / 7) dans l'Espace Direction. On applique le prorata exact.
+    # Formules RH spécifiques sans double division (px_cond contient le coût/jour calculé en Espace Direction)
     if "CDI" in type_contrat_cond: 
         cout_cond = jh_cond * px_cond * jours_totaux
     else: 
@@ -226,31 +222,26 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
     gain_par_jour_recap = float(benefice_net_recap / jours_totaux if jours_totaux > 0 else 0.0)
     roi_par_jour_recap = float(roi_recap / jours_totaux if jours_totaux > 0 else roi_recap)
 
-    # Formatage des textes pour affichage
+    # Formatage strict sans décimales pour l'affichage visuel
     txt_mats = f"{total_mats_recap:,.0f}".replace(",", " ")
     txt_loc = f"{total_location_recap:,.0f}".replace(",", " ")
     txt_sal = f"{total_salaires_recap:,.0f}".replace(",", " ")
     txt_depenses = f"{total_depenses_recap:,.0f}".replace(",", " ")
     txt_gain_jour = f"{gain_par_jour_recap:,.0f}".replace(",", " ")
     txt_benefice = f"{abs(benefice_net_recap):,.0f}".replace(",", " ")
+    
+    txt_duree_precise = f"{int(jours_totaux)} jours" if jours_totaux >= 1 else f"{heures_saisies}h {minutes_saisies}m"
 
-    # ==============================================================================
-    # --- AFFICHAGE DU RÉCAPITULATIF FINANCIER VISUEL ---
-    # ==============================================================================
+    # Affichage des métriques de synthèse graphique
     st.markdown("---")
     st.markdown("### 📊 Récapitulatif Global Estimé (Règles du Jeu)")
-    if jours_totaux > 0 and jours_totaux != jours_factures_jeu:
-        st.warning(f"⚠️ **Pénalité de temps :** Le chantier dépasse sur la journée suivante. Vous êtes facturé **{jours_factures_jeu} jours** au lieu de {jours_totaux:.2f} jours pour la location et vos CDD.")
-
-    txt_duree_precise = f"{jours_saisis}j {heures_saisies}h {minutes_saisies}m" if jours_totaux > 0 else "0 jour"
-
     c_rc1, c_rc2, c_rc3, c_rc4, c_rc5, c_rc6 = st.columns(6)
     with c_rc1: st.metric(label="🧱 Total Matériaux", value=f"{txt_mats} €")
     with c_rc2: st.metric(label="🚜 Total Location", value=f"{txt_loc} €")
     with c_rc3: st.metric(label="👥 Total Salaires (RH)", value=f"{txt_sal} €")
     with c_rc4: st.metric(label="📉 Dépenses Totales", value=f"{txt_depenses} €")
     with c_rc5: st.metric(label="⏱️ Durée du Projet", value=txt_duree_precise)
-    with c_rc6: st.metric(label="📈 Rentabilité Quotidienne", value=f"{txt_gain_jour} €/j")
+    with c_rc6: st.metric(label="📈 Gain / Jour", value=f"{txt_gain_jour} €/j")
 
     if benefice_net_recap >= 0: 
         st.success(f"🟢 **Rentabilité positive :** Bénéfice de **{txt_benefice} €** soit **{txt_gain_jour} € / jour** sur **{txt_duree_precise}** (ROI Global : **{roi_recap:.2f} %**)")
@@ -266,34 +257,30 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
     def confirmer_enregistrement_chantier_detaill():
         st.write("Voici la transparence complète des calculs et formules appliqués selon les règles de l'économie du jeu :")
         
-        # 1. Détail de la Logique du Temps
         st.markdown("#### ⏱️ 1. Décomposition du Temps")
         st.write(f"- **Durée réelle saisie :** `{jours_saisis} jours, {heures_saisies} heures, {minutes_saisies} minutes`")
-        st.write(f"- **Équivalent décimal exact :** `{jours_totaux:.4f} jours` de jeu (base 24h)")
-        st.write(f"- **Forfait facturé (Location & CDD) :** `{jours_factures_jeu} jours` (Toute journée entamée est due)")
+        st.write(f"- **Forfait facturé (Location & CDD) :** `{int(jours_factures_jeu)} jours` (Toute journée entamée est due)")
 
-        # 2. Détail des Formules de la Masse Salariale
         st.markdown("#### 👥 2. Formules appliquées pour la Main-d'œuvre")
         st.write(f"- **Conducteurs d'engins ({type_contrat_cond}) :**")
         if "CDI" in type_contrat_cond:
-            st.code(f"{jh_cond} employé(s) × {px_cond:,.2f} €/jour (prorata CDI) × {jours_totaux:.2f}j de présence = {cout_cond:,.0f} €")
+            st.code(f"{int(jh_cond)} employé(s) × {px_cond:.0f} €/jour (prorata CDI) × {int(jours_totaux)}j de présence = {cout_cond:,.0f} €".replace(",", " "))
         else:
-            st.code(f"{jh_cond} employé(s) × {px_cond:,.2f} €/jour × {jours_factures_jeu}j due(s) = {cout_cond:,.0f} €")
+            st.code(f"{int(jh_cond)} employé(s) × {px_cond:.0f} €/jour × {int(jours_factures_jeu)}j due(s) = {cout_cond:,.0f} €".replace(",", " "))
 
         st.write(f"- **Chefs de chantier ({type_contrat_chef}) :**")
         if "CDI" in type_contrat_chef:
-            st.code(f"{jh_chef} employé(s) × {px_chef:,.2f} €/jour (prorata CDI) × {jours_totaux:.2f}j de présence = {cout_chefs:,.0f} €")
+            st.code(f"{int(jh_chef)} employé(s) × {px_chef:.0f} €/jour (prorata CDI) × {int(jours_totaux)}j de présence = {cout_chefs:,.0f} €".replace(",", " "))
         else:
-            st.code(f"{jh_chef} employé(s) × {px_chef:,.2f} €/jour × {jours_factures_jeu}j due(s) = {cout_chefs:,.0f} €")
+            st.code(f"{int(jh_chef)} employé(s) × {px_chef:.0f} €/jour × {int(jours_factures_jeu)}j due(s) = {cout_chefs:,.0f} €".replace(",", " "))
 
         st.write(f"- **Ouvriers qualifiés ({type_contrat_ouv}) :**")
         if "CDI" in type_contrat_ouv:
-            st.code(f"{jh_ouvrier} employé(s) × {px_ouvrier:,.2f} €/jour (prorata CDI) × {jours_totaux:.2f}j de présence = {cout_ouvriers:,.0f} €")
+            st.code(f"{int(jh_ouvrier)} employé(s) × {px_ouvrier:.0f} €/jour (prorata CDI) × {int(jours_totaux)}j de présence = {cout_ouvriers:,.0f} €".replace(",", " "))
         else:
-            st.code(f"{jh_ouvrier} employé(s) × {px_ouvrier:,.2f} €/jour × {jours_factures_jeu}j due(s) = {cout_ouvriers:,.0f} €")
+            st.code(f"{int(jh_ouvrier)} employé(s) × {px_ouvrier:.0f} €/jour × {int(jours_factures_jeu)}j due(s) = {cout_ouvriers:,.0f} €".replace(",", " "))
 
-        # 3. Tableau Récapitulatif des variables envoyées à Firestore
-        st.markdown("#### 🗂️ 3. Structure finale de la ligne NoSQL (Firebase)")
+        st.markdown("#### 🗂️ 3. Structure finale NoSQL (Firebase)")
         donnees_popup = {
             "Champ technique (Firestore)": [
                 "nom_chantier", "revenus", "cout_materiaux", "cout_location", 
@@ -321,7 +308,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         col_pop1, col_pop2 = st.columns(2)
         with col_pop1:
             if st.button("✅ ACCEPTER & ENREGISTRER", type="primary", use_container_width=True, key="btn_popup_confirm_final_send_complet"):
-                # Envoi des variables brutes et propres sur Firestore
+                # Envoi des variables brutes et propres sur Firestore via database.py
                 db.inserer_chantier(
                     nom_chantier, revenus, total_mats_recap, total_location_recap, 
                     total_salaires_recap, total_depenses_recap, benefice_net_recap, 
@@ -334,7 +321,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
             if st.button("❌ ANNULER & MODIFIER", use_container_width=True, key="btn_popup_cancel_final_send_complet"):
                 st.rerun()
 
-    # --- ENCLENCHEMENT DE LA SÉCURITÉ DU FORMULAIRE ---
+    # --- CONTROLE SÉCURITÉ DOUBLONS ---
     if st.button("LANCER LE CALCUL & ENREGISTRER", type="primary", use_container_width=True, key="btn_principal_declencher_calcul_rentabilite"):
         df_actuel = db.charger_donnees()
         doublon_existe = False if df_actuel.empty else not df_actuel[(df_actuel["Nom du Chantier"] == nom_chantier) & (df_actuel["Revenus (€)"] == revenus)].empty
@@ -346,3 +333,4 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         else: 
             # Si le formulaire passe les contrôles, on déploie le pop-up détaillé
             confirmer_enregistrement_chantier_detaill()
+
