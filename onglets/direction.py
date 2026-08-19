@@ -373,14 +373,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                     else:
                         st.error("❌ L'algorithme n'a détecté aucune fiche de chantier valide dans votre texte brut.")
 
-                    # 🚨 ALIGNEMENT SÉCURISÉ : Ce bloc est reculé de 4 espaces vers la gauche !
-                    # Il s'exécute APRÈS la fin de la boucle de lecture "for ligne in lignes:"
-                    # Cela évite les ouvertures de pop-ups en doublon.
-                    if len(chantiers_detectes) > 0:
-                        pop_up_validation_fiches_chantiers(chantiers_detectes)
-                    else:
-                        st.error("❌ L'algorithme n'a détecté aucune fiche de chantier valide dans votre texte brut.")
-
         # --- 4.2 CONFIGURATION GRILLE SALARIALE ---
         with sub_tab2:
             st.markdown("### 👥 Extracteur et Calculateur de Salaires par Métier & Contrat")
