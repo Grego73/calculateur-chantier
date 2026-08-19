@@ -354,19 +354,10 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                         "Niveau requis": niv_extrait
                                     })
 
-                    # --- NETTOYAGE CHIRURGICAL ET OUVERTURE POP-UP ---
+                    # 🚨 ALIGNEMENT SÉCURISÉ : Ce bloc est reculé de 4 espaces vers la gauche !
+                    # Il s'exécute APRÈS la fin de la boucle de lecture "for ligne in lignes:"
+                    # Cela évite les ouvertures de pop-ups en doublon.
                     if len(chantiers_detectes) > 0:
-                        pop_up_validation_fiches_chantiers(chantiers_detectes)
-                    else:
-                        st.error("❌ L'algorithme n'a détecté aucune fiche de chantier valide dans votre texte brut.")
-
-
-                    # --- NETTOYAGE CHIRURGICAL DES LIGNES RESTÉES À NONE AVANT L'OUVERTURE POP-UP ---
-                    if len(chantiers_detectes) > 0:
-                        for name, data in chantiers_detectes.items():
-                            data["engins_requis"] = [e for e in data["engins_requis"] if e["Type d'engin requis"] is not None]
-                        
-                        # Déclenchement sécurisé du pop-up de validation
                         pop_up_validation_fiches_chantiers(chantiers_detectes)
                     else:
                         st.error("❌ L'algorithme n'a détecté aucune fiche de chantier valide dans votre texte brut.")
