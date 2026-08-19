@@ -24,15 +24,22 @@ def charger_salaires_config():
     except Exception: pass
     return data_defaut
 
-def charger_materiaux_config():
+def charger_salaires_config():
     try:
-        doc_ref = db.collection("configuration_materiaux").document("catalogue")
+        doc_ref = db.collection("configuration_salaires").document("grille")
         doc = doc_ref.get()
-        if doc.exists: return doc.to_dict()
-    except Exception: pass
-    data_defaut = {"Sable": 12.0, "Terre": 16.0, "Enrobé": 42.0, "Armature": 70.0, "Tôle": 55.0, "Béton": 45.0, "Panneaux": 90.0, "Tuyaux": 32.0, "Canalisations": 35.0, "Poutres": 70.0}
-    try: db.collection("configuration_materiaux").document("catalogue").set(data_defaut)
-    except Exception: pass
+        if doc.exists: 
+            return doc.to_dict()
+    except Exception: 
+        pass
+    
+    # Si le document n'existe vraiment pas du tout sur Firebase, on initialise 
+    # une structure vide au lieu de forcer les anciennes lignes à 230€
+    data_defaut = {}
+    try: 
+        db.collection("configuration_salaires").document("grille").set(data_defaut)
+    except Exception: 
+        pass
     return data_defaut
 
 def charger_catalogue_engins():
