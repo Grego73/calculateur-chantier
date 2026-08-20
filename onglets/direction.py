@@ -289,25 +289,27 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                 st.session_state[f"duree_{nom_courant}_{etape_courante_num}"] = int(num_txt)
                             continue
                             
-                        # 7. LOGIQUE RH D'OPTIMISATION (SYNCHRONISÉE AVEC LES CLÉS DE L'ONGLET 1)
-                        if "conducteur" in l_clean.lower() and etape_courante_num is not None:
-                            match_num = re.search(r":\s*(\d+)", l_clean)
+                        # 7. LOGIQUE RH D'OPTIMISATION (BLINDÉE AVEC FILTRE TEXTE STRICT)
+                        ligne_rh_minuscule = l_clean.lower()
+                        if "conducteur" in ligne_rh_minuscule and etape_courante_num is not None:
+                            match_num = re.search(r"(\d+)", ligne_rh_minuscule.split(":")[-1])
                             if match_num:
                                 val_cond = float(match_num.group(1))
                                 chantiers_detectes[nom_courant]["jh_cond"] = max(chantiers_detectes[nom_courant]["jh_cond"], val_cond)
                             continue
-                        if "chef" in l_clean.lower() and etape_courante_num is not None:
-                            match_num = re.search(r":\s*(\d+)", l_clean)
+                        if "chef" in ligne_rh_minuscule and etape_courante_num is not None:
+                            match_num = re.search(r"(\d+)", ligne_rh_minuscule.split(":")[-1])
                             if match_num:
                                 val_chef = float(match_num.group(1))
                                 chantiers_detectes[nom_courant]["jh_chef"] = max(chantiers_detectes[nom_courant]["jh_chef"], val_chef)
                             continue
-                        if "ouvrier" in l_clean.lower() and etape_courante_num is not None:
-                            match_num = re.search(r":\s*(\d+)", l_clean)
+                        if "ouvrier" in ligne_rh_minuscule and etape_courante_num is not None:
+                            match_num = re.search(r"(\d+)", ligne_rh_minuscule.split(":")[-1])
                             if match_num:
                                 val_ouv = float(match_num.group(1))
                                 chantiers_detectes[nom_courant]["jh_ouvrier"] = max(chantiers_detectes[nom_courant]["jh_ouvrier"], val_ouv)
                             continue
+
 
                         # 8. CUMUL DES MATÉRIAUX REQUIS
                         if "matériaux requis :" in l_clean.lower() or "materiaux requis :" in l_clean.lower():
