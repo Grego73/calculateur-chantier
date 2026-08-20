@@ -194,6 +194,8 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         if "engins_requis" in donnees_modele and len(donnees_modele["engins_requis"]) > 0:
             for item in donnees_modele["engins_requis"]:
                 t_engin = item.get("Type d'engin requis")
+                
+                # 🚨 FILTRAGE RADICAL : On ignore la ligne si l'engin est absent, vide ou contient textuellement "none"
                 if t_engin is None or str(t_engin).strip() == "" or str(t_engin).lower() == "none":
                     continue
                     
@@ -206,6 +208,13 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                 })
                 
         df_besoins_init = pd.DataFrame(engins_bruts_modele)
+        
+        # 🚨 DEUXIÈME BARRIÈRE DE SÉCURITÉ : On nettoie le DataFrame de toutes les lignes incomplètes 
+        # pour éliminer les warnings rouges et les lignes vides à la source
+        if not df_besoins_init.empty:
+            df_besoins_init = df_besoins_init.dropna(subset=["Type d'engin requis"])
+            df_besoins_init = df_besoins_init[df_besoins_init["Type d'engin requis"] != ""]
+            
         if df_besoins_init.empty: 
             df_besoins_init = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "Type d'engin requis", "Niveau requis", "À louer ?"])
         
