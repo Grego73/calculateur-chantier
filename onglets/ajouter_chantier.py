@@ -172,13 +172,24 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
 
         # --- TON TABLEAU DE GESTION DES ENGINS (IL RESTE ICI) ---
         st.markdown("### --- TABLE DES ENGINS NÉCESSAIRES ---")
+        donnees_modele = CATALOGUE_CHANTIERS[chantier_selectionne]
         engins_bruts_modele = []
         if "engins_requis" in donnees_modele and len(donnees_modele["engins_requis"]) > 0:
             for item in donnees_modele["engins_requis"]:
+                # 🚨 SÉCURITÉ CRITIQUE : On ignore l'engin s'il est vide, nul ou égal à "None"
+                t_engin = item.get("Type d'engin requis")
+                if t_engin is None or str(t_engin).strip() == "" or str(t_engin).lower() == "none":
+                    continue
+                    
                 engins_bruts_modele.append({
-                    "N° Étape": item.get("N° Étape", 1), "Durée Étape (jours)": item.get("Durée Étape (jours)", 1),
-                    "Type d'engin requis": item.get("Type d'engin requis", "Pelleteuses"), "Niveau requis": item.get("Niveau requis", "N1"), "À louer ?": False
+                    "N° Étape": item.get("N° Étape", 1), 
+                    "Durée Étape (jours)": item.get("Durée Étape (jours)", 1),
+                    "Type d'engin requis": str(t_engin).strip(), 
+                    "Niveau requis": item.get("Niveau requis", "N1"), 
+                    "À louer ?": False
                 })
+
+                
         df_besoins_init = pd.DataFrame(engins_bruts_modele)
         if df_besoins_init.empty: df_besoins_init = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "Type d'engin requis", "Niveau requis", "À louer ?"])
         
@@ -240,7 +251,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         )
 
     # ==============================================================================
-    # --- LOGIQUE FINALE DE SYNTHÈSE ET DE CALCUL FINANCIER DU JEU (TABLE RH COCHÉ) ---
+    # --- LOGIQUE FINALE DE SYNTHÈSE ET DE CALCUL FINANCIER DU JEU (CORRIGÉE) ---
     # ==============================================================================
     jours_factures_jeu = math.ceil(jours_totaux)
     total_mats_recap = float(total_mats_direct)
@@ -250,12 +261,11 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         df_propres_direct = engins_edites.dropna(subset=["Sélection de l'engin / Modèle"])
         total_location_recap = float((df_propres_direct["Quantité"] * df_propres_direct["Prix Location (€/jour)"] * jours_factures_jeu).sum())
 
-    # --- NOUVEAU SYSTÈME DE CALCUL RH EN CASCADE ---
+    # --- CALCUL RH EN CASCADE ÉTAPE PAR ÉTAPE ---
     cout_cond = 0.0
     cout_chefs = 0.0
     cout_ouvriers = 0.0
     
-    # On initialise des variables pour le pop-up final
     jh_cond, jh_chef, jh_ouvrier = 0.0, 0.0, 0.0
 
     if tableau_employes_etapes is not None and not tableau_employes_etapes.empty:
@@ -269,24 +279,22 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
             ch_count = float(r_rh.get("🧑‍💼 Chefs", 0))
             o_count = float(r_rh.get("👷 Ouvriers", 0))
             
-            # Accumulation pour mémoire pop-up
             jh_cond = max(jh_cond, c_count)
             jh_chef = max(jh_chef, ch_count)
             jh_ouvrier = max(jh_ouvrier, o_count)
 
-            # Calcul Conducteurs
             if "CDI" in type_contrat_cond: cout_cond += c_count * px_cond * (duree_e / 7.0)
             else: cout_cond += c_count * px_cond * duree_e_due
                 
-            # Calcul Chefs
             if "CDI" in type_contrat_chef: cout_chefs += ch_count * px_chef * (duree_e / 7.0)
             else: cout_chefs += ch_count * px_chef * duree_e_due
                 
-            # Calcul Ouvriers
             if "CDI" in type_contrat_ouv: cout_ouvriers += o_count * px_ouvrier * (duree_e / 7.0)
             else: cout_ouvriers += o_count * px_ouvrier * duree_e_due
 
     total_salaires_recap = float(cout_chefs + cout_ouvriers + cout_cond)
+
+    
     total_depenses_recap = float(total_mats_recap + total_location_recap + total_salaires_recap)
     benefice_net_recap = float(revenus - total_depenses_recap)
     roi_recap = float((benefice_net_recap / total_depenses_recap) * 100 if total_depenses_recap > 0 else 0)
