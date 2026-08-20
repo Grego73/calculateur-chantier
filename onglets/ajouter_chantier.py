@@ -279,65 +279,30 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         if len(engins_transferes_list) > 0: 
             df_engins_init = pd.DataFrame(engins_transferes_list)
         
-        # 📏 Version corrigée sans variable fantôme 'df_ins_init'
+        # 🚀 CORRECTIF RADICAL : Remplacement de SelectboxColumn par TextColumn
+        # Cela empêche Streamlit de masquer le texte si le modèle n'est pas trouvé dans le catalogue Firebase
         engins_edites = st.data_editor(
             df_engins_init, num_rows="dynamic", use_container_width=True, key="table_engins_a_louer",
             column_config={
-                "engin_modele": st.column_config.SelectboxColumn("Engin & Modèle", options=list(CATALOGUE_ENGINS.keys()), required=True, width="medium"),
+                "engin_modele": st.column_config.TextColumn("Engin & Modèle", width="medium", disabled=True),
                 "Quantité": st.column_config.NumberColumn("Qté", min_value=1, default=1, step=1, width="small"),
                 "Prix Location (€/jour)": st.column_config.NumberColumn("Prix/j", min_value=0, step=10, width="small"),
                 "Jours de Location": st.column_config.NumberColumn("Jours", min_value=1, max_value=365, step=1, width="small")
             }
         )
 
-
     # ==============================================================================
-    # --- LOGIQUE FINALE DE SYNTHÈSE ET DE CALCUL FINANCIER DU JEU (CUMUL ÉTAPES) ---
+    # --- LOGIQUE FINALE DE SYNTHÈSE ET DE CALCUL FINANCIER DU JEU ---
     # ==============================================================================
     jours_factures_jeu = math.ceil(jours_totaux)
     total_mats_recap = float(total_mats_direct)
 
     total_location_recap = 0.0
     if engins_edites is not None and not engins_edites.empty:
-        df_propres_direct = engins_edites.dropna(subset=["engin_modele"]) # 🚀 Utilise engin_modele ici aussi !
-        total_location_recap = float((df_propres_direct["Quantité"] * df_propres_direct["Prix Location (€/jour)"] * df_propres_direct["Jours de Location"]).sum())
-
-    # Initialisation des compteurs de jours-hommes cumulés pour le chantier
-    total_jours_hommes_cond = 0.0
-    total_jours_hommes_chef = 0.0
-    total_jours_hommes_ouvrier = 0.0
-
-    if tableau_employes_etapes is not None and not tableau_employes_etapes.empty:
-        df_rh_propre = tableau_employes_etapes.dropna(subset=["N° Étape"])
-        
-        for _, r_rh in df_rh_propre.iterrows():
-            # On prend la durée exacte configurée pour cette étape précise
-            duree_etape_reelle = float(r_rh.get("Durée Étape (jours)", 1.0))
-            
-            # Récupération des effectifs de l'étape
-            c_count = float(r_rh.get("🕹️ Conducteurs", 0))
-            ch_count = float(r_rh.get("🧑‍💼 Chefs", 0))
-            o_count = float(r_rh.get("👷 Ouvriers", 0))
-            
-            # Mathématiques du jeu : Cumul (Effectif x Durée de l'étape)
-            total_jours_hommes_cond += c_count * duree_etape_reelle
-            total_jours_hommes_chef += ch_count * duree_etape_reelle
-            total_jours_hommes_ouvrier += o_count * duree_etape_reelle
-
-    # --- APPLICATION DU TARIF SALARIAL SUR LES CUMULS ---
-    cout_cond = total_jours_hommes_cond * px_cond
-    cout_chefs = total_jours_hommes_chef * px_chef
-    cout_ouvriers = total_jours_hommes_ouvrier * px_ouvrier
-
-    # Sauvegarde des maximums pour l'affichage NoSQL
-    jh_cond = total_jours_hommes_cond
-    jh_chef = total_jours_hommes_chef
-    jh_ouvrier = total_jours_hommes_ouvrier
+        df_propres_direct = engins_edites.dropna(subset=["engin_modele"])
+        total_location_recap = float((df_propres_direct["Quantité"] * df_propres_direct["Prix Location (€/jour)"] * jours_factures_jeu).sum())
 
     total_salaires_recap = float(cout_chefs + cout_ouvriers + cout_cond)
-
-
-    
     total_depenses_recap = float(total_mats_recap + total_location_recap + total_salaires_recap)
     benefice_net_recap = float(revenus - total_depenses_recap)
     roi_recap = float((benefice_net_recap / total_depenses_recap) * 100 if total_depenses_recap > 0 else 0)
@@ -393,22 +358,8 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
 
         st.markdown("#### 🗂️ 3. Structure finale NoSQL (Firebase)")
         donnees_popup = {
-            "Champ technique (Firestore)": [
-                "nom_chantier", "revenus", "cout_materiaux", "cout_location", 
-                "cout_salaires", "depenses_totales", "benefice_net", "roi", 
-                "gain_par_jour"
-            ],
-            "Valeur brute insérée": [
-                nom_chantier, 
-                f"{revenus:,.0f} €".replace(",", " "), 
-                f"{txt_mats} €", 
-                f"{txt_loc} €", 
-                f"{txt_sal} €", 
-                f"{txt_depenses} €", 
-                f"{txt_benefice} €", 
-                f"{roi_recap:.2f} %", 
-                f"{txt_gain_jour} €/j"
-            ]
+            "Champ technique (Firestore)": ["nom_chantier", "revenus", "cout_materiaux", "cout_location", "cout_salaires", "depenses_totales", "benefice_net", "roi", "gain_par_jour"],
+            "Valeur brute insérée": [nom_chantier, f"{revenus:,.0f} €".replace(",", " "), f"{txt_mats} €", f"{txt_loc} €", f"{txt_sal} €", f"{txt_depenses} €", f"{txt_benefice} €", f"{roi_recap:.2f} %", f"{txt_gain_jour} €/j"]
         }
         st.table(pd.DataFrame(donnees_popup))
         
@@ -416,17 +367,11 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         col_pop1, col_pop2 = st.columns(2)
         with col_pop1:
             if st.button("✅ ACCEPTER & ENREGISTRER", type="primary", use_container_width=True):
-                db.inserer_chantier(
-                    nom_chantier, revenus, total_mats_recap, total_location_recap, 
-                    total_salaires_recap, total_depenses_recap, benefice_net_recap, 
-                    round(roi_recap, 2), float(jours_totaux), round(gain_par_jour_recap, 2), 
-                    round(roi_par_jour_recap, 2)
-                )
+                db.inserer_chantier(nom_chantier, revenus, total_mats_recap, total_location_recap, total_salaires_recap, total_depenses_recap, benefice_net_recap, round(roi_recap, 2), float(jours_totaux), round(gain_par_jour_recap, 2), round(roi_par_jour_recap, 2))
                 st.toast("🚀 Simulation enregistrée avec succès sur le Cloud Firestore !")
                 st.rerun()
         with col_pop2:
-            if st.button("❌ ANNULER & MODIFIER", use_container_width=True): 
-                st.rerun()
+            if st.button("❌ ANNULER & MODIFIER", use_container_width=True): st.rerun()
 
     if st.button("LANCER LE CALCUL & ENREGISTRER", type="primary", use_container_width=True):
         df_actuel = db.charger_donnees()
@@ -437,4 +382,3 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
             st.error(f"❌ Erreur NoSQL : Une fiche identique au nom de '{nom_chantier}' existe déjà dans l'historique cloud.")
         else: 
             confirmer_enregistrement_chantier_detaill()
-
