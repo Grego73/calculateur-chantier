@@ -194,8 +194,6 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         if "engins_requis" in donnees_modele and len(donnees_modele["engins_requis"]) > 0:
             for item in donnees_modele["engins_requis"]:
                 t_engin = item.get("Type d'engin requis")
-                
-                # 🚨 PROTECTION DOUBLE : On écarte de force les engins non lus ou vides venus de Firebase
                 if t_engin is None or str(t_engin).strip() == "" or str(t_engin).lower() == "none":
                     continue
                     
@@ -204,66 +202,84 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                     "Durée Étape (jours)": int(item.get("Durée Étape (jours)", 1)),
                     "Type d'engin requis": str(t_engin).strip(), 
                     "Niveau requis": item.get("Niveau requis", "N1"), 
-                    "À louer ?": False  # 🚀 RETOUR DE LA COLONNE : Indispensable pour afficher la case à cocher !
+                    "À louer ?": False
                 })
-       
+                
         df_besoins_init = pd.DataFrame(engins_bruts_modele)
-        if df_besoins_init.empty: df_besoins_init = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "Type d'engin requis", "Niveau requis", "À louer ?"])
+        if df_besoins_init.empty: 
+            df_besoins_init = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "Type d'engin requis", "Niveau requis", "À louer ?"])
         
+        # 📏 AMÉLIORATION LARGEUR : On force des colonnes petites pour afficher "À louer ?" du premier coup
         engins_necessaires = st.data_editor(
             df_besoins_init, num_rows="dynamic", use_container_width=True, key="table_engins_necessaires",
             column_config={
-                "N° Étape": st.column_config.NumberColumn("N° Étape", min_value=1, step=1, required=True),
-                "Durée Étape (jours)": st.column_config.NumberColumn("Durée (jours)", min_value=1, step=1, required=True),
-                "Type d'engin requis": st.column_config.SelectboxColumn("Type d'engin", options=TYPES_ENGINS_BRUTS, required=True),
-                "Niveau requis": st.column_config.SelectboxColumn("Niveau requis", options=["N1", "N2", "N3", "N4"], required=True),
-                "À louer ?": st.column_config.CheckboxColumn("À louer ?", default=False)
+                "N° Étape": st.column_config.NumberColumn("N°", min_value=1, step=1, required=True, width="small"),
+                "Durée Étape (jours)": st.column_config.NumberColumn("Jours", min_value=1, step=1, required=True, width="small"),
+                "Type d'engin requis": st.column_config.SelectboxColumn("Type d'engin", options=TYPES_ENGINS_BRUTS, required=True, width="medium"),
+                "Niveau requis": st.column_config.SelectboxColumn("Niv", options=["N1", "N2", "N3", "N4"], required=True, width="small"),
+                "À louer ?": st.column_config.CheckboxColumn("À louer ?", default=False, width="small")
             }
         )
 
-        # --- LOGIQUE DE LIAISON LOCATION ---
+        # 🚜 LOGIQUE DE TRANSFERT SÉCURISÉE AVEC RECHERCHE PLUS SOUPLE
         engins_transferes_list = []
-        if not engins_necessaires.empty:
+        if not engins_necessaires.empty and "À louer ?" in engins_necessaires.columns:
             df_coches = engins_necessaires[engins_necessaires["À louer ?"] == True].dropna(subset=["Type d'engin requis"])
+            
             for _, row in df_coches.iterrows():
-                type_demande, niveau_demande, duree_etape = str(row["Type d'engin requis"]).strip(), str(row["Niveau requis"]).strip(), int(row["Durée Étape (jours)"])
+                type_demande = str(row["Type d'engin requis"]).strip()
+                niveau_demande = str(row["Niveau requis"]).strip().lower()
+                duree_etape = int(row["Durée Étape (jours)"])
                 
                 def nettoyer_mots(texte):
                     texte = texte.lower().replace("é", "e").replace("è", "e").replace("ê", "e").replace("à", "a")
-                    for char in ["'", "-", "/", "’"]: texte = texte.replace(char, " ")
-                    mots, mots_propres = texte.split(), []
+                    for char in ["'", "-", "/", "’"]: 
+                        texte = texte.replace(char, " ")
+                    mots = texte.split()
                     mots_utiles = ["pour", "de", "d", "un", "une", "le", "la", "les", "sur"]
-                    for m in mots:
-                        if m in mots_utiles: continue
-                        if m.endswith("s") and m not in ["tapis", "fraiseuse", "niveleuse", "sol"]: m = m[:-1]
-                        mots_propres.append(m)
-                    return mots_propres
+                    return [m for m in mots if m not in mots_utiles]
 
                 mots_cles_recherche = nettoyer_mots(type_demande)
                 modele_trouve, prix_trouve = None, 380.0
+                
+                # Étape A : Recherche stricte avec Niveau
                 for engin_nom, prix in CATALOGUE_ENGINS.items():
-                    if niveau_demande.lower() in engin_nom.lower() and all(mot in nettoyer_mots(engin_nom) for mot in mots_cles_recherche):
+                    if niveau_demande in engin_nom.lower() and all(mot in nettoyer_mots(engin_nom) for mot in mots_cles_recherche):
                         modele_trouve, prix_trouve = engin_nom, prix
                         break
+                
+                # Étape B : Recherche par mots-clés uniquement (si le niveau n'est pas écrit dans le nom)
                 if not modele_trouve:
                     for engin_nom, prix in CATALOGUE_ENGINS.items():
                         if all(mot in nettoyer_mots(engin_nom) for mot in mots_cles_recherche):
                             modele_trouve, prix_trouve = engin_nom, prix
                             break
-                if modele_trouve:
-                    engins_transferes_list.append({"Sélection de l'engin / Modèle": modele_trouve, "Quantité": 1, "Prix Location (€/jour)": prix_trouve, "Jours de Location": duree_etape})
+                            
+                # 🚀 CORRECTIF RECHERCHE : Si aucune machine n'est trouvée, on garde le nom brut requis pour ne pas bloquer la location !
+                if not modele_trouve:
+                    modele_trouve = f"{type_demande} ({niveau_demande.upper()})"
+                    prix_trouve = 380.0 # Tarif forfaitaire de secours
+                    
+                engins_transferes_list.append({
+                    "Sélection de l'engin / Modèle": modele_trouve, 
+                    "Quantité": 1, 
+                    "Prix Location (€/jour)": prix_trouve, 
+                    "Jours de Location": duree_etape
+                })
 
         st.markdown("### --- TABLE DES ENGINS À LOUER ---")
         df_engins_init = pd.DataFrame(columns=["Sélection de l'engin / Modèle", "Quantité", "Prix Location (€/jour)", "Jours de Location"])
-        if len(engins_transferes_list) > 0: df_engins_init = pd.DataFrame(engins_transferes_list)
+        if len(engins_transferes_list) > 0: 
+            df_engins_init = pd.DataFrame(engins_transferes_list)
         
+        # 📏 On applique les mêmes largeurs forcées sur le tableau de location
         engins_edites = st.data_editor(
             df_engins_init, num_rows="dynamic", use_container_width=True, key="table_engins_a_louer",
             column_config={
-                "Sélection de l'engin / Modèle": st.column_config.SelectboxColumn("Engin & Modèle", options=list(CATALOGUE_ENGINS.keys()), required=True),
-                "Quantité": st.column_config.NumberColumn("Quantité", min_value=1, default=1, step=1),
-                "Prix Location (€/jour)": st.column_config.NumberColumn("Prix / Jour (€)", min_value=0, step=10),
-                "Jours de Location": st.column_config.NumberColumn("Jours à louer", min_value=1, max_value=365, step=1)
+                "Sélection de l'engin / Modèle": st.column_config.SelectboxColumn("Engin & Modèle", options=list(CATALOGUE_ENGINS.keys()), required=True, width="medium"),
+                "Quantité": st.column_config.NumberColumn("Qté", min_value=1, default=1, step=1, width="small"),
+                "Prix Location (€/jour)": st.column_config.NumberColumn("Prix/j", min_value=0, step=10, width="small"),
+                "Jours de Location": st.column_config.NumberColumn("Jours", min_value=1, max_value=365, step=1, width="small")
             }
         )
 
