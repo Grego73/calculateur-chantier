@@ -144,25 +144,29 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         # --- NOUVEAU : LE TABLEAU DES EMPLOYÉS PAR ÉTAPE ---
         st.markdown("**👥 Planification des Effectifs requis à l'Étape :**")
         
-        # Récupération automatique du modèle d'importation
         donnees_modele = CATALOGUE_CHANTIERS[chantier_selectionne]
         lignes_employes_modele = []
         
-        # Si le modèle pré-configuré contient des engins requis, on crée une ligne par étape
         if "engins_requis" in donnees_modele and len(donnees_modele["engins_requis"]) > 0:
             etapes_vues = set()
             for item in donnees_modele["engins_requis"]:
                 num_e = item.get("N° Étape", 1)
+                t_engin = item.get("Type d'engin requis")
+                
+                # On ignore les étapes fantômes qui n'ont pas d'engin valide rattaché
+                if t_engin is None or str(t_engin).strip() == "" or str(t_engin).lower() == "none":
+                    continue
+                    
                 if num_e not in etapes_vues:
                     etapes_vues.add(num_e)
                     lignes_employes_modele.append({
-                        "N° Étape": num_e,
-                        "Durée Étape (jours)": item.get("Durée Étape (jours)", 1),
+                        "N° Étape": int(num_e),
+                        "Durée Étape (jours)": int(item.get("Durée Étape (jours)", 1)),
                         "🕹️ Conducteurs": int(donnees_modele.get("jh_cond", 1)),
                         "🧑‍💼 Chefs": int(donnees_modele.get("jh_chef", 0)),
                         "👷 Ouvriers": int(donnees_modele.get("jh_ouvrier", 0))
                     })
-        
+
         df_rh_init = pd.DataFrame(lignes_employes_modele)
         if df_rh_init.empty: 
             df_rh_init = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "🕹️ Conducteurs", "🧑‍💼 Chefs", "👷 Ouvriers"])
@@ -183,22 +187,23 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         st.markdown("### --- TABLE DES ENGINS NÉCESSAIRES ---")
         donnees_modele = CATALOGUE_CHANTIERS[chantier_selectionne]
         engins_bruts_modele = []
+        
         if "engins_requis" in donnees_modele and len(donnees_modele["engins_requis"]) > 0:
             for item in donnees_modele["engins_requis"]:
-                # 🚨 SÉCURITÉ CRITIQUE : On ignore l'engin s'il est vide, nul ou égal à "None"
                 t_engin = item.get("Type d'engin requis")
+                
+                # 🚨 PROTECTION DOUBLE : On écarte de force les engins non lus ou vides venus de Firebase
                 if t_engin is None or str(t_engin).strip() == "" or str(t_engin).lower() == "none":
                     continue
                     
                 engins_bruts_modele.append({
-                    "N° Étape": item.get("N° Étape", 1), 
-                    "Durée Étape (jours)": item.get("Durée Étape (jours)", 1),
+                    "N° Étape": int(item.get("N° Étape", 1)), 
+                    "Durée Étape (jours)": int(item.get("Durée Étape (jours)", 1)),
                     "Type d'engin requis": str(t_engin).strip(), 
                     "Niveau requis": item.get("Niveau requis", "N1"), 
-                    "À louer ?": False
+                    "À louer ?": False  # 🚀 RETOUR DE LA COLONNE : Indispensable pour afficher la case à cocher !
                 })
-
-                
+       
         df_besoins_init = pd.DataFrame(engins_bruts_modele)
         if df_besoins_init.empty: df_besoins_init = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "Type d'engin requis", "Niveau requis", "À louer ?"])
         
