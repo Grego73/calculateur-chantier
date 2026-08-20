@@ -8,12 +8,21 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
     
     liste_triee = ["Choisir un chantier pré-configuré..."] + sorted([k for k in CATALOGUE_CHANTIERS.keys() if k != "Choisir un chantier pré-configuré..."])
     
-    # Fonction de forçage du cache d'affichage des inputs
+    # Fonction de forçage du cache d'affichage des inputs (CORRIGÉE POUR LES ENGINS)
     def mise_a_jour_cache_modele():
         selection = st.session_state["select_modele_chantier_dynamique"]
         modele = CATALOGUE_CHANTIERS[selection]
         
-        # Injection immédiate des variables dans le State de Streamlit pour outrepasser le bug d'affichage
+        # 🚨 CORRECTIF SÉCURITÉ STREAMLIT : On détruit l'ancienne mémoire des tableaux éditables
+        # Cela force Streamlit à reconstruire le tableau avec les nouvelles données Firebase
+        if "table_engins_necessaires" in st.session_state:
+            del st.session_state["table_engins_necessaires"]
+        if "table_engins_a_louer" in st.session_state:
+            del st.session_state["table_engins_a_louer"]
+        if "table_employes_planification_etapes" in st.session_state:
+            del st.session_state["table_employes_planification_etapes"]
+        
+        # Injection immédiate des variables de matériaux et RH
         st.session_state["val_revenus"] = float(modele.get("revenus", 0.0))
         st.session_state["val_jours"] = int(modele.get("jours", 0))
         st.session_state["val_sable"] = float(modele.get("sable", 0.0))
@@ -27,9 +36,9 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         st.session_state["val_canalisations"] = float(modele.get("canalisations", 0.0))
         st.session_state["val_poutres"] = float(modele.get("poutres", 0.0))
         
-        st.session_state["val_jh_cond"] = float(modele.get("jh_cond", modele.get("max_cond", 0.0)))
-        st.session_state["val_jh_chef"] = float(modele.get("jh_chef", modele.get("max_chef", 0.0)))
-        st.session_state["val_jh_ouvrier"] = float(modele.get("jh_ouvrier", modele.get("max_ouvrier", 0.0)))
+        st.session_state["val_jh_cond"] = float(modele.get("jh_cond", 0.0))
+        st.session_state["val_jh_chef"] = float(modele.get("jh_chef", 0.0))
+        st.session_state["val_jh_ouvrier"] = float(modele.get("jh_ouvrier", 0.0))
 
     # Initialisation des variables de secours dans le state au tout premier chargement
     if "val_revenus" not in st.session_state:
