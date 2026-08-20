@@ -265,7 +265,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         )
 
     # ==============================================================================
-    # --- LOGIQUE FINALE DE SYNTHÈSE ET DE CALCUL FINANCIER DU JEU (CORRIGÉE) ---
+    # --- LOGIQUE FINALE DE SYNTHÈSE ET DE CALCUL FINANCIER DU JEU (CUMUL ÉTAPES) ---
     # ==============================================================================
     jours_factures_jeu = math.ceil(jours_totaux)
     total_mats_recap = float(total_mats_direct)
@@ -275,38 +275,40 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         df_propres_direct = engins_edites.dropna(subset=["Sélection de l'engin / Modèle"])
         total_location_recap = float((df_propres_direct["Quantité"] * df_propres_direct["Prix Location (€/jour)"] * jours_factures_jeu).sum())
 
-    # --- CALCUL RH EN CASCADE ÉTAPE PAR ÉTAPE ---
-    cout_cond = 0.0
-    cout_chefs = 0.0
-    cout_ouvriers = 0.0
-    
-    jh_cond, jh_chef, jh_ouvrier = 0.0, 0.0, 0.0
+    # Initialisation des compteurs de jours-hommes cumulés pour le chantier
+    total_jours_hommes_cond = 0.0
+    total_jours_hommes_chef = 0.0
+    total_jours_hommes_ouvrier = 0.0
 
     if tableau_employes_etapes is not None and not tableau_employes_etapes.empty:
         df_rh_propre = tableau_employes_etapes.dropna(subset=["N° Étape"])
         
         for _, r_rh in df_rh_propre.iterrows():
-            duree_e = float(r_rh.get("Durée Étape (jours)", 1.0))
-            duree_e_due = math.ceil(duree_e)
+            # On prend la durée exacte configurée pour cette étape précise
+            duree_etape_reelle = float(r_rh.get("Durée Étape (jours)", 1.0))
             
+            # Récupération des effectifs de l'étape
             c_count = float(r_rh.get("🕹️ Conducteurs", 0))
             ch_count = float(r_rh.get("🧑‍💼 Chefs", 0))
             o_count = float(r_rh.get("👷 Ouvriers", 0))
             
-            jh_cond = max(jh_cond, c_count)
-            jh_chef = max(jh_chef, ch_count)
-            jh_ouvrier = max(jh_ouvrier, o_count)
+            # Mathématiques du jeu : Cumul (Effectif x Durée de l'étape)
+            total_jours_hommes_cond += c_count * duree_etape_reelle
+            total_jours_hommes_chef += ch_count * duree_etape_reelle
+            total_jours_hommes_ouvrier += o_count * duree_etape_reelle
 
-            if "CDI" in type_contrat_cond: cout_cond += c_count * px_cond * (duree_e / 7.0)
-            else: cout_cond += c_count * px_cond * duree_e_due
-                
-            if "CDI" in type_contrat_chef: cout_chefs += ch_count * px_chef * (duree_e / 7.0)
-            else: cout_chefs += ch_count * px_chef * duree_e_due
-                
-            if "CDI" in type_contrat_ouv: cout_ouvriers += o_count * px_ouvrier * (duree_e / 7.0)
-            else: cout_ouvriers += o_count * px_ouvrier * duree_e_due
+    # --- APPLICATION DU TARIF SALARIAL SUR LES CUMULS ---
+    cout_cond = total_jours_hommes_cond * px_cond
+    cout_chefs = total_jours_hommes_chef * px_chef
+    cout_ouvriers = total_jours_hommes_ouvrier * px_ouvrier
+
+    # Sauvegarde des maximums pour l'affichage NoSQL
+    jh_cond = total_jours_hommes_cond
+    jh_chef = total_jours_hommes_chef
+    jh_ouvrier = total_jours_hommes_ouvrier
 
     total_salaires_recap = float(cout_chefs + cout_ouvriers + cout_cond)
+
 
     
     total_depenses_recap = float(total_mats_recap + total_location_recap + total_salaires_recap)
