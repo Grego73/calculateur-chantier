@@ -240,7 +240,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         )
 
     # ==============================================================================
-    # --- LOGIQUE FINALE DE SYNTHÈSE ET DE CALCUL FINANCIER DU JEU ---
+    # --- LOGIQUE FINALE DE SYNTHÈSE ET DE CALCUL FINANCIER DU JEU (TABLE RH COCHÉ) ---
     # ==============================================================================
     jours_factures_jeu = math.ceil(jours_totaux)
     total_mats_recap = float(total_mats_direct)
@@ -250,14 +250,41 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         df_propres_direct = engins_edites.dropna(subset=["Sélection de l'engin / Modèle"])
         total_location_recap = float((df_propres_direct["Quantité"] * df_propres_direct["Prix Location (€/jour)"] * jours_factures_jeu).sum())
 
-    if "CDI" in type_contrat_cond: cout_cond = jh_cond * px_cond * jours_totaux
-    else: cout_cond = jh_cond * px_cond * jours_factures_jeu
+    # --- NOUVEAU SYSTÈME DE CALCUL RH EN CASCADE ---
+    cout_cond = 0.0
+    cout_chefs = 0.0
+    cout_ouvriers = 0.0
+    
+    # On initialise des variables pour le pop-up final
+    jh_cond, jh_chef, jh_ouvrier = 0.0, 0.0, 0.0
 
-    if "CDI" in type_contrat_chef: cout_chefs = jh_chef * px_chef * jours_totaux
-    else: cout_chefs = jh_chef * px_chef * jours_factures_jeu
+    if tableau_employes_etapes is not None and not tableau_employes_etapes.empty:
+        df_rh_propre = tableau_employes_etapes.dropna(subset=["N° Étape"])
+        
+        for _, r_rh in df_rh_propre.iterrows():
+            duree_e = float(r_rh.get("Durée Étape (jours)", 1.0))
+            duree_e_due = math.ceil(duree_e)
+            
+            c_count = float(r_rh.get("🕹️ Conducteurs", 0))
+            ch_count = float(r_rh.get("🧑‍💼 Chefs", 0))
+            o_count = float(r_rh.get("👷 Ouvriers", 0))
+            
+            # Accumulation pour mémoire pop-up
+            jh_cond = max(jh_cond, c_count)
+            jh_chef = max(jh_chef, ch_count)
+            jh_ouvrier = max(jh_ouvrier, o_count)
 
-    if "CDI" in type_contrat_ouv: cout_ouvriers = jh_ouvrier * px_ouvrier * jours_totaux
-    else: cout_ouvriers = jh_ouvrier * px_ouvrier * jours_factures_jeu
+            # Calcul Conducteurs
+            if "CDI" in type_contrat_cond: cout_cond += c_count * px_cond * (duree_e / 7.0)
+            else: cout_cond += c_count * px_cond * duree_e_due
+                
+            # Calcul Chefs
+            if "CDI" in type_contrat_chef: cout_chefs += ch_count * px_chef * (duree_e / 7.0)
+            else: cout_chefs += ch_count * px_chef * duree_e_due
+                
+            # Calcul Ouvriers
+            if "CDI" in type_contrat_ouv: cout_ouvriers += o_count * px_ouvrier * (duree_e / 7.0)
+            else: cout_ouvriers += o_count * px_ouvrier * duree_e_due
 
     total_salaires_recap = float(cout_chefs + cout_ouvriers + cout_cond)
     total_depenses_recap = float(total_mats_recap + total_location_recap + total_salaires_recap)
