@@ -117,28 +117,31 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         with c_rh_ch: type_contrat_chef = st.selectbox("Contrat Chefs :", ["CDI", "CDD"], key="type_contrat_chef")
         with c_rh_ou: type_contrat_ouv = st.selectbox("Contrat Ouvriers :", ["CDI", "CDD"], key="type_contrat_ouv")
         
-        # --- STRATÉGIE SALARIALE (PALIERS DE TA GRILLE) ---
-        p_min_co = float(SALAIRES_DB.get(f"Conducteur_{type_contrat_cond}_Min", 230.0))
-        p_moy_co = float(SALAIRES_DB.get(f"Conducteur_{type_contrat_cond}_Moyen", 230.0))
-        p_max_co = float(SALAIRES_DB.get(f"Conducteur_{type_contrat_cond}_Max", 230.0))
+        # --- STRATÉGIE SALARIALE (PALIERS DE TA GRILLE SANS AUCUNE DIVISION) ---
+        p_min_co = float(SALAIRES_DB.get(f"Conducteur_{type_contrat_cond}_Min", 235.0))
+        p_moy_co = float(SALAIRES_DB.get(f"Conducteur_{type_contrat_cond}_Moyen", 235.0))
+        p_max_co = float(SALAIRES_DB.get(f"Conducteur_{type_contrat_cond}_Max", 235.0))
         
-        p_min_c = float(SALAIRES_DB.get(f"Chef_{type_contrat_chef}_Min", 230.0))
-        p_moy_c = float(SALAIRES_DB.get(f"Chef_{type_contrat_chef}_Moyen", 230.0))
-        p_max_c = float(SALAIRES_DB.get(f"Chef_{type_contrat_chef}_Max", 230.0))
+        p_min_c = float(SALAIRES_DB.get(f"Chef_{type_contrat_chef}_Min", 232.0))
+        p_moy_c = float(SALAIRES_DB.get(f"Chef_{type_contrat_chef}_Moyen", 232.0))
+        p_max_c = float(SALAIRES_DB.get(f"Chef_{type_contrat_chef}_Max", 232.0))
         
-        p_min_o = float(SALAIRES_DB.get(f"Ouvrier_{type_contrat_ouv}_Min", 230.0))
-        p_moy_o = float(SALAIRES_DB.get(f"Ouvrier_{type_contrat_ouv}_Moyen", 230.0))
-        p_max_o = float(SALAIRES_DB.get(f"Ouvrier_{type_contrat_ouv}_Max", 230.0))
+        p_min_o = float(SALAIRES_DB.get(f"Ouvrier_{type_contrat_ouv}_Min", 240.0))
+        p_moy_o = float(SALAIRES_DB.get(f"Ouvrier_{type_contrat_ouv}_Moyen", 240.0))
+        p_max_o = float(SALAIRES_DB.get(f"Ouvrier_{type_contrat_ouv}_Max", 240.0))
 
         c_strat_co, c_strat_ch, c_strat_ou = st.columns(3)
         with c_strat_co:
             strat_cond = st.selectbox("Salaire Conducteurs :", [f"Éco ({p_min_co:.0f}€)", f"Std ({p_moy_co:.0f}€)", f"Prem ({p_max_co:.0f}€)"], key="sel_strat_cond")
+            # 🚀 CORRECTIF : Utilisation directe du prix brut du palier
             px_cond = p_min_co if "Éco" in strat_cond else (p_moy_co if "Std" in strat_cond else p_max_co)
         with c_strat_ch:
             strat_chef = st.selectbox("Salaire Chefs :", [f"Éco ({p_min_c:.0f}€)", f"Std ({p_moy_c:.0f}€)", f"Prem ({p_max_c:.0f}€)"], key="sel_strat_chef")
+            # 🚀 CORRECTIF : Utilisation directe du prix brut du palier
             px_chef = p_min_c if "Éco" in strat_chef else (p_moy_c if "Std" in strat_chef else p_max_c)
         with c_strat_ou:
             strat_ouv = st.selectbox("Salaire Ouvriers :", [f"Éco ({p_min_o:.0f}€)", f"Std ({p_moy_o:.0f}€)", f"Prem ({p_max_o:.0f}€)"], key="sel_strat_ouv")
+            # 🚀 CORRECTIF : Utilisation directe du prix brut du palier
             px_ouvrier = p_min_o if "Éco" in strat_ouv else (p_moy_o if "Std" in strat_ouv else p_max_o)
 
         # --- NOUVEAU : LE TABLEAU DES EMPLOYÉS PAR ÉTAPE ---
