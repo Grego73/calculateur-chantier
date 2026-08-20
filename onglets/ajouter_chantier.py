@@ -298,8 +298,8 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
 
     total_location_recap = 0.0
     if engins_edites is not None and not engins_edites.empty:
-        df_propres_direct = engins_edites.dropna(subset=["Sélection de l'engin / Modèle"])
-        total_location_recap = float((df_propres_direct["Quantité"] * df_propres_direct["Prix Location (€/jour)"] * jours_factures_jeu).sum())
+        df_propres_direct = engins_edites.dropna(subset=["engin_modele"]) # 🚀 Utilise engin_modele ici aussi !
+        total_location_recap = float((df_propres_direct["Quantité"] * df_propres_direct["Prix Location (€/jour)"] * df_propres_direct["Jours de Location"]).sum())
 
     # Initialisation des compteurs de jours-hommes cumulés pour le chantier
     total_jours_hommes_cond = 0.0
