@@ -313,15 +313,12 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                         elif "poutre" in sub_mat: chantiers_detectes[nom_courant]["poutres"] = qte_val
                             continue
 
-                        # 9. LECTURE DU NOM DE LA MACHINE (DICTIONNAIRE ENRICHI ET BLINDÉ)
-                        if ("requis :" in l_clean.lower() or "nécessite :" in l_clean.lower()) and "matériaux" not in l_clean.lower() and "materiaux" not in l_clean.lower() and "employé" not in l_clean.lower() and etape_courante_num is not None:
-                            match_niv = re.search(r"niveau\s*(\d+)", l_clean, re.IGNORECASE)
-                            niv_extrait = f"N{match_niv.group(1)}" if match_niv else "N1"
-                            
+                        # 9. LECTURE DU NOM DE LA MACHINE (DÉTECTION DIRECTE SANS LIGNES BLANCHES)
+                        if etape_courante_num is not None and "employés requis" not in l_clean.lower() and "matériaux requis" not in l_clean.lower():
                             ligne_minuscule = l_clean.lower()
                             cat_engin = None
                             
-                            # Dictionnaire de correspondance étendu avec toutes les machines de tes fiches
+                            # 🚜 Détection par mots-clés stricts du catalogue du jeu
                             if "camion benne" in ligne_minuscule: 
                                 cat_engin = "Camions Benne"
                             elif "niveleuse" in ligne_minuscule: 
@@ -331,7 +328,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             elif "compacteur pour enrobe" in ligne_minuscule or "compacteur pour enrobé" in ligne_minuscule: 
                                 cat_engin = "Compacteur pour enrobé"
                             elif "compacteur de sol" in ligne_minuscule or "compacteur" in ligne_minuscule: 
-                                # Sécurité : Si le jeu écrit juste "Compacteur" ou "Compacteur de Sol"
                                 cat_engin = "Compacteur de Sol"
                             elif "fraiseuse" in ligne_minuscule: 
                                 cat_engin = "Fraiseuse"
@@ -339,12 +335,14 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                 cat_engin = "Chargeuse Compacte"
                             elif "pelleteuse" in ligne_minuscule: 
                                 cat_engin = "Pelleteuses"
-                            elif "beton malaxeur" in ligne_minuscule or "malaxeur" in ligne_minuscule or "béton" in ligne_minuscule:
-                                # 🚀 NOUVEAU : Capture x1 Camion Béton Malaxeur
+                            elif "malaxeur" in ligne_minuscule or "camion beton" in ligne_minuscule or "camion béton" in ligne_minuscule:
                                 cat_engin = "Camion Béton Malaxeur"
 
-                            # On n'ajoute la ligne QUE si la machine a été légitimement identifiée
+                            # Si un engin valide est identifié, on cherche son niveau et on l'ajoute
                             if cat_engin is not None:
+                                match_niv = re.search(r"niveau\s*(\d+)", ligne_minuscule, re.IGNORECASE)
+                                niv_extrait = f"N{match_niv.group(1)}" if match_niv else "N1"
+                                
                                 d_etape = st.session_state.get(f"duree_{nom_courant}_{etape_courante_num}", 1)
                                 
                                 doublon_engin = any(
