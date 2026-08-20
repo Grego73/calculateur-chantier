@@ -313,36 +313,30 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                         elif "poutre" in sub_mat: chantiers_detectes[nom_courant]["poutres"] = qte_val
                             continue
 
-                        # 9. LECTURE DU NOM DE LA MACHINE (DÉTECTION DIRECTE SANS LIGNES BLANCHES)
+                        # 9. LECTURE DU NOM DE LA MACHINE (NETTOYAGE ACCENTS ET CASSE)
                         if etape_courante_num is not None and "employés requis" not in l_clean.lower() and "matériaux requis" not in l_clean.lower():
-                            ligne_minuscule = l_clean.lower()
+                            # On retire les accents et les caractères spéciaux pour blinder la détection
+                            ligne_brute_clean = l_clean.lower().replace("é", "e").replace("è", "e").replace("ê", "e").replace("à", "a")
                             cat_engin = None
                             
-                            # 🚜 Détection par mots-clés stricts du catalogue du jeu
-                            if "camion benne" in ligne_minuscule: 
+                            if "camion benne" in ligne_brute_clean: 
                                 cat_engin = "Camions Benne"
-                            elif "niveleuse" in ligne_minuscule: 
+                            elif "niveleuse" in ligne_brute_clean: 
                                 cat_engin = "Niveleuse"
-                            elif "finisseur" in ligne_minuscule: 
+                            elif "finisseur" in ligne_brute_clean: 
                                 cat_engin = "Finisseur"
-                            elif "compacteur pour enrobe" in ligne_minuscule or "compacteur pour enrobé" in ligne_minuscule: 
+                            elif "compacteur pour enrobe" in ligne_brute_clean or "compacteur" in ligne_brute_clean: 
                                 cat_engin = "Compacteur pour enrobé"
-                            elif "compacteur de sol" in ligne_minuscule or "compacteur" in ligne_minuscule: 
-                                cat_engin = "Compacteur de Sol"
-                            elif "fraiseuse" in ligne_minuscule: 
+                            elif "fraiseuse" in ligne_brute_clean: 
                                 cat_engin = "Fraiseuse"
-                            elif "chargeuse" in ligne_minuscule: 
+                            elif "chargeuse" in ligne_brute_clean: 
                                 cat_engin = "Chargeuse Compacte"
-                            elif "pelleteuse" in ligne_minuscule: 
+                            elif "pelleteuse" in ligne_brute_clean: 
                                 cat_engin = "Pelleteuses"
-                            elif "malaxeur" in ligne_minuscule or "camion beton" in ligne_minuscule or "camion béton" in ligne_minuscule:
+                            elif "malaxeur" in ligne_brute_clean or "camion beton" in ligne_brute_clean:
                                 cat_engin = "Camion Béton Malaxeur"
 
-                            # Si un engin valide est identifié, on cherche son niveau et on l'ajoute
                             if cat_engin is not None:
-                                match_niv = re.search(r"niveau\s*(\d+)", ligne_minuscule, re.IGNORECASE)
-                                niv_extrait = f"N{match_niv.group(1)}" if match_niv else "N1"
-                                
                                 d_etape = st.session_state.get(f"duree_{nom_courant}_{etape_courante_num}", 1)
                                 
                                 doublon_engin = any(
@@ -355,7 +349,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                         "N° Étape": etape_courante_num,
                                         "Durée Étape (jours)": d_etape,
                                         "Type d'engin requis": cat_engin,
-                                        "Niveau requis": niv_extrait
+                                        "Niveau requis": f"N{re.search(r'niveau\s*(\d+)', ligne_brute_clean).group(1)}" if re.search(r'niveau\s*(\d+)', ligne_brute_clean) else "N1"
                                     })
 
                     if len(chantiers_detectes) > 0:
