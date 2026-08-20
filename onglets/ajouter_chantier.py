@@ -279,9 +279,9 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         if len(engins_transferes_list) > 0: 
             df_engins_init = pd.DataFrame(engins_transferes_list)
         
-        # 📏 Rendu visuel compact et synchronisé
+        # 📏 Version corrigée sans variable fantôme 'df_ins_init'
         engins_edites = st.data_editor(
-            df_ins_init if 'df_ins_init' in locals() else df_engins_init, num_rows="dynamic", use_container_width=True, key="table_engins_a_louer",
+            df_engins_init, num_rows="dynamic", use_container_width=True, key="table_engins_a_louer",
             column_config={
                 "engin_modele": st.column_config.SelectboxColumn("Engin & Modèle", options=list(CATALOGUE_ENGINS.keys()), required=True, width="medium"),
                 "Quantité": st.column_config.NumberColumn("Qté", min_value=1, default=1, step=1, width="small"),
@@ -289,6 +289,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                 "Jours de Location": st.column_config.NumberColumn("Jours", min_value=1, max_value=365, step=1, width="small")
             }
         )
+
 
     # ==============================================================================
     # --- LOGIQUE FINALE DE SYNTHÈSE ET DE CALCUL FINANCIER DU JEU (CUMUL ÉTAPES) ---
