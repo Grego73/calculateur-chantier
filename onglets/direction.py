@@ -258,7 +258,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             if prix_txt: chantiers_detectes[nom_courant]["revenus"] = float(prix_txt)
                             continue
                             
-                        # 3. EXTRACTION DU NOMBRE D'ÉTAPES GLOBALES
+                        # 3. EXTRACTION DU NOMBRE D'ÉTAPES GLOBOALES
                         if "nombre d'étapes :" in l_clean.lower():
                             num_txt = "".join(c for c in l_clean.split(":")[-1] if c.isdigit())
                             if num_txt: chantiers_detectes[nom_courant]["nb_etapes"] = int(num_txt)
@@ -289,12 +289,12 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                 st.session_state[f"duree_{nom_courant}_{etape_courante_num}"] = int(num_txt)
                             continue
                             
-                        # 7. LOGIQUE RH D'OPTIMISATION FINALE (CORRIGÉE DES MOTS PARASITES ET CASSE)
-                        if ":" in l_clean and etape_courante_num is not None:
+                        # 7. LOGIQUE RH D'OPTIMISATION (CORRIGÉE DU BUG SPLIT)
+                        if ":" in l_clean and etape_courante_num is not None and ("chef" in l_clean.lower() or "ouvrier" in l_clean.lower() or "conducteur" in l_clean.lower()):
                             gauche, droite = l_clean.split(":", 1)
                             gauche_low = gauche.lower()
                             
-                            # On nettoie la partie droite pour isoler le nombre avant la parenthèse
+                            # Nettoyage strict pour extraire uniquement le nombre requis avant la parenthèse
                             droite_propre = droite.split("(")[0].strip()
                             match_nb = re.search(r"(\d+)", droite_propre)
                             
@@ -302,15 +302,13 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                 nb_val = float(match_nb.group(1))
                                 if "conducteur" in gauche_low or "engin" in gauche_low:
                                     chantiers_detectes[nom_courant]["jh_cond"] = max(chantiers_detectes[nom_courant]["jh_cond"], nb_val)
-                                    continue
                                 elif "chef" in gauche_low:
                                     chantiers_detectes[nom_courant]["jh_chef"] = max(chantiers_detectes[nom_courant]["jh_chef"], nb_val)
-                                    continue
                                 elif "ouvrier" in gauche_low:
                                     chantiers_detectes[nom_courant]["jh_ouvrier"] = max(chantiers_detectes[nom_courant]["jh_ouvrier"], nb_val)
-                                    continue
+                            continue
 
-                        # 8. CUMUL DES MATÉRIAUX REQUIS (CORRIGÉ DES DOUBLONS AVEC =)
+                        # 8. CUMUL DE TOUS LES MATÉRIAUX PAR ÉTAPE (SÉCURISÉ CONTRE LES RAFFRAICHISSEMENTS)
                         if "matériaux requis :" in l_clean.lower() or "materiaux requis :" in l_clean.lower():
                             partie_mats = l_clean.split(":")[-1].lower()
                             if "aucun" not in partie_mats:
@@ -319,19 +317,19 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                     qte_txt = "".join(c for c in sub_mat if c.isdigit())
                                     if qte_txt:
                                         qte_val = float(qte_txt)
-                                        if "canalisation" in sub_mat: chantiers_detectes[nom_courant]["canalisations"] = qte_val
-                                        elif "armature" in sub_mat: chantiers_detectes[nom_courant]["armature"] = qte_val
-                                        elif "enrob" in sub_mat: chantiers_detectes[nom_courant]["enrobe"] = qte_val
-                                        elif "sable" in sub_mat: chantiers_detectes[nom_courant]["sable"] = qte_val
-                                        elif "terre" in sub_mat: chantiers_detectes[nom_courant]["terre"] = qte_val
-                                        elif "tôle" in sub_mat or "tole" in sub_mat: chantiers_detectes[nom_courant]["tole"] = qte_val
-                                        elif "béton" in sub_mat or "beton" in sub_mat: chantiers_detectes[nom_courant]["beton"] = qte_val
-                                        elif "panneau" in sub_mat: chantiers_detectes[nom_courant]["panneaux"] = qte_val
-                                        elif "tuyau" in sub_mat: chantiers_detectes[nom_courant]["tuyaux"] = qte_val
-                                        elif "poutre" in sub_mat: chantiers_detectes[nom_courant]["poutres"] = qte_val
+                                        if "canalisation" in sub_mat: chantiers_detectes[nom_courant]["canalisations"] += qte_val
+                                        elif "armature" in sub_mat: chantiers_detectes[nom_courant]["armature"] += qte_val
+                                        elif "enrob" in sub_mat: chantiers_detectes[nom_courant]["enrobe"] += qte_val
+                                        elif "sable" in sub_mat: chantiers_detectes[nom_courant]["sable"] += qte_val
+                                        elif "terre" in sub_mat: chantiers_detectes[nom_courant]["terre"] += qte_val
+                                        elif "tôle" in sub_mat or "tole" in sub_mat: chantiers_detectes[nom_courant]["tole"] += qte_val
+                                        elif "béton" in sub_mat or "beton" in sub_mat: chantiers_detectes[nom_courant]["beton"] += qte_val
+                                        elif "panneau" in sub_mat: chantiers_detectes[nom_courant]["panneaux"] += qte_val
+                                        elif "tuyau" in sub_mat: chantiers_detectes[nom_courant]["tuyaux"] += qte_val
+                                        elif "poutre" in sub_mat: chantiers_detectes[nom_courant]["poutres"] += qte_val
                             continue
 
-                        # 9. LECTURE DU NOM DE LA MACHINE ET DU NIVEAU REQUIS (AVEC EXCLUSIONS STRICTES)
+                        # 9. LECTURE DU NOM DE LA MACHINE ET DU NIVEAU REQUIS
                         if ("requis :" in l_clean.lower() or "nécessite :" in l_clean.lower()) and "matériaux" not in l_clean.lower() and "materiaux" not in l_clean.lower() and "employé" not in l_clean.lower() and etape_courante_num is not None:
                             match_niv = re.search(r"niveau\s*(\d+)", l_clean, re.IGNORECASE)
                             niv_extrait = f"N{match_niv.group(1)}" if match_niv else "N1"
@@ -364,12 +362,11 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                     })
 
                     # 🚨 ALIGNEMENT STRICT : Ce bloc est placé EN DEHORS du "for ligne in lignes:"
-                    # Il s'exécute à la toute fin de la lecture globale pour éviter les crashs d'ID Streamlit
+                    # Il s'exécute à la toute fin de la lecture globale pour éviter les ouvertures multiples de pop-ups
                     if len(chantiers_detectes) > 0:
                         pop_up_validation_fiches_chantiers(chantiers_detectes)
                     else:
                         st.error("❌ L'algorithme n'a détecté aucune fiche de chantier valide dans votre texte brut.")
-
 
         # --- 4.2 CONFIGURATION GRILLE SALARIALE ---
         with sub_tab2:
