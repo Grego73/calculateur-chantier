@@ -218,6 +218,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                         l_clean = ligne.strip()
                         if not l_clean: continue
                         
+                        # 1. DÉTECTION DU DEBUT D'UN NOUVEAU CHANTIER
                         if "euros" in l_clean.lower() and not l_clean.lower().startswith("revenus"):
                             match_debut = re.search(r"^(.*?)\s+(\d[\d\s]+)\s+euros", l_clean, re.IGNORECASE)
                             if match_debut:
@@ -274,12 +275,13 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                 st.session_state[f"duree_{nom_courant}_{etape_courante_num}"] = int(num_txt)
                             continue
                             
+                        # 🛠️ REPARATION LOGIQUE RH : On applique le regex sur la chaîne de caractères brute de droite
                         if ":" in l_clean and etape_courante_num is not None and ("chef" in l_clean.lower() or "ouvrier" in l_clean.lower() or "conducteur" in l_clean.lower()):
                             gauche, droite = l_clean.split(":", 1)
                             gauche_low = gauche.lower()
                             
-                            droite_sans_parenthese = droite.split("(")[0]
-                            match_nb = re.search(r"(\d+)", droite_sans_parenthese)
+                            droite_propre = droite.split("(")[0].strip() # Extraction sécurisée de la chaîne avant la parenthèse
+                            match_nb = re.search(r"(\d+)", droite_propre)
                             
                             if match_nb:
                                 nb_val = float(match_nb.group(1))
@@ -327,24 +329,17 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             
                             if cat_engin is not None:
                                 d_etape = st.session_state.get(f"duree_{nom_courant}_{etape_courante_num}", 1)
-                                
-                                doublon_engin = any(
-                                    e["N° Étape"] == etape_courante_num and e["Type d'engin requis"] == cat_engin 
-                                    for e in chantiers_detectes[nom_courant]["engins_requis"]
-                                )
-                                
+                                doublon_engin = any(e["N° Étape"] == etape_courante_num and e["Type d'engin requis"] == cat_engin for e in chantiers_detectes[nom_courant]["engins_requis"])
                                 if not doublon_engin:
                                     chantiers_detectes[nom_courant]["engins_requis"].append({
-                                        "N° Étape": etape_courante_num,
-                                        "Durée Étape (jours)": d_etape,
-                                        "Type d'engin requis": cat_engin,
-                                        "Niveau requis": niv_extrait
+                                        "N° Étape": etape_courante_num, "Durée Étape (jours)": d_etape,
+                                        "Type d'engin requis": cat_engin, "Niveau requis": niv_extrait
                                     })
 
                     if len(chantiers_detectes) > 0:
                         pop_up_validation_fiches_chantiers(chantiers_detectes)
                     else:
-                        st.error("❌ L'algorithme n'a détecté aucune fiche de chantier valide dans votre texte brut.")
+                        st.error("❌ L'algorithme n'a détecté aucune fiche de chantier valide.")
 
         # --- 4.2 CONFIGURATION GRILLE SALARIALE ---
         with sub_tab2:
