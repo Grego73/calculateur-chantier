@@ -313,27 +313,51 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                         elif "poutre" in sub_mat: chantiers_detectes[nom_courant]["poutres"] = qte_val
                             continue
 
+                        # 9. LECTURE DU NOM DE LA MACHINE (DICTIONNAIRE ENRICHI ET BLINDÉ)
                         if ("requis :" in l_clean.lower() or "nécessite :" in l_clean.lower()) and "matériaux" not in l_clean.lower() and "materiaux" not in l_clean.lower() and "employé" not in l_clean.lower() and etape_courante_num is not None:
                             match_niv = re.search(r"niveau\s*(\d+)", l_clean, re.IGNORECASE)
                             niv_extrait = f"N{match_niv.group(1)}" if match_niv else "N1"
                             
                             ligne_minuscule = l_clean.lower()
                             cat_engin = None
-                            if "camion benne" in ligne_minuscule: cat_engin = "Camions Benne"
-                            elif "niveleuse" in ligne_minuscule: cat_engin = "Niveleuse"
-                            elif "finisseur" in ligne_minuscule: cat_engin = "Finisseur"
-                            elif "compacteur" in ligne_minuscule: cat_engin = "Compacteur pour enrobé"
-                            elif "fraiseuse" in ligne_minuscule: cat_engin = "Fraiseuse"
-                            elif "chargeuse" in ligne_minuscule: cat_engin = "Chargeuse Compacte"
-                            elif "pelleteuse" in ligne_minuscule: cat_engin = "Pelleteuses"
                             
+                            # Dictionnaire de correspondance étendu avec toutes les machines de tes fiches
+                            if "camion benne" in ligne_minuscule: 
+                                cat_engin = "Camions Benne"
+                            elif "niveleuse" in ligne_minuscule: 
+                                cat_engin = "Niveleuse"
+                            elif "finisseur" in ligne_minuscule: 
+                                cat_engin = "Finisseur"
+                            elif "compacteur pour enrobe" in ligne_minuscule or "compacteur pour enrobé" in ligne_minuscule: 
+                                cat_engin = "Compacteur pour enrobé"
+                            elif "compacteur de sol" in ligne_minuscule or "compacteur" in ligne_minuscule: 
+                                # Sécurité : Si le jeu écrit juste "Compacteur" ou "Compacteur de Sol"
+                                cat_engin = "Compacteur de Sol"
+                            elif "fraiseuse" in ligne_minuscule: 
+                                cat_engin = "Fraiseuse"
+                            elif "chargeuse" in ligne_minuscule: 
+                                cat_engin = "Chargeuse Compacte"
+                            elif "pelleteuse" in ligne_minuscule: 
+                                cat_engin = "Pelleteuses"
+                            elif "beton malaxeur" in ligne_minuscule or "malaxeur" in ligne_minuscule or "béton" in ligne_minuscule:
+                                # 🚀 NOUVEAU : Capture x1 Camion Béton Malaxeur
+                                cat_engin = "Camion Béton Malaxeur"
+
+                            # On n'ajoute la ligne QUE si la machine a été légitimement identifiée
                             if cat_engin is not None:
                                 d_etape = st.session_state.get(f"duree_{nom_courant}_{etape_courante_num}", 1)
-                                doublon_engin = any(e["N° Étape"] == etape_courante_num and e["Type d'engin requis"] == cat_engin for e in chantiers_detectes[nom_courant]["engins_requis"])
+                                
+                                doublon_engin = any(
+                                    e["N° Étape"] == etape_courante_num and e["Type d'engin requis"] == cat_engin 
+                                    for e in chantiers_detectes[nom_courant]["engins_requis"]
+                                )
+                                
                                 if not doublon_engin:
                                     chantiers_detectes[nom_courant]["engins_requis"].append({
-                                        "N° Étape": etape_courante_num, "Durée Étape (jours)": d_etape,
-                                        "Type d'engin requis": cat_engin, "Niveau requis": niv_extrait
+                                        "N° Étape": etape_courante_num,
+                                        "Durée Étape (jours)": d_etape,
+                                        "Type d'engin requis": cat_engin,
+                                        "Niveau requis": niv_extrait
                                     })
 
                     if len(chantiers_detectes) > 0:
