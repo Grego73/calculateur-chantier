@@ -230,7 +230,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
             }
         )
 
-        # 🚜 LOGIQUE DE TRANSFERT SÉCURISÉE AVEC RECHERCHE PLUS SOUPLE
+        # 🚜 LOGIQUE DE TRANSFERT SÉCURISÉE AVEC CLÉ TECHNIQUE SIMPLIFIÉE
         engins_transferes_list = []
         if not engins_necessaires.empty and "À louer ?" in engins_necessaires.columns:
             df_coches = engins_necessaires[engins_necessaires["À louer ?"] == True].dropna(subset=["Type d'engin requis"])
@@ -251,41 +251,39 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                 mots_cles_recherche = nettoyer_mots(type_demande)
                 modele_trouve, prix_trouve = None, 380.0
                 
-                # Étape A : Recherche stricte avec Niveau
                 for engin_nom, prix in CATALOGUE_ENGINS.items():
                     if niveau_demande in engin_nom.lower() and all(mot in nettoyer_mots(engin_nom) for mot in mots_cles_recherche):
                         modele_trouve, prix_trouve = engin_nom, prix
                         break
                 
-                # Étape B : Recherche par mots-clés uniquement (si le niveau n'est pas écrit dans le nom)
                 if not modele_trouve:
                     for engin_nom, prix in CATALOGUE_ENGINS.items():
                         if all(mot in nettoyer_mots(engin_nom) for mot in mots_cles_recherche):
                             modele_trouve, prix_trouve = engin_nom, prix
                             break
                             
-                # 🚀 CORRECTIF RECHERCHE : Si aucune machine n'est trouvée, on garde le nom brut requis pour ne pas bloquer la location !
                 if not modele_trouve:
                     modele_trouve = f"{type_demande} ({niveau_demande.upper()})"
-                    prix_trouve = 380.0 # Tarif forfaitaire de secours
+                    prix_trouve = 380.0
                     
+                # 🚀 SÉCURITÉ : Clé technique simplifiée 'engin_modele'
                 engins_transferes_list.append({
-                    "Sélection de l'engin / Modèle": modele_trouve, 
+                    "engin_modele": modele_trouve, 
                     "Quantité": 1, 
                     "Prix Location (€/jour)": prix_trouve, 
                     "Jours de Location": duree_etape
                 })
 
         st.markdown("### --- TABLE DES ENGINS À LOUER ---")
-        df_engins_init = pd.DataFrame(columns=["Sélection de l'engin / Modèle", "Quantité", "Prix Location (€/jour)", "Jours de Location"])
+        df_engins_init = pd.DataFrame(columns=["engin_modele", "Quantité", "Prix Location (€/jour)", "Jours de Location"])
         if len(engins_transferes_list) > 0: 
             df_engins_init = pd.DataFrame(engins_transferes_list)
         
-        # 📏 On applique les mêmes largeurs forcées sur le tableau de location
+        # 📏 Rendu visuel compact et synchronisé
         engins_edites = st.data_editor(
-            df_engins_init, num_rows="dynamic", use_container_width=True, key="table_engins_a_louer",
+            df_ins_init if 'df_ins_init' in locals() else df_engins_init, num_rows="dynamic", use_container_width=True, key="table_engins_a_louer",
             column_config={
-                "Sélection de l'engin / Modèle": st.column_config.SelectboxColumn("Engin & Modèle", options=list(CATALOGUE_ENGINS.keys()), required=True, width="medium"),
+                "engin_modele": st.column_config.SelectboxColumn("Engin & Modèle", options=list(CATALOGUE_ENGINS.keys()), required=True, width="medium"),
                 "Quantité": st.column_config.NumberColumn("Qté", min_value=1, default=1, step=1, width="small"),
                 "Prix Location (€/jour)": st.column_config.NumberColumn("Prix/j", min_value=0, step=10, width="small"),
                 "Jours de Location": st.column_config.NumberColumn("Jours", min_value=1, max_value=365, step=1, width="small")
