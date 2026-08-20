@@ -99,50 +99,79 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         st.info(f"🧱 **Total est. matériaux :** {total_mats_direct:,.0f}".replace(",", " ") + " €")
         
     with col2:
-        st.markdown("### --- GRILLE SALARIALE (PALIERS & CONTRATS) ---")
+        st.markdown("### --- CONFIGURATION DE LA MAIN-D'ŒUVRE PAR ÉTAPE ---")
         st.caption("💡 CDI : au prorata réel (1 mois = 7j). CDD : à la journée complète entamée (due).")
         
-        st.markdown("**🕹️ PROFIL : CONDUCTEURS D'ENGINS**")
-        c_cond_type, c_cond_strat, c_cond_jh = st.columns(3)
-        with c_cond_type:
-            type_contrat_cond = st.selectbox("Contrat :", ["CDI", "CDD"], key="type_contrat_cond")
-        with c_cond_strat:
-            p_min_co = float(SALAIRES_DB.get(f"Conducteur_{type_contrat_cond}_Min", 230.0))
-            p_moy_co = float(SALAIRES_DB.get(f"Conducteur_{type_contrat_cond}_Moyen", 230.0))
-            p_max_co = float(SALAIRES_DB.get(f"Conducteur_{type_contrat_cond}_Max", 230.0))
-            strat_cond = st.selectbox("Salaire :", [f"Économique ({p_min_co:.0f} €/j)", f"Standard ({p_moy_co:.0f} €/j)", f"Premium ({p_max_co:.0f} €/j)"], key="sel_strat_cond")
-            px_cond = p_min_co if "Économique" in strat_cond else (p_moy_co if "Standard" in strat_cond else p_max_co)
-        with c_cond_jh:
-            jh_cond = st.number_input("Nombre d'employés", min_value=0.0, value=st.session_state["val_jh_cond"], key="jh_input_cond", format="%.0f")
+        # --- TYPE DE CONTRAT DE L'ÉQUIPE GLOBOALE ---
+        c_rh_co, c_rh_ch, c_rh_ou = st.columns(3)
+        with c_rh_co: type_contrat_cond = st.selectbox("Contrat Conducteurs :", ["CDI", "CDD"], key="type_contrat_cond")
+        with c_rh_ch: type_contrat_chef = st.selectbox("Contrat Chefs :", ["CDI", "CDD"], key="type_contrat_chef")
+        with c_rh_ou: type_contrat_ouv = st.selectbox("Contrat Ouvriers :", ["CDI", "CDD"], key="type_contrat_ouv")
+        
+        # --- STRATÉGIE SALARIALE (PALIERS DE TA GRILLE) ---
+        p_min_co = float(SALAIRES_DB.get(f"Conducteur_{type_contrat_cond}_Min", 230.0))
+        p_moy_co = float(SALAIRES_DB.get(f"Conducteur_{type_contrat_cond}_Moyen", 230.0))
+        p_max_co = float(SALAIRES_DB.get(f"Conducteur_{type_contrat_cond}_Max", 230.0))
+        
+        p_min_c = float(SALAIRES_DB.get(f"Chef_{type_contrat_chef}_Min", 230.0))
+        p_moy_c = float(SALAIRES_DB.get(f"Chef_{type_contrat_chef}_Moyen", 230.0))
+        p_max_c = float(SALAIRES_DB.get(f"Chef_{type_contrat_chef}_Max", 230.0))
+        
+        p_min_o = float(SALAIRES_DB.get(f"Ouvrier_{type_contrat_ouv}_Min", 230.0))
+        p_moy_o = float(SALAIRES_DB.get(f"Ouvrier_{type_contrat_ouv}_Moyen", 230.0))
+        p_max_o = float(SALAIRES_DB.get(f"Ouvrier_{type_contrat_ouv}_Max", 230.0))
 
-        st.markdown("**🧑‍💼 PROFIL : CHEFS DE CHANTIER**")
-        c_chef_type, c_chef_strat, c_chef_jh = st.columns(3)
-        with c_chef_type:
-            type_contrat_chef = st.selectbox("Contrat :", ["CDI", "CDD"], key="type_contrat_chef")
-        with c_chef_strat:
-            p_min_c = float(SALAIRES_DB.get(f"Chef_{type_contrat_chef}_Min", 230.0))
-            p_moy_c = float(SALAIRES_DB.get(f"Chef_{type_contrat_chef}_Moyen", 230.0))
-            p_max_c = float(SALAIRES_DB.get(f"Chef_{type_contrat_chef}_Max", 230.0))
-            strat_chef = st.selectbox("Salaire :", [f"Économique ({p_min_c:.0f} €/j)", f"Standard ({p_moy_c:.0f} €/j)", f"Premium ({p_max_c:.0f} €/j)"], key="sel_strat_chef")
-            px_chef = p_min_c if "Économique" in strat_chef else (p_moy_c if "Standard" in strat_chef else p_max_c)
-        with c_chef_jh:
-            jh_chef = st.number_input("Nombre d'employés", min_value=0.0, value=st.session_state["val_jh_chef"], key="jh_input_chef", format="%.0f")
+        c_strat_co, c_strat_ch, c_strat_ou = st.columns(3)
+        with c_strat_co:
+            strat_cond = st.selectbox("Salaire Conducteurs :", [f"Éco ({p_min_co:.0f}€)", f"Std ({p_moy_co:.0f}€)", f"Prem ({p_max_co:.0f}€)"], key="sel_strat_cond")
+            px_cond = p_min_co if "Éco" in strat_cond else (p_moy_co if "Std" in strat_cond else p_max_co)
+        with c_strat_ch:
+            strat_chef = st.selectbox("Salaire Chefs :", [f"Éco ({p_min_c:.0f}€)", f"Std ({p_moy_c:.0f}€)", f"Prem ({p_max_c:.0f}€)"], key="sel_strat_chef")
+            px_chef = p_min_c if "Éco" in strat_chef else (p_moy_c if "Std" in strat_chef else p_max_c)
+        with c_strat_ou:
+            strat_ouv = st.selectbox("Salaire Ouvriers :", [f"Éco ({p_min_o:.0f}€)", f"Std ({p_moy_o:.0f}€)", f"Prem ({p_max_o:.0f}€)"], key="sel_strat_ouv")
+            px_ouvrier = p_min_o if "Éco" in strat_ouv else (p_moy_o if "Std" in strat_ouv else p_max_o)
 
-        st.markdown("**👷 PROFIL : OUVRIERS QUALIFIÉS**")
-        c_ouv_type, c_ouv_strat, c_ouv_jh = st.columns(3)
-        with c_ouv_type:
-            type_contrat_ouv = st.selectbox("Contrat :", ["CDI", "CDD"], key="type_contrat_ouv")
-        with c_ouv_strat:
-            p_min_o = float(SALAIRES_DB.get(f"Ouvrier_{type_contrat_ouv}_Min", 230.0))
-            p_moy_o = float(SALAIRES_DB.get(f"Ouvrier_{type_contrat_ouv}_Moyen", 230.0))
-            p_max_o = float(SALAIRES_DB.get(f"Ouvrier_{type_contrat_ouv}_Max", 230.0))
-            strat_ouv = st.selectbox("Salaire :", [f"Économique ({p_min_o:.0f} €/j)", f"Standard ({p_moy_o:.0f} €/j)", f"Premium ({p_max_o:.0f} €/j)"], key="sel_strat_ouv")
-            px_ouvrier = p_min_o if "Économique" in strat_ouv else (p_moy_o if "Standard" in strat_ouv else p_max_o)
-        with c_ouv_jh:
-            jh_ouvrier = st.number_input("Nombre d'employés", min_value=0.0, value=st.session_state["val_jh_ouvrier"], key="jh_input_ouv", format="%.0f")
-
-        st.markdown("### --- TABLE DES ENGINS NÉCESSAIRES ---")
+        # --- NOUVEAU : LE TABLEAU DES EMPLOYÉS PAR ÉTAPE ---
+        st.markdown("**👥 Planification des Effectifs requis à l'Étape :**")
+        
+        # Récupération automatique du modèle d'importation
         donnees_modele = CATALOGUE_CHANTIERS[chantier_selectionne]
+        lignes_employes_modele = []
+        
+        # Si le modèle pré-configuré contient des engins requis, on crée une ligne par étape
+        if "engins_requis" in donnees_modele and len(donnees_modele["engins_requis"]) > 0:
+            etapes_vues = set()
+            for item in donnees_modele["engins_requis"]:
+                num_e = item.get("N° Étape", 1)
+                if num_e not in etapes_vues:
+                    etapes_vues.add(num_e)
+                    lignes_employes_modele.append({
+                        "N° Étape": num_e,
+                        "Durée Étape (jours)": item.get("Durée Étape (jours)", 1),
+                        "🕹️ Conducteurs": int(donnees_modele.get("jh_cond", 1)),
+                        "🧑‍💼 Chefs": int(donnees_modele.get("jh_chef", 0)),
+                        "👷 Ouvriers": int(donnees_modele.get("jh_ouvrier", 0))
+                    })
+        
+        df_rh_init = pd.DataFrame(lignes_employes_modele)
+        if df_rh_init.empty: 
+            df_rh_init = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "🕹️ Conducteurs", "🧑‍💼 Chefs", "👷 Ouvriers"])
+
+        # Affichage du grand Tableau Étape par Étape pour les Employés
+        tableau_employes_etapes = st.data_editor(
+            df_rh_init, num_rows="dynamic", use_container_width=True, key="table_employes_planification_etapes",
+            column_config={
+                "N° Étape": st.column_config.NumberColumn("N° Étape", min_value=1, step=1, required=True),
+                "Durée Étape (jours)": st.column_config.NumberColumn("Durée (jours)", min_value=1, step=1, required=True),
+                "🕹️ Conducteurs": st.column_config.NumberColumn("Conducteurs", min_value=0, step=1, default=1),
+                "🧑‍💼 Chefs": st.column_config.NumberColumn("Chefs", min_value=0, step=1, default=0),
+                "👷 Ouvriers": st.column_config.NumberColumn("Ouvriers", min_value=0, step=1, default=0)
+            }
+        )
+
+        # --- TON TABLEAU DE GESTION DES ENGINS (IL RESTE ICI) ---
+        st.markdown("### --- TABLE DES ENGINS NÉCESSAIRES ---")
         engins_bruts_modele = []
         if "engins_requis" in donnees_modele and len(donnees_modele["engins_requis"]) > 0:
             for item in donnees_modele["engins_requis"]:
@@ -164,6 +193,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
             }
         )
 
+        # --- LOGIQUE DE LIAISON LOCATION ---
         engins_transferes_list = []
         if not engins_necessaires.empty:
             df_coches = engins_necessaires[engins_necessaires["À louer ?"] == True].dropna(subset=["Type d'engin requis"])
