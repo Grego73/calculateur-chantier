@@ -349,14 +349,22 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             if cat_engin is not None:
                                 d_etape = st.session_state.get(f"duree_{nom_courant}_{etape_courante_num}", 1)
                                 
+                                # SÉCURITÉ COMPLÈTE ANTI-DOUBLON : On vérifie si l'engin est déjà listé à cette étape précise
                                 doublon_engin = any(
                                     e["N° Étape"] == etape_courante_num and e["Type d'engin requis"] == cat_engin 
                                     for e in chantiers_detectes[nom_courant]["engins_requis"]
                                 )
+                                
+                                if not doublon_engin:
+                                    chantiers_detectes[nom_courant]["engins_requis"].append({
+                                        "N° Étape": etape_courante_num,
+                                        "Durée Étape (jours)": d_etape,
+                                        "Type d'engin requis": cat_engin,
+                                        "Niveau requis": niv_extrait
+                                    })
 
-
-                    # 🚨 ALIGNEMENT SÉCURISÉ : Ce bloc est placé EN DEHORS du "for ligne in lignes:"
-                    # Il s'exécute une seule fois à la fin de la lecture globale pour éviter les crashs d'ID doublons
+                    # 🚨 ALIGNEMENT STRICT : Ce bloc est placé EN DEHORS du "for ligne in lignes:"
+                    # Il s'exécute à la toute fin de la lecture globale pour éviter les crashs d'ID Streamlit
                     if len(chantiers_detectes) > 0:
                         pop_up_validation_fiches_chantiers(chantiers_detectes)
                     else:
