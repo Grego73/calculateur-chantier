@@ -6,21 +6,32 @@ import database as db
 def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_ENGINS_BRUTS, CATALOGUE_CHANTIERS):
     st.subheader("Formulaire de saisie")
     
-    liste_triee = ["Choisir un chantier pré-configuré..."] + sorted([k for k in CATALOGUE_CHANTIERS.keys() if k != "Choisir un chantier pré-configuré..."])
+    # 🚀 NOUVEAU : On crée une liste d'options qui affiche le NOM et le PRIX à côté
+    options_menu = ["Choisir un chantier pré-configuré..."]
     
-    # 1. INITIALISATION FORCEE DU STATE DE STREAMLIT (ZÉRO ERREUR)
-    if "val_revenus" not in st.session_state:
-        st.session_state["val_revenus"] = 0.0
-        st.session_state["val_jours"] = 0
-        for k in ["sable","terre","enrobe","armature","tole","beton","panneaux","tuyaux","canalisations","poutres"]:
-            st.session_state[f"val_{k}"] = 0.0
-        st.session_state["val_jh_cond"] = 0.0
-        st.session_state["val_jh_chef"] = 0.0
-        st.session_state["val_jh_ouvrier"] = 0.0
-
+    # Dictionnaire inversé pour retrouver le vrai nom de la clé Firebase NoSQL quand l'utilisateur clique
+    correspondance_cles = {}
+    
+    for nom_brut, donnees in CATALOGUE_CHANTIERS.items():
+        if nom_brut == "Choisir un chantier pré-configuré...":
+            continue
+        prix_formate = f"{int(donnees.get('revenus', 0)):,.0f}".replace(",", " ")
+        texte_option = f"{nom_brut} \t {prix_formate} euros"
+        options_menu.append(texte_option)
+        correspondance_cles[texte_option] = nom_brut
+        
+    options_menu_triees = ["Choisir un chantier pré-configuré..."] + sorted(options_menu[1:])
+    
+    # Fonction de forçage du cache d'affichage des inputs
     def mise_a_jour_cache_modele():
-        selection = st.session_state["select_modele_chantier_dynamique"]
-        modele = CATALOGUE_CHANTIERS[selection]
+        selection_affichage = st.session_state["select_modele_chantier_dynamique"]
+        
+        if selection_affichage == "Choisir un chantier pré-configuré...":
+            modele = {}
+        else:
+            # On retrouve la vraie clé Firebase NoSQL grâce à notre dictionnaire inversé
+            vrai_nom_firebase = correspondance_cles.get(selection_affichage, selection_affichage)
+            modele = CATALOGUE_CHANTIERS[vrai_nom_firebase]
         
         if "table_engins_necessaires" in st.session_state: del st.session_state["table_engins_necessaires"]
         if "table_engins_a_louer" in st.session_state: del st.session_state["table_engins_a_louer"]
@@ -43,12 +54,23 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         st.session_state["val_jh_chef"] = float(modele.get("jh_chef", 0.0))
         st.session_state["val_jh_ouvrier"] = float(modele.get("jh_ouvrier", 0.0))
 
+    if "val_revenus" not in st.session_state:
+        st.session_state["val_revenus"] = 0.0
+        st.session_state["val_jours"] = 0
+        for k in ["sable","terre","enrobe","armature","tole","beton","panneaux","tuyaux","canalisations","poutres"]:
+            st.session_state[f"val_{k}"] = 0.0
+        st.session_state["val_jh_cond"] = 0.0
+        st.session_state["val_jh_chef"] = 0.0
+        st.session_state["val_jh_ouvrier"] = 0.0
+
     chantier_selectionne = st.selectbox(
         "🚀 Sélectionner un modèle de chantier dynamique :", 
-        liste_triee, key="select_modele_chantier_dynamique", on_change=mise_a_jour_cache_modele
+        options_menu_triees, key="select_modele_chantier_dynamique", on_change=mise_a_jour_cache_modele
     )
     
-    valeur_nom_defaut = "" if chantier_selectionne == "Choisir un chantier pré-configuré..." else chantier_selectionne
+    # Nettoyage automatique du champ d'écriture pour que le nom inséré dans l'historique soit propre (sans le prix à côté)
+    vrai_nom_propre = correspondance_cles.get(chantier_selectionne, "")
+    valeur_nom_defaut = "" if chantier_selectionne == "Choisir un chantier pré-configuré..." else vrai_nom_propre
     nom_chantier = st.text_input("Nom ou Numéro du chantier :", value=valeur_nom_defaut).strip()
     
     # 2. SECTIONS DE COLONNES (UNIQUEMENT POUR LES INPUTS GENERAUX ET RH)
