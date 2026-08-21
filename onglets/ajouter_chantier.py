@@ -6,21 +6,25 @@ import database as db
 def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_ENGINS_BRUTS, CATALOGUE_CHANTIERS):
     st.subheader("Formulaire de saisie")
     
-    # 🚀 NOUVEAU : Formatage avec tabulation et prix entre parenthèses
     options_menu = ["Choisir un chantier pré-configuré..."]
     correspondance_cles = {}
     
-    for nom_brut, donnees in CATALOGUE_CHANTIERS.items():
-        if nom_brut == "Choisir un chantier pré-configuré...":
+    for cle_document, donnees in CATALOGUE_CHANTIERS.items():
+        if cle_document == "Choisir un chantier pré-configuré...":
             continue
+            
+        # On extrait le nom propre pour l'affichage (ex: Pose de panneaux de signalisation)
+        nom_propre_affichage = donnees.get("nom_modele", cle_document)
         prix_formate = f"{int(donnees.get('revenus', 0)):,.0f}".replace(",", " ")
-        # 🎯 Insertion de la tabulation (\t) et des parenthèses autour du prix
-        texte_option = f"{nom_brut} \t ({prix_formate} euros)"
+        
+        texte_option = f"{nom_propre_affichage} \t ({prix_formate} euros)"
         options_menu.append(texte_option)
-        correspondance_cles[texte_option] = nom_brut
+        
+        # On fait correspondre le texte du menu avec le nom exact du document Firestore NoSQL
+        correspondance_cles[texte_option] = cle_document
         
     options_menu_triees = ["Choisir un chantier pré-configuré..."] + sorted(options_menu[1:])
-    
+   
     # Fonction de forçage du cache d'affichage des inputs
     def mise_a_jour_cache_modele():
         selection_affichage = st.session_state["select_modele_chantier_dynamique"]
