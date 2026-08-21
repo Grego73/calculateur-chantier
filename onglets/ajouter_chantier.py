@@ -6,12 +6,12 @@ import database as db
 def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_ENGINS_BRUTS, CATALOGUE_CHANTIERS):
     st.subheader("Formulaire de saisie")
     
-    # 🚀 CONFIGURATION DE L'ESPACEMENT MAXIMAL ALIGNÉ
+    # 🚀 CONFIGURATION DE L'ESPACEMENT INSECABLE GÉANT
     options_menu = ["Choisir un chantier pré-configuré..."]
     correspondance_cles = {}
     
-    # Largeur fixe pour le nom (augmente à 70 ou 80 si tu as des noms de chantiers extrêmement longs)
-    largeur_alignement = 65 
+    # Largeur totale visuelle fixe pour pousser le prix très loin
+    largeur_alignement = 70 
     
     for cle_document, donnees in CATALOGUE_CHANTIERS.items():
         if cle_document == "Choisir un chantier pré-configuré...":
@@ -20,11 +20,14 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         nom_propre_affichage = donnees.get("nom_modele", cle_document)
         prix_formate = f"{int(donnees.get('revenus', 0)):,.0f}".replace(",", " ")
         
-        # 🎯 Force le nom à occuper exactement 'largeur_alignement' caractères en complétant avec des espaces
-        nom_aligne = nom_propre_affichage.ljust(largeur_alignement)
+        # 🎯 Calcul du nombre d'espaces invisibles requis pour ce chantier précis
+        nb_espaces_requis = max(1, largeur_alignement - len(nom_propre_affichage))
         
-        # Construction de l'option avec un alignement parfait à droite pour le prix
-        texte_option = f"{nom_aligne} ({prix_formate} euros)"
+        # \u00A0 est un espace insécable HTML (le navigateur est FORCÉ de l'afficher en entier)
+        espacement_geant = "\u00A0" * nb_espaces_requis
+        
+        # Construction de l'option avec un écart de colonnes parfait à l'écran
+        texte_option = f"{nom_propre_affichage}{espacement_geant}({prix_formate} euros)"
         options_menu.append(texte_option)
         correspondance_cles[texte_option] = cle_document
         
