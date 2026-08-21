@@ -160,17 +160,18 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
     if not df_besoins_init.empty: df_besoins_init = df_besoins_init.dropna(subset=["Type d'engin requis"])
     if df_besoins_init.empty: df_besoins_init = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "Type d'engin requis", "Niveau requis", "À louer ?"])
     
-    # Déclaration globale de la table racine
+    # 📏 Version corrigée : On passe le Type d'engin en TextColumn pour éviter les cases blanches
     engins_necessaires = st.data_editor(
         df_besoins_init, num_rows="dynamic", use_container_width=True, key="table_engins_necessaires",
         column_config={
             "N° Étape": st.column_config.NumberColumn("N° Étape", min_value=1, step=1, required=True),
             "Durée Étape (jours)": st.column_config.NumberColumn("Durée (jours)", min_value=1, step=1, required=True),
-            "Type d'engin requis": st.column_config.SelectboxColumn("Type d'engin requis", options=TYPES_ENGINS_BRUTS, required=True),
+            "Type d'engin requis": st.column_config.TextColumn("Type d'engin requis", disabled=True), # 🚀 FIX : Plus de blocage d'options !
             "Niveau requis": st.column_config.SelectboxColumn("Niveau requis", options=["N1", "N2", "N3", "N4"], required=True),
             "À louer ?": st.column_config.CheckboxColumn("À louer ?", default=False)
         }
     )
+
 
     engins_transferes_list = []
     if not engins_necessaires.empty and "À louer ?" in engins_necessaires.columns:
