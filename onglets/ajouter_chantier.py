@@ -20,6 +20,9 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
 
     def mise_a_jour_cache_modele():
         selection = st.session_state["select_modele_chantier_dynamique"]
+        if selection == "Choisir un chantier pré-configuré...":
+            return
+            
         modele = CATALOGUE_CHANTIERS[selection]
         
         if "table_engins_necessaires" in st.session_state: del st.session_state["table_engins_necessaires"]
@@ -51,7 +54,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
     valeur_nom_defaut = "" if chantier_selectionne == "Choisir un chantier pré-configuré..." else chantier_selectionne
     nom_chantier = st.text_input("Nom ou Numéro du chantier :", value=valeur_nom_defaut).strip()
     
-    # 2. SECTIONS DE COLONNES (UNIQUEMENT POUR LES INPUTS GENERAUX ET RH)
+    # 2. SECTIONS DE COLONNES (GÉNÉRAUX À GAUCHE, RH ET ENGINS À DROITE)
     col1, col2 = st.columns(2)
 
     with col1:
@@ -112,7 +115,8 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         st.info(f"💰 Tarifs : 🕹️ Cond : {px_cond:.0f}€/j | 🧑‍💼 Chef : {px_chef:.0f}€/j | 👷 Ouv : {px_ouvrier:.0f}€/j")
 
         st.markdown("**👥 Planification des Effectifs requis à l'Étape :**")
-        donnees_modele = CATALOGUE_CHANTIERS[chantier_selectionne]
+        
+        donnees_modele = CATALOGUE_CHANTIERS.get(chantier_selectionne, {})
         lignes_employes_modele = []
         
         if "engins_requis" in donnees_modele and len(donnees_modele["engins_requis"]) > 0:
@@ -142,84 +146,82 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
             }
         )
 
-    # 🚨 SORTIE DES COLONNES : LES TABLES D'ENGINS SONT DEPLOYÉES SUR TOUTE LA LARGEUR (ZÉRO NAMEERROR POSSIBLE)
-    st.markdown("---")
-    st.markdown("### 🚜 --- TABLE DES ENGINS NÉCESSAIRES ---")
-    
-    engins_bruts_modele = []
-    if "engins_requis" in donnees_modele and len(donnees_modele["engins_requis"]) > 0:
-        for item in donnees_modele["engins_requis"]:
-            t_engin = item.get("Type d'engin requis")
-            if t_engin is None or str(t_engin).strip() == "" or str(t_engin).lower() == "none": continue
-            engins_bruts_modele.append({
-                "N° Étape": int(item.get("N° Étape", 1)), "Durée Étape (jours)": int(item.get("Durée Étape (jours)", 1)),
-                "Type d'engin requis": str(t_engin).strip(), "Niveau requis": item.get("Niveau requis", "N1"), "À louer ?": False
-            })
-            
-    df_besoins_init = pd.DataFrame(engins_bruts_modele)
-    if not df_besoins_init.empty: df_besoins_init = df_besoins_init.dropna(subset=["Type d'engin requis"])
-    if df_besoins_init.empty: df_besoins_init = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "Type d'engin requis", "Niveau requis", "À louer ?"])
-    
-        # 📏 Version corrigée : On passe le Type d'engin en TextColumn pour éviter les cases blanches
-    engins_necessaires = st.data_editor(
-        df_besoins_init, num_rows="dynamic", use_container_width=True, key="table_engins_necessaires",
-        column_config={
-            "N° Étape": st.column_config.NumberColumn("N° Étape", min_value=1, step=1, required=True),
-            "Durée Étape (jours)": st.column_config.NumberColumn("Durée (jours)", min_value=1, step=1, required=True),
-            "Type d'engin requis": st.column_config.TextColumn("Type d'engin requis", disabled=True), # 🚀 FIX : Plus de blocage d'options !
-            "Niveau requis": st.column_config.SelectboxColumn("Niveau requis", options=["N1", "N2", "N3", "N4"], required=True),
-            "À louer ?": st.column_config.CheckboxColumn("À louer ?", default=False)
-        }
-    )
+        # --- TABLE DES ENGINS NÉCESSAIRES ---
+        st.markdown("### 🚜 --- TABLE DES ENGINS NÉCESSAIRES ---")
+        
+        engins_bruts_modele = []
+        if "engins_requis" in donnees_modele and len(donnees_modele["engins_requis"]) > 0:
+            for item in donnees_modele["engins_requis"]:
+                t_engin = item.get("Type d'engin requis")
+                if t_engin is None or str(t_engin).strip() == "" or str(t_engin).lower() == "none": continue
+                engins_bruts_modele.append({
+                    "N° Étape": int(item.get("N° Étape", 1)), "Durée Étape (jours)": int(item.get("Durée Étape (jours)", 1)),
+                    "Type d'engin requis": str(t_engin).strip(), "Niveau requis": item.get("Niveau requis", "N1"), "À louer ?": False
+                })
+                
+        df_besoins_init = pd.DataFrame(engins_bruts_modele)
+        if not df_besoins_init.empty: df_besoins_init = df_besoins_init.dropna(subset=["Type d'engin requis"])
+        if df_besoins_init.empty: df_besoins_init = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "Type d'engin requis", "Niveau requis", "À louer ?"])
+        
+        engins_necessaires = st.data_editor(
+            df_besoins_init, num_rows="dynamic", use_container_width=True, key="table_engins_necessaires",
+            column_config={
+                "N° Étape": st.column_config.NumberColumn("N°", min_value=1, step=1, required=True, width="small"),
+                "Durée Étape (jours)": st.column_config.NumberColumn("Durée (jours)", min_value=1, step=1, required=True),
+                "Type d'engin requis": st.column_config.TextColumn("Type d'engin requis", disabled=True),
+                "Niveau requis": st.column_config.SelectboxColumn("Niveau requis", options=["N1", "N2", "N3", "N4"], required=True),
+                "À louer ?": st.column_config.CheckboxColumn("À louer ?", default=False)
+            }
+        )
 
+        engins_transferes_list = []
+        if not engins_necessaires.empty and "À louer ?" in engins_necessaires.columns:
+            df_coches = engins_necessaires[engins_necessaires["À louer ?"] == True].dropna(subset=["Type d'engin requis"])
+            for _, row in df_coches.iterrows():
+                type_demande = str(row["Type d'engin requis"]).strip()
+                niveau_demande = str(row["Niveau requis"]).strip().lower()
+                duree_etape = int(row["Durée Étape (jours)"])
+                
+                def nettoyer_mots(texte):
+                    texte = texte.lower().replace("é", "e").replace("è", "e").replace("ê", "e").replace("à", "a")
+                    for char in ["'", "-", "/", "’"]: texte = texte.replace(char, " ")
+                    mots = texte.split()
+                    mots_utiles = ["pour", "de", "d", "un", "une", "le", "la", "les", "sur"]
+                    return [m for m in mots if m not in mots_utiles]
 
-    engins_transferes_list = []
-    if not engins_necessaires.empty and "À louer ?" in engins_necessaires.columns:
-        df_coches = engins_necessaires[engins_necessaires["À louer ?"] == True].dropna(subset=["Type d'engin requis"])
-        for _, row in df_coches.iterrows():
-            type_demande = str(row["Type d'engin requis"]).strip()
-            niveau_demande = str(row["Niveau requis"]).strip().lower()
-            duree_etape = int(row["Durée Étape (jours)"])
-            
-            def nettoyer_mots(texte):
-                texte = texte.lower().replace("é", "e").replace("è", "e").replace("ê", "e").replace("à", "a")
-                for char in ["'", "-", "/", "’"]: texte = texte.replace(char, " ")
-                mots = texte.split()
-                mots_utiles = ["pour", "de", "d", "un", "une", "le", "la", "les", "sur"]
-                return [m for m in mots if m not in mots_utiles]
-
-            mots_cles_recherche = nettoyer_mots(type_demande)
-            modele_trouve, prix_trouve = None, 380.0
-            for engin_nom, prix in CATALOGUE_ENGINS.items():
-                if niveau_demande in engin_nom.lower() and all(mot in nettoyer_mots(engin_nom) for mot in mots_cles_recherche):
-                    modele_trouve, prix_trouve = engin_nom, prix
-                    break
-            if not modele_trouve:
+                mots_cles_recherche = nettoyer_mots(type_demande)
+                modele_trouve, prix_trouve = None, 380.0
                 for engin_nom, prix in CATALOGUE_ENGINS.items():
-                    if all(mot in nettoyer_mots(engin_nom) for mot in mots_cles_recherche):
+                    if niveau_demande in engin_nom.lower() and all(mot in nettoyer_mots(engin_nom) for mot in mots_cles_recherche):
                         modele_trouve, prix_trouve = engin_nom, prix
                         break
-            if not modele_trouve:
-                modele_trouve = f"{type_demande} ({niveau_demande.upper()})"
-                prix_trouve = 380.0
-                
-            engins_transferes_list.append({
-                "engin_modele": modele_trouve, "Quantité": 1, "Prix Location (€/jour)": prix_trouve, "Jours de Location": duree_etape
-            })
+                if not modele_trouve:
+                    for engin_nom, prix in CATALOGUE_ENGINS.items():
+                        if all(mot in nettoyer_mots(engin_nom) for mot in mots_cles_recherche):
+                            modele_trouve, prix_trouve = engin_nom, prix
+                            break
+                if not modele_trouve:
+                    modele_trouve = f"{type_demande} ({niveau_demande.upper()})"
+                    prix_trouve = 380.0
+                    
+                engins_transferes_list.append({
+                    "engin_modele": modele_trouve, "Quantité": 1, "Prix Location (€/jour)": prix_trouve, "Jours de Location": duree_etape
+                })
 
-    st.markdown("### 🚜 --- TABLE DES ENGINS À LOUER ---")
-    df_engins_init = pd.DataFrame(columns=["engin_modele", "Quantité", "Prix Location (€/jour)", "Jours de Location"])
-    if len(engins_transferes_list) > 0: df_engins_init = pd.DataFrame(engins_transferes_list)
-    
-    engins_edites = st.data_editor(
-        df_engins_init, num_rows="dynamic", use_container_width=True, key="table_engins_a_louer",
-        column_config={
-            "engin_modele": st.column_config.TextColumn("Engin & Modèle", disabled=True),
-            "Quantité": st.column_config.NumberColumn("Quantité", min_value=1, default=1, step=1),
-            "Prix Location (€/jour)": st.column_config.NumberColumn("Prix Location (€/jour)", min_value=0, step=10),
-            "Jours de Location": st.column_config.NumberColumn("Jours de Location", min_value=1, max_value=365, step=1)
-        }
-    )
+        # --- TABLE DES ENGINS À LOUER ---
+        st.markdown("### 🚜 --- TABLE DES ENGINS À LOUER ---")
+        df_engins_init = pd.DataFrame(columns=["engin_modele", "Quantité", "Prix Location (€/jour)", "Jours de Location"])
+        if len(engins_transferes_list) > 0: df_engins_init = pd.DataFrame(engins_transferes_list)
+        
+        engins_edites = st.data_editor(
+            df_engins_init, num_rows="dynamic", use_container_width=True, key="table_engins_a_louer",
+            column_config={
+                "engin_modele": st.column_config.TextColumn("Engin & Modèle", disabled=True),
+                "Quantité": st.column_config.NumberColumn("Quantité", min_value=1, default=1, step=1),
+                "Prix Location (€/jour)": st.column_config.NumberColumn("Prix Location (€/jour)", min_value=0, step=10),
+                "Jours de Location": st.column_config.NumberColumn("Jours de Location", min_value=1, max_value=365, step=1)
+            }
+        )
 
     # ==============================================================================
     # --- LOGIQUE FINALE DE SYNTHÈSE ET DE CALCUL FINANCIER ---
@@ -243,9 +245,14 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
             ch_count = float(r_rh.get("🧑‍💼 Chefs", 0))
             o_count = float(r_rh.get("👷 Ouvriers", 0))
             
-            cout_cond += c_count * duree_etape_reelle * px_cond
-            cout_chefs += ch_count * duree_etape_reelle * px_chef
-            cout_ouvriers += o_count * duree_etape_reelle * px_ouvrier
+            # Prorata si CDI, Journée complète due si CDD
+            d_cond = duree_etape_reelle if type_contrat_cond == "CDI" else float(math.ceil(duree_etape_reelle))
+            d_chef = duree_etape_reelle if type_contrat_chef == "CDI" else float(math.ceil(duree_etape_reelle))
+            d_ouv  = duree_etape_reelle if type_contrat_ouv  == "CDI" else float(math.ceil(duree_etape_reelle))
+            
+            cout_cond += c_count * d_cond * px_cond
+            cout_chefs += ch_count * d_chef * px_chef
+            cout_ouvriers += o_count * d_ouv * px_ouvrier
             
             jh_cond += c_count * duree_etape_reelle
             jh_chef += ch_count * duree_etape_reelle
@@ -263,7 +270,10 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
     txt_loc = f"{total_location_recap:,.0f}".replace(",", " ")
     txt_sal = f"{total_salaires_recap:,.0f}".replace(",", " ")
     txt_depenses = f"{total_depenses_recap:,.0f}".replace(",", " ")
+    
     txt_gain_jour = f"{gain_par_jour_recap:,.0f}".replace(",", " ")
+    txt_gain_jour_abs = f"{abs(gain_par_jour_recap):,.0f}".replace(",", " ")
+    
     txt_benefice = f"{abs(benefice_net_recap):,.0f}".replace(",", " ")
     txt_duree_precise = f"{int(jours_totaux)} jours" if jours_totaux >= 1 else f"{heures_saisies}h {minutes_saisies}m"
 
@@ -280,7 +290,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
     if benefice_net_recap >= 0: 
         st.success(f"🟢 **Rentabilité positive :** Bénéfice de **{txt_benefice} €** soit **{txt_gain_jour} € / jour** sur **{txt_duree_precise}** (ROI Global : **{roi_recap:.2f} %**)")
     else: 
-        st.error(f"🔴 **Chantier déficitaire :** Perte de **{txt_benefice} €** soit **{txt_gain_jour} € / jour** sur **{txt_duree_precise}** (ROI Global : **{roi_recap:.2f} %**)")
+        st.error(f"🔴 **Chantier déficitaire :** Perte de **{txt_benefice} €** soit **{txt_gain_jour_abs} € / jour** sur **{txt_duree_precise}** (ROI Global : **{roi_recap:.2f} %**)")
 
     @st.dialog("🔍 Rapport de Calcul et Feuille d'Insertion NoSQL")
     def confirmer_enregistrement_chantier_detaill():
@@ -290,9 +300,9 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         st.write(f"- **Forfait facturé (Location & CDD) :** `{int(jours_factures_jeu)} jours` (Toute journée entamée est due)")
 
         st.markdown("#### 👥 2. Formules appliquées pour la Main-d'œuvre")
-        st.code(f"Conducteurs : {cout_cond:,.0f} € (basé sur le cumul des étapes)")
-        st.code(f"Chefs : {cout_chefs:,.0f} € (basé sur le cumul des étapes)")
-        st.code(f"Ouvriers : {cout_ouvriers:,.0f} € (basé sur le cumul des étapes)")
+        st.code(f"Conducteurs ({type_contrat_cond}) : {cout_cond:,.0f} € (basé sur le cumul des étapes)")
+        st.code(f"Chefs ({type_contrat_chef}) : {cout_chefs:,.0f} € (basé sur le cumul des étapes)")
+        st.code(f"Ouvriers ({type_contrat_ouv}) : {cout_ouvriers:,.0f} € (basé sur le cumul des étapes)")
 
         st.markdown("#### 🗂️ 3. Structure finale NoSQL (Firebase)")
         donnees_popup = {
@@ -309,7 +319,8 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                 st.toast("🚀 Simulation enregistrée avec succès sur le Cloud Firestore !")
                 st.rerun()
         with col_pop2:
-            if st.button("❌ ANNULER & MODIFIER", use_container_width=True): st.rerun()
+            if st.button("❌ ANNULER & MODIFIER", use_container_width=True): 
+                st.rerun()
 
     if st.button("LANCER LE CALCUL & ENREGISTRER", type="primary", use_container_width=True):
         df_actuel = db.charger_donnees()
@@ -320,4 +331,3 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
             st.error(f"❌ Erreur NoSQL : Une fiche identique au nom de '{nom_chantier}' existe déjà dans l'historique cloud.")
         else: 
             confirmer_enregistrement_chantier_detaill()
-
