@@ -6,17 +6,16 @@ import database as db
 def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_ENGINS_BRUTS, CATALOGUE_CHANTIERS):
     st.subheader("Formulaire de saisie")
     
-    # 🚀 NOUVEAU : On crée une liste d'options qui affiche le NOM et le PRIX à côté
+    # 🚀 NOUVEAU : Formatage avec tabulation et prix entre parenthèses
     options_menu = ["Choisir un chantier pré-configuré..."]
-    
-    # Dictionnaire inversé pour retrouver le vrai nom de la clé Firebase NoSQL quand l'utilisateur clique
     correspondance_cles = {}
     
     for nom_brut, donnees in CATALOGUE_CHANTIERS.items():
         if nom_brut == "Choisir un chantier pré-configuré...":
             continue
         prix_formate = f"{int(donnees.get('revenus', 0)):,.0f}".replace(",", " ")
-        texte_option = f"{nom_brut} \t {prix_formate} euros"
+        # 🎯 Insertion de la tabulation (\t) et des parenthèses autour du prix
+        texte_option = f"{nom_brut} \t ({prix_formate} euros)"
         options_menu.append(texte_option)
         correspondance_cles[texte_option] = nom_brut
         
@@ -29,7 +28,6 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         if selection_affichage == "Choisir un chantier pré-configuré...":
             modele = {}
         else:
-            # On retrouve la vraie clé Firebase NoSQL grâce à notre dictionnaire inversé
             vrai_nom_firebase = correspondance_cles.get(selection_affichage, selection_affichage)
             modele = CATALOGUE_CHANTIERS[vrai_nom_firebase]
         
@@ -68,11 +66,10 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         options_menu_triees, key="select_modele_chantier_dynamique", on_change=mise_a_jour_cache_modele
     )
     
-    # Nettoyage automatique du champ d'écriture pour que le nom inséré dans l'historique soit propre (sans le prix à côté)
     vrai_nom_propre = correspondance_cles.get(chantier_selectionne, "")
     valeur_nom_defaut = "" if chantier_selectionne == "Choisir un chantier pré-configuré..." else vrai_nom_propre
     nom_chantier = st.text_input("Nom ou Numéro du chantier :", value=valeur_nom_defaut).strip()
-    
+   
     # 2. SECTIONS DE COLONNES (UNIQUEMENT POUR LES INPUTS GENERAUX ET RH)
     col1, col2 = st.columns(2)
 
