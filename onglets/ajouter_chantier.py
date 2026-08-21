@@ -6,22 +6,14 @@ import database as db
 def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_ENGINS_BRUTS, CATALOGUE_CHANTIERS):
     st.subheader("Formulaire de saisie")
     
+    # 🚀 CONFIGURATION DE L'ESPACEMENT GEANT CONSTANT (SANS ALIGNEMENT RIGIDE)
     options_menu = ["Choisir un chantier pré-configuré..."]
     correspondance_cles = {}
     
-    # 🔎 1. CALCUL DYNAMIQUE DU CHANTIER LE PLUS LONG DE LA BASE
-    longueur_max_nom = 0
-    for cle_document, donnees in CATALOGUE_CHANTIERS.items():
-        if cle_document == "Choisir un chantier pré-configuré...":
-            continue
-        nom_propre = donnees.get("nom_modele", cle_document)
-        if len(nom_propre) > longueur_max_nom:
-            longueur_max_nom = len(nom_propre)
-            
-    # On ajoute une marge fixe de 5 caractères pour éloigner le prix du chantier le plus long
-    largeur_cible = longueur_max_nom + 5
+    # Règle ici le nombre d'espaces géants que tu veux entre le nom et le prix (4 ou 5 c'est idéal)
+    nombre_espaces_fixes = 4 
+    espacement_constant_geant = "\u3000" * nombre_espaces_fixes
     
-    # 🚀 2. CONSTRUCTION DE L'ALIGNEMENT VERTICAL PARFAIT
     for cle_document, donnees in CATALOGUE_CHANTIERS.items():
         if cle_document == "Choisir un chantier pré-configuré...":
             continue
@@ -29,13 +21,8 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         nom_propre_affichage = donnees.get("nom_modele", cle_document)
         prix_formate = f"{int(donnees.get('revenus', 0)):,.0f}".replace(",", " ")
         
-        # On calcule le nombre d'espaces standards nécessaires pour atteindre la largeur cible
-        # Grâce au style Monospace injecté plus bas, ces espaces feront la taille exacte des lettres
-        nb_espaces_restants = max(2, largeur_cible - len(nom_propre_affichage))
-        espacement_parfait = " " * nb_espaces_restants
-        
-        # Construction textuelle brute
-        texte_option = f"{nom_propre_affichage}{espacement_parfait}({prix_formate} euros)"
+        # 🎯 Construction de l'option : le prix suit le nom mais reste séparé par un grand bloc vide
+        texte_option = f"{nom_propre_affichage}{espacement_constant_geant}({prix_formate} euros)"
         options_menu.append(texte_option)
         correspondance_cles[texte_option] = cle_document
         
@@ -80,19 +67,6 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         st.session_state["val_jh_cond"] = 0.0
         st.session_state["val_jh_chef"] = 0.0
         st.session_state["val_jh_ouvrier"] = 0.0
-
-    # 🎯 INJECTION CSS POUR RENDRE LA LISTE SELECTBOX ULTRA-ALIGNEE (POLICE TYPE CODE TERMINAL)
-    st.markdown(
-        """
-        <style>
-        div[data-baseweb="select"] * {
-            font-family: 'Courier New', Courier, monospace !important;
-            font-size: 14px !important;
-        }
-        </style>
-        """,
-        unsafe_allowed_html=True
-    )
 
     chantier_selectionne = st.selectbox(
         "🚀 Sélectionner un modèle de chantier dynamique :", 
