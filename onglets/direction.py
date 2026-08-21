@@ -412,19 +412,75 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                 db.db.collection("configuration_materiaux").document("catalogue").set(nouveau_dict)
                 st.success("Tarifs matériaux actualisés !"); st.rerun()
 
-        # --- 4.4 CATALOGUE D'ENGINS ---
+        # --- 4.4 CATALOGUE D'ENGINS (EXTRACTEUR EN BLOC INTÉGRÉ) ---
         with sub_tab4:
-            st.write("Ajoutez ou modifiez vos engins lourds.")
+            st.markdown("### 📥 Importation d'Engins de Location en Bloc")
+            st.caption("💡 Format attendu : `Nom de l'engin [Tabulation ou Espace] Tarif€` (Exemple : `Camions Benne N2 250€` ou `Finisseur N3 490`) ")
+            
+            texte_engins_brut = st.text_area(
+                "Collez votre liste d'engins et tarifs ici :", value="", height=200, 
+                key="zone_texte_import_engins_lourds_bloc"
+            )
+
+            if st.button("🚜 ANALYSER ET INJECTER LA FLOTTE D'ENGINS", type="primary"):
+                if not texte_engins_brut.strip():
+                    st.error("❌ La zone de texte est vide.")
+                else:
+                    lignes_engins = texte_engins_brut.split("\n")
+                    compteur_engins = 0
+                    
+                    # On nettoie d'abord l'ancien catalogue NoSQL pour éviter les doublons obsolètes
+                    docs_a_purger = db.db.collection("catalogue_engins").stream()
+                    for doc_p in docs_a_purger:
+                        doc_p.reference.delete()
+                        
+                    for lg in lignes_engins:
+                        lg_clean = lg.strip()
+                        if not lg_clean: 
+                            continue
+                            
+                        # Utilisation d'un regex pour capturer le nom de l'engin à gauche et le tarif numérique à droite
+                        match_location = re.search(r"^(.*?)\s+(\d+)\s*(?:€|euros|/jour)?$", lg_clean, re.IGNORECASE)
+                        if match_location:
+                            nom_complet_engin = match_location.group(1).strip()
+                            prix_jour_loc = float(match_location.group(2))
+                            
+                            # Extraction automatique de la catégorie générique (type_brut) en retirant le "N1", "N2", etc.
+                            # Exemple : "Camions Benne N2" -> "Camions Benne"
+                            type_brut_extrait = re.sub(r"\s+N\d+\s*$", "", nom_complet_engin, flags=re.IGNORECASE).strip()
+                            
+                            # Injection NoSQL directe sur Firebase Firestore
+                            db.db.collection("catalogue_engins").document(nom_complet_engin).set({
+                                "type_brut": type_brut_extrait,
+                                "prix_jour": prix_jour_loc
+                            })
+                            compteur_engins += 1
+                            
+                    if compteur_engins > 0:
+                        st.success(f"🚀 Synchronisation Cloud réussie : {compteur_engins} engin(s) lourd(s) injecté(s) au catalogue NoSQL !")
+                        st.rerun()
+                    else:
+                        st.error("❌ Aucun engin ou tarif valide n'a pu être extrait. Vérifiez le format de saisie.")
+
+            st.markdown("---")
+            st.markdown("### 🛠️ Éditeur Visuel du Catalogue Actuel")
+            
+            # On conserve ton éditeur manuel en dessous au cas où tu as besoin d'ajuster un prix à la main
             docs_engins = db.db.collection("catalogue_engins").stream()
             liste_engins = [{"nom_engin": d.id, "type_brut": d.to_dict().get("type_brut", ""), "prix_jour": d.to_dict().get("prix_jour", 0.0)} for d in docs_engins]
             df_engins = pd.DataFrame(liste_engins) if liste_engins else pd.DataFrame(columns=["nom_engin", "type_brut", "prix_jour"])
+            
             engins_edites_db = st.data_editor(df_engins, use_container_width=True, key="editeur_engins_db", num_rows="dynamic")
-            if st.button("METTRE À JOUR LE CATALOGUE DES ENGINS"):
+            if st.button("METTRE À JOUR MANUELLEMENT LE CATALOGUE DES ENGINS"):
                 old_docs = db.db.collection("catalogue_engins").stream()
-                for od in old_docs: od.reference.delete()
+                for od in old_docs: 
+                    od.reference.delete()
                 for _, r in engins_edites_db.iterrows():
                     if pd.notnull(r["nom_engin"]) and str(r["nom_engin"]).strip():
-                        db.db.collection("catalogue_engins").document(str(r["nom_engin"]).strip()).set({"type_brut": str(r["type_brut"]), "prix_jour": float(r["prix_jour"])})
+                        db.db.collection("catalogue_engins").document(str(r["nom_engin"]).strip()).set({
+                            "type_brut": str(r["type_brut"]), 
+                            "prix_jour": float(r["prix_jour"])
+                        })
                 st.success("Parc d'engins synchronisé !"); st.rerun()
 
         # --- 4.5 CONSULTATION DES TABLES ---
