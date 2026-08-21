@@ -105,7 +105,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         
     with col2:
         st.markdown("### --- CONFIGURATION DE LA MAIN-D'ŒUVRE PAR ÉTAPE ---")
-        st.caption("💡 CDI : au prorata réel (1 mois = 7j). CDD : à la journée complète entamée (due).")
+        st.caption("💡 CDI : au prorata réel. CDD : à la journée complète entamée (due).")
         
         c_rh_co, c_rh_ch, c_rh_ou = st.columns(3)
         with c_rh_co: type_contrat_cond = st.selectbox("Contrat Conducteurs :", ["CDI", "CDD"], key="type_contrat_cond")
@@ -116,7 +116,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         px_chef = float(SALAIRES_DB.get(f"Chef_{type_contrat_chef}_Moyen", SALAIRES_DB.get("Chef", 230.0)))
         px_ouvrier = float(SALAIRES_DB.get(f"Ouvrier_{type_contrat_ouv}_Moyen", SALAIRES_DB.get("Ouvrier", 230.0)))
 
-        st.info(f"💰 Tarifs BDD appliqués : 🕹️ Cond : {px_cond:.0f}€/j | 🧑‍💼 Chef : {px_chef:.0f}€/j | 👷 Ouv : {px_ouvrier:.0f}€/j")
+        st.info(f"💰 Tarifs BDD : 🕹️ Cond : {px_cond:.0f}€/j | 🧑‍💼 Chef : {px_chef:.0f}€/j | 👷 Ouv : {px_ouvrier:.0f}€/j")
 
         st.markdown("**👥 Planification des Effectifs requis à l'Étape :**")
         donnees_modele = CATALOGUE_CHANTIERS[chantier_selectionne]
