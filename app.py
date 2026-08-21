@@ -4,7 +4,7 @@ import database as db  # On importe notre fichier de base de données
 # On importe les fonctions d'affichage de nos futurs fichiers onglets
 from onglets.ajouter_chantier1 import afficher_onglet_ajouter
 from onglets.historique import afficher_onglet_historique
-from onglets.direction import afficher_onglet_direction
+from onglets.direction1 import afficher_onglet_direction
 
 st.set_page_config(page_title="Gestion des Chantiers", page_icon="🏗️", layout="wide")
 st.title("Gestion et Rentabilité des Chantiers")
