@@ -195,10 +195,12 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
         st.markdown("---")
 
         st.markdown("## ⚙️ Administration Suprême des Bases NoSQL")
-        sub_tab1, sub_tab2, sub_tab3, sub_tab4, sub_tab5 = st.tabs([
+        sub_tab1, sub_tab2, sub_tab3, sub_tab4, sub_tab5, sub_tab6 = st.tabs([
             "🏗️ Saisie Multi-Chantiers en Bloc", "👥 Éditer Grille Salariale", 
-            "🧱 Éditer Prix Matériaux", "🚜 Éditer Catalogue Engins", "🗂️ Consulter les Bases Données"
+            "🧱 Éditer Prix Matériaux", "🚜 Éditer Catalogue Engins", "🗂️ Consulter les Bases Données",
+            "🔎 Comparateur de Fiches"
         ])
+
         
         # --- 4.1 IMPORTATION EN BLOC ET DECODAGE ---
         with sub_tab1:
@@ -483,6 +485,89 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                         })
                 st.success("Parc d'engins synchronisé !"); st.rerun()
 
+                # --- 4.6 🔎 SOUS-ONGLET : COMPARATEUR DE FICHES AVEC LA BASE NOSQL ---
+        with sub_tab6:
+            st.markdown("### 🔎 Comparateur de Chantiers Cloud vs Fiche Brute")
+            st.caption("💡 Collez votre liste brute de chantiers ci-dessous pour vérifier s'ils existent déjà en base de données et comparer leurs revenus.")
+            
+            texte_comparaison_brut = st.text_area(
+                "Zone de texte pour la comparaison :", value="", height=250, 
+                key="zone_texte_comparateur_chantiers_bruts"
+            )
+            
+            if st.button("🔎 LANCER LA COMPARAISON DES CHANTIERS", type="primary"):
+                if not texte_comparaison_brut.strip():
+                    st.error("❌ La zone de texte est vide.")
+                else:
+                    # A. Récupération instantanée de tous les modèles actuellement sur Firebase
+                    docs_firebase = db.db.collection("modeles_chantiers").stream()
+                    catalogue_cloud = {}
+                    for d_fb in docs_firebase:
+                        d_dict = d_fb.to_dict()
+                        nom_doc = d_fb.id
+                        catalogue_cloud[nom_doc.lower().strip()] = float(d_dict.get("revenus", 0.0))
+                    
+                    # B. Analyse du texte brut collé
+                    lignes_comp = texte_comparaison_brut.split("\n")
+                    chantiers_analyses = []
+                    
+                    for l_comp in lignes_comp:
+                        l_c = l_comp.strip()
+                        if not l_c or "euros" not in l_c.lower():
+                            continue
+                            
+                        # Extraction du nom, du niveau et du prix
+                        # Exemple : "Creuser (niveau 3)    10 881 euros"
+                        match_ch = re.search(r"^(.*?)\s+(\d[\d\s]+)\s+euros", l_c, re.IGNORECASE)
+                        if match_ch:
+                            nom_brut = match_ch.group(1).strip()
+                            prix_txt = "".join(c for c in match_ch.group(2) if c.isdigit())
+                            prix_fiche = float(prix_txt) if prix_txt else 0.0
+                            
+                            # Standardisation du nom pour la recherche NoSQL (ex: "Creuser (niveau 3)")
+                            cle_recherche = nom_brut.lower().strip()
+                            
+                            # C. Analyse comparative de l'état NoSQL
+                            if cle_recherche in catalogue_cloud:
+                                prix_cloud = catalogue_cloud[cle_recherche]
+                                if prix_fiche == prix_cloud:
+                                    statut = "✅ Prix Identique"
+                                    action_rec = "➡️ Conserver (Rien à faire)"
+                                else:
+                                    statut = "⚠️ Prix Différent"
+                                    action_rec = f"🔄 Mettre à jour (Cloud: {int(prix_cloud):,.0f} €)"
+                            else:
+                                statut = "🆕 Inconnu en Base NoSQL"
+                                action_rec = "📥 À importer (Nouveau modèle)"
+                                
+                            chantiers_analyses.append({
+                                "Chantier à analyser": nom_brut,
+                                "Revenus Fiche (€)": int(prix_fiche),
+                                "État de la Base Cloud": statut,
+                                "Action recommandée": action_rec
+                            })
+                    
+                    # D. Rendu sous forme de Tableau Scannable
+                    if chantiers_analyses:
+                        st.markdown("### 📊 Résultat de l'analyse comparative")
+                        df_comparatif = pd.DataFrame(chantiers_analyses)
+                        
+                        # Tri automatique pour mettre en premier les nouveaux chantiers ou ceux modifiés
+                        df_comparatif.sort_values(by="État de la Base Cloud", ascending=False, inplace=True)
+                        
+                        st.dataframe(
+                            df_comparatif, use_container_width=True, hide_index=True,
+                            column_config={
+                                "Revenus Fiche (€)": st.column_config.NumberColumn("Revenus Fiche", format="%d €"),
+                                "État de la Base Cloud": st.column_config.TextColumn("Diagnostic NoSQL"),
+                                "Action recommandée": st.column_config.TextColumn("Action")
+                            }
+                        )
+                        st.toast(f"🔎 {len(chantiers_analyses)} chantiers analysés avec succès !")
+                    else:
+                        st.error("❌ Aucun chantier valide n'a été détecté. Vérifiez que les lignes contiennent le mot 'euros'.")
+
+        
         # --- 4.5 CONSULTATION DES TABLES ---
         with sub_tab5:
             st.markdown("### 🗂️ Consultation brute complète")
