@@ -58,8 +58,9 @@ def pop_up_validation_recrutement(salaires_mensuels, metier, type_contrat, salai
 def pop_up_validation_fiches_chantiers(chantiers_detectes):
     st.write("Voici la transparence des données techniques extraites de vos fiches brutes avant insertion cloud :")
     
-    for name, data in chantiers_detectes.items():
-        st.markdown(f"### 🏗️ Chantier : **{name}**")
+    for temporary_key, data in chantiers_detectes.items():
+        vrai_nom_propre = data["nom_affiche_propre"]
+        st.markdown(f"### 🏗️ Chantier : **{vrai_nom_propre}**")
         st.info(f"💰 **Revenus détectés :** `{int(data['revenus']):,.0f}` €".replace(",", " "))
         
         st.markdown("**⏱️ Temps configuré pour l'Onglet 1 :**")
@@ -75,22 +76,30 @@ def pop_up_validation_fiches_chantiers(chantiers_detectes):
         else:
             st.write("*Aucun matériau requis pour ce modèle.*")
             
-        # --- TABLEAU 1 : ENGINS UNIQUEMENT ---
+        # --- TABLEAU 1 : ENGINS REQUIS PAR ETAPE ---
         st.markdown("**🚜 Étapes techniques & Engins détectés :**")
         df_brut_etapes = pd.DataFrame(data["engins_requis"])
         cols_engins = ["N° Étape", "Durée Étape (jours)", "Type d'engin requis", "Niveau requis"]
         df_engins = df_brut_etapes[[c for c in cols_engins if c in df_brut_etapes.columns]] if not df_brut_etapes.empty else pd.DataFrame()
         st.dataframe(df_engins, use_container_width=True, hide_index=True)
         
-        # --- TABLEAU 2 : EMPLOYÉS (SYNCHRONISÉ ET SÉCURISÉ) ---
+        # --- TABLEAU 2 : STRUCTURE DES EFFECTIFS ---
         st.markdown("**👥 Structure des Employés requis à l'étape :**")
         lignes_emp = []
-        for e in data["engins_requis"]:
+        if not df_brut_etapes.empty:
+            for _, row_e in df_brut_etapes.iterrows():
+                lignes_emp.append({
+                    "N° Étape": row_e.get("N° Étape", 1),
+                    "🕹️ Conducteurs": data.get("jh_cond", 0.0),
+                    "🧑‍💼 Chefs": data.get("jh_chef", 0.0),
+                    "👷 Ouvriers": data.get("jh_ouvrier", 0.0)
+                })
+        else:
             lignes_emp.append({
-                "N° Étape": e.get("N° Étape", 1),
-                "🕹️ Conducteurs": data.get("jh_cond", 1),
-                "🧑‍💼 Chefs": data.get("jh_chef", 0),
-                "👷 Ouvriers": data.get("jh_ouvrier", 0)
+                "N° Étape": 1,
+                "🕹️ Conducteurs": data.get("jh_cond", 0.0),
+                "🧑‍💼 Chefs": data.get("jh_chef", 0.0),
+                "👷 Ouvriers": data.get("jh_ouvrier", 0.0)
             })
             
         df_employes_brut = pd.DataFrame(lignes_emp)
@@ -108,17 +117,18 @@ def pop_up_validation_fiches_chantiers(chantiers_detectes):
     with col_c1:
         if st.button("✅ CONFIRMER L'IMPORTATION", type="primary", use_container_width=True, key="btn_confirm_cloud_import_fiches"):
             compteur = 0
-            for name, data in chantiers_detectes.items():
+            for temporary_key, data in chantiers_detectes.items():
                 engins_propres = [
                     e for e in data["engins_requis"] 
                     if e.get("Type d'engin requis") is not None and str(e["Type d'engin requis"]).strip() != ""
                 ]
                 
-                # 🚀 FIX COMPORTEMENT CLOUD : Clé unique incluant le prix pour éviter l'écrasement NoSQL
-                nom_unique_key = f"{name} - {int(data['revenus'])}€"
+                # 🚀 EXTRACTION TECHNIQUE : Clé unique incluant le prix pour stocker les déclinaisons sans écrasement
+                vrai_nom_propre = data["nom_affiche_propre"]
+                nom_unique_key = f"{vrai_nom_propre} - {int(data['revenus'])}€"
                 
                 db.db.collection("modeles_chantiers").document(nom_unique_key).set({
-                    "nom_modele": name, # Le nom affiché reste propre
+                    "nom_modele": vrai_nom_propre, 
                     "revenus": float(data["revenus"]), 
                     "jours": int(data["jours"]), 
                     "heures": int(data["heures"]), 
@@ -144,7 +154,7 @@ def pop_up_validation_fiches_chantiers(chantiers_detectes):
                 compteur += 1
             st.toast(f"🚀 {compteur} modèle(s) synchronisé(s) avec succès !")
             st.rerun()
-
+            
     with col_c2:
         if st.button("❌ ANNULER", use_container_width=True, key="btn_cancel_cloud_import_fiches"):
             st.rerun()
