@@ -22,23 +22,23 @@ def pop_up_validation_recrutement(salaires_mensuels, metier, type_contrat, salai
         sj_moyen = math.ceil(sm_moyen / 7.0)
         sj_max = math.ceil(sm_max / 7.0)
         prefixe_cle = f"{metier}_CDI"
-        st.info(f"💡 Conversion CDI mensuelle (base 1 mois = 7j) ramenée au jour (Moyenne : {int(sm_moyen)} €/mois)")
+        st.info(f"💡 Conversion CDI mensuelle (base 1 mois = 7j) ramenée au jour (Moyenne : {f'{int(sm_moyen)}:,.0f}'.replace(',', ' ')} €/mois)")
         
         st.markdown("### 🧮 Conversion ramenée à la journée de jeu :")
-        st.success(f"**- Coût Minimum :** `{int(sj_min)} € / jour` (soit {int(sm_min)} €/mois)")
-        st.success(f"**- Coût Moyen :** `{int(sj_moyen)} € / jour` (soit {int(sm_moyen)} €/mois)")
-        st.success(f"**- Coût Maximum :** `{int(sj_max)} € / jour` (soit {int(sm_max)} €/mois)")
+        st.success(f"**- Coût Minimum :** `{f'{int(sj_min)}:,.0f}'.replace(',', ' ')} € / jour` (soit {f'{int(sm_min)}:,.0f}'.replace(',', ' ')} €/mois)")
+        st.success(f"**- Coût Moyen :** `{f'{int(sj_moyen)}:,.0f}'.replace(',', ' ')} € / jour` (soit {f'{int(sm_moyen)}:,.0f}'.replace(',', ' ')} €/mois)")
+        st.success(f"**- Coût Maximum :** `{f'{int(sj_max)}:,.0f}'.replace(',', ' ')} € / jour` (soit {f'{int(sm_max)}:,.0f}'.replace(',', ' ')} €/mois)")
     else:
         sj_min = math.ceil(sm_min)
         sj_moyen = math.ceil(sm_moyen)
         sj_max = math.ceil(sm_max)
         prefixe_cle = f"{metier}_CDD"
-        st.info(f"💡 Enregistrement CDD direct au jour (Moyenne : {int(sm_moyen)} €/jour)")
+        st.info(f"💡 Enregistrement CDD direct au jour (Moyenne : {f'{int(sm_moyen)}:,.0f}'.replace(',', ' ')} €/jour)")
         
         st.markdown("### 🧮 Tarification au jour de jeu :")
-        st.success(f"**- Tarif Minimum :** `{int(sj_min)} € / jour`")
-        st.success(f"**- Tarif Moyen :** `{int(sj_moyen)} € / jour`")
-        st.success(f"**- Tarif Maximum :** `{int(sj_max)} € / jour`")
+        st.success(f"**- Tarif Minimum :** `{f'{int(sj_min)}:,.0f}'.replace(',', ' ')} € / jour`")
+        st.success(f"**- Tarif Moyen :** `{f'{int(sj_moyen)}:,.0f}'.replace(',', ' ')} € / jour`")
+        st.success(f"**- Tarif Maximum :** `{f'{int(sj_max)}:,.0f}'.replace(',', ' ')} € / jour`")
 
     if st.button("✅ ENREGISTRER SUR FIREBASE", type="primary", use_container_width=True, key=f"btn_save_cloud_{metier}_{prefixe_cle}"):
         grille_actuelle = dict(salaires_db_dict)
@@ -48,6 +48,7 @@ def pop_up_validation_recrutement(salaires_mensuels, metier, type_contrat, salai
         grille_actuelle[metier] = int(sj_moyen)
 
         db.db.collection("configuration_salaires").document("grille").set(grille_actuelle)
+        st.cache_data.clear()
         st.toast("🚀 Tarifs enregistrés sur Firebase !")
         st.rerun()
 
@@ -61,7 +62,7 @@ def pop_up_validation_fiches_chantiers(chantiers_detectes):
     for temporary_key, data in chantiers_detectes.items():
         vrai_nom_propre = data["nom_affiche_propre"]
         st.markdown(f"### 🏗️ Chantier : **{vrai_nom_propre}**")
-        st.info(f"💰 **Revenus détectés :** `{int(data['revenus']):,.0f}` €".replace(",", " "))
+        st.info(f"💰 **Revenus détectés :** `{f'{int(data['revenus'])}:,.0f}'.replace(',', ' ')}` €")
         
         st.markdown("**⏱️ Temps configuré pour l'Onglet 1 :**")
         st.code(f"{data['jours']} jour(s), {data['heures']} heure(s), {data['minutes']} minute(s)")
@@ -70,7 +71,7 @@ def pop_up_validation_fiches_chantiers(chantiers_detectes):
         mats_list = []
         for m_key in ["sable", "terre", "enrobe", "armature", "tole", "beton", "panneaux", "tuyaux", "canalisations", "poutres"]:
             if data[m_key] > 0:
-                mats_list.append(f"{m_key.capitalize()} : `{int(data[m_key])}`")
+                mats_list.append(f"{m_key.capitalize()} : `{f'{int(data[m_key])}:,.0f}'.replace(',', ' ')}`")
         if mats_list:
             st.write(" | ".join(mats_list))
         else:
@@ -123,7 +124,6 @@ def pop_up_validation_fiches_chantiers(chantiers_detectes):
                     if e.get("Type d'engin requis") is not None and str(e["Type d'engin requis"]).strip() != ""
                 ]
                 
-                # 🚀 EXTRACTION TECHNIQUE : Clé unique incluant le prix pour stocker les déclinaisons sans écrasement
                 vrai_nom_propre = data["nom_affiche_propre"]
                 nom_unique_key = f"{vrai_nom_propre} - {int(data['revenus'])}€"
                 
@@ -152,6 +152,7 @@ def pop_up_validation_fiches_chantiers(chantiers_detectes):
                     "engins_requis": engins_propres
                 })
                 compteur += 1
+            st.cache_data.clear()
             st.toast(f"🚀 {compteur} modèle(s) synchronisé(s) avec succès !")
             st.rerun()
             
@@ -194,12 +195,14 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                 if st.button("🗑️ Vider l'Historique des Chantiers", type="secondary", use_container_width=True):
                     docs = db.db.collection("chantiers").stream()
                     for d in docs: d.reference.delete()
+                    db.st.cache_data.clear()  # Purge immédiate après altération
                     st.toast("Historique des chantiers supprimé !")
                     st.rerun()
             with col_del2:
                 if st.button("🗑️ Vider les Modèles Préfabriqués", type="secondary", use_container_width=True):
                     docs = db.db.collection("modeles_chantiers").stream()
                     for d in docs: d.reference.delete()
+                    db.st.cache_data.clear()  # Purge immédiate après altération
                     st.toast("Catalogue des modèles vidé !")
                     st.rerun()
             with col_del3:
@@ -216,7 +219,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
             "🔎 Comparateur de Fiches"
         ])
 
-        
         # --- 4.1 IMPORTATION EN BLOC ET DECODAGE ---
         with sub_tab1:
             st.markdown("### 📥 Extracteur de Fiches Chantiers Multi-Étapes")
@@ -235,7 +237,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                         l_clean = ligne.strip()
                         if not l_clean: continue
                         
-                        # 1. DÉTECTION DU DEBUT D'UN NOUVEAU CHANTIER (SÉCURISÉE AVEC LE PRIX)
                         if "euros" in l_clean.lower() and not l_clean.lower().startswith("revenus"):
                             match_debut = re.search(r"^(.*?)\s+(\d[\d\s]+)\s+euros", l_clean, re.IGNORECASE)
                             if match_debut:
@@ -246,13 +247,12 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                 prix_ch = 0.0
                                 nom_ch = l_clean.replace("euros", "").replace("Euros", "").strip()
                                 
-                            # 🚀 SÉCURITÉ CRITIQUE : L'identifiant temporaire contient le prix pour éviter la collision de nom
                             nom_courant = f"{nom_ch} _PLANCHER_ {int(prix_ch)}"
                             etape_courante_num = None
                             
                             if nom_courant not in chantiers_detectes:
                                 chantiers_detectes[nom_courant] = {
-                                    "nom_affiche_propre": nom_ch, # On garde le vrai nom pour l'affichage
+                                    "nom_affiche_propre": nom_ch,
                                     "revenus": prix_ch, "jours": 0, "heures": 0, "minutes": 0, "nb_etapes": 1,
                                     "sable": 0.0, "terre": 0.0, "enrobe": 0.0, "armature": 0.0, "tole": 0.0,
                                     "beton": 0.0, "panneaux": 0.0, "tuyaux": 0.0, "canalisations": 0.0, "poutres": 0.0,
@@ -262,12 +262,10 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
 
                         if not nom_courant: continue
                         
-                        # 2. CAPTURE DES REVENUS REPETÉS
                         if l_clean.lower().startswith("revenus :"):
                             prix_txt = "".join(c for c in l_clean if c.isdigit())
                             if prix_txt: 
                                 chantiers_detectes[nom_courant]["revenus"] = float(prix_txt)
-                                # On met à jour la clé au cas où le premier prix était mal lu
                                 old_data = chantiers_detectes[nom_courant]
                                 nom_filtre_secours = f"{old_data['nom_affiche_propre']} _PLANCHER_ {int(prix_txt)}"
                                 if nom_filtre_secours != nom_courant:
@@ -359,11 +357,11 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                         "Niveau requis": f"N{re.search(r'niveau\s*(\d+)', ligne_brute_clean).group(1)}" if re.search(r'niveau\s*(\d+)', ligne_brute_clean) else "N1"
                                     })
 
-                    # --- FIN DE LA LECTURE DES LIGNES / ENCLENCHEMENT POP-UP MIEUX CLÔTURÉ ---
                     if len(chantiers_detectes) > 0:
                         pop_up_validation_fiches_chantiers(chantiers_detectes)
                     else:
                         st.error("❌ L'algorithme n'a détecté aucune fiche de chantier valide dans votre texte brut.")
+
         # --- 4.2 CONFIGURATION GRILLE SALARIALE ---
         with sub_tab2:
             st.markdown("### 👥 Extracteur et Calculateur de Salaires par Métier & Contrat")
@@ -388,210 +386,159 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             if "€" in el:
                                 chiffre_net = "".join(c for c in el if c.isdigit())
                                 if chiffre_net: salaire_trouve = float(chiffre_net); break
-                        if salaire_trouve is not None: liste_salaires_extraits.append(salaire_trouve)
+                        
+                        if salaire_trouve is not None: 
+                            liste_salaires_extraits.append(salaire_trouve)
 
-                    if len(liste_salaires_extraits) > 0: pop_up_validation_recrutement(liste_salaires_extraits, metier_cible, type_contrat_cible, SALAIRES_DB)
-                    else: st.error("❌ Aucun montant trouvé.")
+                    if liste_salaires_extraits:
+                        pop_up_validation_recrutement(liste_salaires_extraits, metier_cible, type_contrat_cible, SALAIRES_DB)
+                    else:
+                        st.error("❌ Impossible d'extraire des montants de salaires valides (€).")
 
-            st.markdown("---")
-            lignes_brutes_firebase = [{"Clé": poste, "Montant (€)": int(mt), "🗑️ Retirer": False} for poste, mt in SALAIRES_DB.items()]
-            lignes_brutes_firebase.sort(key=lambda x: x["Clé"])
-            table_retour_edition = st.data_editor(pd.DataFrame(lignes_brutes_firebase), use_container_width=True, hide_index=True, key="editeur_interactif_brut_total")
-            
-            if not table_retour_edition.empty:
-                lignes_a_supprimer = table_retour_edition[table_retour_edition["🗑️ Retirer"] == True]
-                if len(lignes_a_supprimer) > 0:
-                    st.warning(f"🚨 Alerte : Vous allez détruire définitivement {len(lignes_a_supprimer)} ligne(s) du Cloud Firebase.")
-                    if st.button("💥 CONFIRMER LA SUPPRESSION DU CLOUD", type="primary", use_container_width=True):
-                        grille_firebase = dict(SALAIRES_DB)
-                        for _, row_del in lignes_a_supprimer.iterrows():
-                            cle_a_retirer = row_del["Clé"]
-                            if cle_a_retirer in grille_firebase: del grille_firebase[cle_a_retirer]
-                        db.db.collection("configuration_salaires").document("grille").set(grille_firebase)
-                        st.toast("🔥 Données effacées définitivement !"); st.rerun()
+            st.markdown("#### 📄 Grille Salariale Active dans le Cloud :")
+            if not SALAIRES_DB:
+                st.info("La grille salariale cloud est actuellement vide.")
+            else:
+                df_sal_visuel = pd.DataFrame(list(SALAIRES_DB.items()), columns=["Poste / Contrat", "Tarif Journalier (€)"])
+                df_sal_style = df_sal_visuel.style.format({
+                    "Tarif Journalier (€)": lambda x: f"{x:,.0f}".replace(",", " ") + " €" if pd.notnull(x) else "-"
+                })
+                st.dataframe(df_sal_style, use_container_width=True, hide_index=True)
 
         # --- 4.3 PRIX DES MATÉRIAUX ---
         with sub_tab3:
-            st.write("Ajustez le prix unitaire de vos matières premières.")
-            mats_edites = st.data_editor(pd.DataFrame(list(MATERIAUX_DB.items()), columns=["materiau", "prix_unitaire"]), use_container_width=True, key="editeur_mats_db")
-            if st.button("METTRE À JOUR LE COÛT DES MATÉRIAUX"):
-                nouveau_dict = dict(zip(mats_edites["materiau"], mats_edites["prix_unitaire"].astype(float)))
-                db.db.collection("configuration_materiaux").document("catalogue").set(nouveau_dict)
-                st.success("Tarifs matériaux actualisés !"); st.rerun()
+            st.markdown("### 🧱 Édition du Coût de l'Approvisionnement (Prix Unitaires)")
+            form_mats = dict(MATERIAUX_DB)
+            col_m1, col_m2 = st.columns(2)
+            
+            liste_cles_mats = list(form_mats.keys())
+            milieu = math.ceil(len(liste_cles_mats) / 2)
+            
+            with col_m1:
+                for m_k in liste_cles_mats[:milieu]:
+                    form_mats[m_k] = st.number_input(f"Prix {m_k} (€/t ou €/u) :", value=float(form_mats[m_k]), min_value=0.0, step=1.0, format="%.2f")
+            with col_m2:
+                for m_k in liste_cles_mats[milieu:]:
+                    form_mats[m_k] = st.number_input(f"Prix {m_k} (€/t ou €/u) :", value=float(form_mats[m_k]), min_value=0.0, step=1.0, format="%.2f")
+                    
+            if st.button("✅ METTRE À JOUR LES TARIFS MATÉRIAUX", type="primary", use_container_width=True):
+                db.db.collection("configuration_materiaux").document("catalogue").set(form_mats)
+                st.cache_data.clear()
+                st.toast("🧱 Catalogue des prix matériaux synchronisé avec succès !")
+                st.rerun()
 
-        # --- 4.4 CATALOGUE D'ENGINS (EXTRACTEUR EN BLOC INTÉGRÉ) ---
+        # --- 4.4 CATALOGUE DE LA FLOTTE D'ENGINS ---
         with sub_tab4:
-            st.markdown("### 📥 Importation d'Engins de Location en Bloc")
-            st.caption("💡 Format attendu : `Nom de l'engin [Tabulation ou Espace] Tarif€` (Exemple : `Camions Benne N2 250€` ou `Finisseur N3 490`) ")
+            st.markdown("### 🚜 Administration et Tarification de la Flotte")
+            catalogue_engins_brut = db.charger_catalogue_engins()
             
-            texte_engins_brut = st.text_area(
-                "Collez votre liste d'engins et tarifs ici :", value="", height=200, 
-                key="zone_texte_import_engins_lourds_bloc"
-            )
-
-            if st.button("🚜 ANALYSER ET INJECTER LA FLOTTE D'ENGINS", type="primary"):
-                if not texte_engins_brut.strip():
-                    st.error("❌ La zone de texte est vide.")
-                else:
-                    lignes_engins = texte_engins_brut.split("\n")
-                    compteur_engins = 0
-                    
-                    # On nettoie d'abord l'ancien catalogue NoSQL pour éviter les doublons obsolètes
-                    docs_a_purger = db.db.collection("catalogue_engins").stream()
-                    for doc_p in docs_a_purger:
-                        doc_p.reference.delete()
-                        
-                    for lg in lignes_engins:
-                        lg_clean = lg.strip()
-                        if not lg_clean: 
-                            continue
-                            
-                        # Utilisation d'un regex pour capturer le nom de l'engin à gauche et le tarif numérique à droite
-                        match_location = re.search(r"^(.*?)\s+(\d+)\s*(?:€|euros|/jour)?$", lg_clean, re.IGNORECASE)
-                        if match_location:
-                            nom_complet_engin = match_location.group(1).strip()
-                            prix_jour_loc = float(match_location.group(2))
-                            
-                            # Extraction automatique de la catégorie générique (type_brut) en retirant le "N1", "N2", etc.
-                            # Exemple : "Camions Benne N2" -> "Camions Benne"
-                            type_brut_extrait = re.sub(r"\s+N\d+\s*$", "", nom_complet_engin, flags=re.IGNORECASE).strip()
-                            
-                            # Injection NoSQL directe sur Firebase Firestore
-                            db.db.collection("catalogue_engins").document(nom_complet_engin).set({
-                                "type_brut": type_brut_extrait,
-                                "prix_jour": prix_jour_loc
-                            })
-                            compteur_engins += 1
-                            
-                    if compteur_engins > 0:
-                        st.success(f"🚀 Synchronisation Cloud réussie : {compteur_engins} engin(s) lourd(s) injecté(s) au catalogue NoSQL !")
-                        st.rerun()
+            with st.form("form_ajout_engin_direction", clear_on_submit=True):
+                c_en1, c_en2, c_en3 = st.columns(3)
+                with c_en1: nom_nouveau_engin = st.text_input("Nom unique & Niveau (ex: Pelleteuse N1) :").strip()
+                with c_en2: type_brut_choisi = st.text_input("Famille d'engin (ex: Pelleteuses) :").strip()
+                with c_en3: prix_jour_choisi = st.number_input("Prix de location journalier (€) :", min_value=0.0, step=10.0, value=380.0)
+                
+                submit_engin = st.form_submit_button("🚜 INSÉRER L'ENGIN DANS LE CATALOGUE GLOBAL", type="primary", use_container_width=True)
+                
+                if submit_engin:
+                    if not nom_nouveau_engin or not type_brut_choisi:
+                        st.error("❌ Veuillez compléter l'intégralité des champs textuels.")
                     else:
-                        st.error("❌ Aucun engin ou tarif valide n'a pu être extrait. Vérifiez le format de saisie.")
-
-            st.markdown("---")
-            st.markdown("### 🛠️ Éditeur Visuel du Catalogue Actuel")
-            
-            # On conserve ton éditeur manuel en dessous au cas où tu as besoin d'ajuster un prix à la main
-            docs_engins = db.db.collection("catalogue_engins").stream()
-            liste_engins = [{"nom_engin": d.id, "type_brut": d.to_dict().get("type_brut", ""), "prix_jour": d.to_dict().get("prix_jour", 0.0)} for d in docs_engins]
-            df_engins = pd.DataFrame(liste_engins) if liste_engins else pd.DataFrame(columns=["nom_engin", "type_brut", "prix_jour"])
-            
-            engins_edites_db = st.data_editor(df_engins, use_container_width=True, key="editeur_engins_db", num_rows="dynamic")
-            if st.button("METTRE À JOUR MANUELLEMENT LE CATALOGUE DES ENGINS"):
-                old_docs = db.db.collection("catalogue_engins").stream()
-                for od in old_docs: 
-                    od.reference.delete()
-                for _, r in engins_edites_db.iterrows():
-                    if pd.notnull(r["nom_engin"]) and str(r["nom_engin"]).strip():
-                        db.db.collection("catalogue_engins").document(str(r["nom_engin"]).strip()).set({
-                            "type_brut": str(r["type_brut"]), 
-                            "prix_jour": float(r["prix_jour"])
+                        db.db.collection("catalogue_engins").document(nom_nouveau_engin).set({
+                            "type_brut": type_brut_choisi,
+                            "prix_jour": float(prix_jour_choisi)
                         })
-                st.success("Parc d'engins synchronisé !"); st.rerun()
+                        st.cache_data.clear()
+                        st.toast(f"🚀 Engin '{nom_nouveau_engin}' ajouté au catalogue !")
+                        st.rerun()
 
-                # --- 4.6 🔎 SOUS-ONGLET : COMPARATEUR DE FICHES AVEC LA BASE NOSQL ---
-        with sub_tab6:
-            st.markdown("### 🔎 Comparateur de Chantiers Cloud vs Fiche Brute")
-            st.caption("💡 Collez votre liste brute de chantiers ci-dessous pour vérifier s'ils existent déjà en base de données et comparer leurs revenus.")
-            
-            texte_comparaison_brut = st.text_area(
-                "Zone de texte pour la comparaison :", value="", height=250, 
-                key="zone_texte_comparateur_chantiers_bruts"
-            )
-            
-            if st.button("🔎 LANCER LA COMPARAISON DES CHANTIERS", type="primary"):
-                if not texte_comparaison_brut.strip():
-                    st.error("❌ La zone de texte est vide.")
-                else:
-                    # A. Récupération instantanée de tous les modèles actuellement sur Firebase
-                    docs_firebase = db.db.collection("modeles_chantiers").stream()
-                    catalogue_cloud = {}
-                    for d_fb in docs_firebase:
-                        d_dict = d_fb.to_dict()
-                        nom_doc = d_fb.id
-                        catalogue_cloud[nom_doc.lower().strip()] = float(d_dict.get("revenus", 0.0))
-                    
-                    # B. Analyse du texte brut collé
-                    lignes_comp = texte_comparaison_brut.split("\n")
-                    chantiers_analyses = []
-                    
-                    for l_comp in lignes_comp:
-                        l_c = l_comp.strip()
-                        if not l_c or "euros" not in l_c.lower():
-                            continue
-                            
-                        # Extraction du nom, du niveau et du prix
-                        # Exemple : "Creuser (niveau 3)    10 881 euros"
-                        match_ch = re.search(r"^(.*?)\s+(\d[\d\s]+)\s+euros", l_c, re.IGNORECASE)
-                        if match_ch:
-                            nom_brut = match_ch.group(1).strip()
-                            prix_txt = "".join(c for c in match_ch.group(2) if c.isdigit())
-                            prix_fiche = float(prix_txt) if prix_txt else 0.0
-                            
-                            # Standardisation du nom pour la recherche NoSQL (ex: "Creuser (niveau 3)")
-                            cle_recherche = nom_brut.lower().strip()
-                            
-                            # C. Analyse comparative de l'état NoSQL
-                            if cle_recherche in catalogue_cloud:
-                                prix_cloud = catalogue_cloud[cle_recherche]
-                                if prix_fiche == prix_cloud:
-                                    statut = "✅ Prix Identique"
-                                    action_rec = "➡️ Conserver (Rien à faire)"
-                                else:
-                                    statut = "⚠️ Prix Différent"
-                                    action_rec = f"🔄 Mettre à jour (Cloud: {int(prix_cloud):,.0f} €)"
-                            else:
-                                statut = "🆕 Inconnu en Base NoSQL"
-                                action_rec = "📥 À importer (Nouveau modèle)"
-                                
-                            chantiers_analyses.append({
-                                "Chantier à analyser": nom_brut,
-                                "Revenus Fiche (€)": int(prix_fiche),
-                                "État de la Base Cloud": statut,
-                                "Action recommandée": action_rec
-                            })
-                    
-                    # D. Rendu sous forme de Tableau Scannable
-                    if chantiers_analyses:
-                        st.markdown("### 📊 Résultat de l'analyse comparative")
-                        df_comparatif = pd.DataFrame(chantiers_analyses)
-                        
-                        # Tri automatique pour mettre en premier les nouveaux chantiers ou ceux modifiés
-                        df_comparatif.sort_values(by="État de la Base Cloud", ascending=False, inplace=True)
-                        
-                        st.dataframe(
-                            df_comparatif, use_container_width=True, hide_index=True,
-                            column_config={
-                                "Revenus Fiche (€)": st.column_config.NumberColumn("Revenus Fiche", format="%d €"),
-                                "État de la Base Cloud": st.column_config.TextColumn("Diagnostic NoSQL"),
-                                "Action recommandée": st.column_config.TextColumn("Action")
-                            }
-                        )
-                        st.toast(f"🔎 {len(chantiers_analyses)} chantiers analysés avec succès !")
-                    else:
-                        st.error("❌ Aucun chantier valide n'a été détecté. Vérifiez que les lignes contiennent le mot 'euros'.")
+            st.markdown("#### Matériels actuellement référencés (Vue Cloud) :")
+            if not catalogue_engins_brut:
+                st.info("Le catalogue d'engins est vu comme vide.")
+            else:
+                df_liste_engins = pd.DataFrame([
+                    {"Nom de l'engin": k, "Prix / Jour (€)": v} 
+                    for k, v in catalogue_engins_brut.items()
+                ])
+                df_liste_engins_style = df_liste_engins.style.format({
+                    "Prix / Jour (€)": lambda x: f"{x:,.0f}".replace(",", " ") + " €" if pd.notnull(x) else "-"
+                })
+                st.dataframe(df_liste_engins_style, use_container_width=True, hide_index=True)
 
-        
         # --- 4.5 CONSULTATION DES TABLES ---
         with sub_tab5:
             st.markdown("### 🗂️ Consultation brute complète")
-            choix_table = st.selectbox("Choisir la table :", ["Modèles de Chantiers Pré-configurés", "Grille Salariale Actuelle", "Prix des Matériaux de base", "Catalogue de Location des Engins"])
+            choix_table = st.selectbox(
+                "Choisir la table :", 
+                ["Modèles de Chantiers Pré-configurés", "Grille Salariale Actuelle", "Prix des Matériaux de base", "Catalogue de Location des Engins"]
+            )
+            
             if choix_table == "Modèles de Chantiers Pré-configurés":
-                docs = db.db.collection("modeles_chantiers").stream()
-                res = [d.to_dict() for d in docs]
+                dict_modeles = db.charger_catalogue_chantiers()
+                res = [dict_modeles[k] for k in dict_modeles if k != "Choisir un chantier pré-configuré..."]
+                
                 if res:
                     df_apercu = pd.DataFrame(res)
-                    if "engins_requis" in df_apercu.columns: df_apercu = df_apercu.drop(columns=["engins_requis"])
-                    st.dataframe(df_apercu, use_container_width=True)
-                else: st.info("Aucun modèle configuré sur votre base Firebase.")
-            elif choix_table == "Grille Salariale Actuelle": st.json(SALAIRES_DB)
-            elif choix_table == "Prix des Matériaux de base": st.json(MATERIAUX_DB)
+                    if "engins_requis" in df_apercu.columns: 
+                        df_apercu = df_apercu.drop(columns=["engins_requis"])
+                    colonnes_numeriques = df_apercu.select_dtypes(include=['number']).columns
+                    df_stylise = df_apercu.style.format({
+                        col: lambda x: f"{x:,.0f}".replace(",", " ") if pd.notnull(x) else "-" 
+                        for col in colonnes_numeriques
+                    })
+                    st.dataframe(df_stylise, use_container_width=True, hide_index=True)
+                else: 
+                    st.info("Aucun modèle configuré sur votre base Firebase.")
+                    
+            elif choix_table == "Grille Salariale Actuelle": 
+                salaires_formates = {k: f"{v:,.0f}".replace(",", " ") + " €" for k, v in SALAIRES_DB.items()}
+                st.json(salaires_formates)
+                
+            elif choix_table == "Prix des Matériaux de base": 
+                materiaux_formates = {k: f"{v:,.0f}".replace(",", " ") + " €" for k, v in MATERIAUX_DB.items()}
+                st.json(materiaux_formates)
+                
             elif choix_table == "Catalogue de Location des Engins":
-                docs = db.db.collection("catalogue_engins").stream()
-                res = [{"Engin Modèle": d.id, "Catégorie": d.to_dict().get("type_brut"), "Prix/j (€)": d.to_dict().get("prix_jour")} for d in docs]
-                if res: st.dataframe(pd.DataFrame(res), use_container_width=True)
-                else: st.info("Catalogue vide.")
+                catalogue_engins_brut = db.charger_catalogue_engins()
+                
+                if catalogue_engins_brut: 
+                    res = [{"Engin Modèle": k, "Prix/j (€)": v} for k, v in catalogue_engins_brut.items()]
+                    df_engins_apercu = pd.DataFrame(res)
+                    df_engins_stylise = df_engins_apercu.style.format({
+                        "Prix/j (€)": lambda x: f"{x:,.0f}".replace(",", " ") + " €" if pd.notnull(x) else "-"
+                    })
+                    st.dataframe(df_engins_stylise, use_container_width=True, hide_index=True)
+                else: 
+                    st.info("Catalogue vide.")
+
+        # --- 4.6 COMPARATEUR DE FICHES CHANTIERS ---
+        with sub_tab6:
+            st.markdown("### 🔎 Outil de Comparaison de Modèles Préfabriqués")
+            dict_modeles_comp = db.charger_catalogue_chantiers()
+            liste_selection_comp = [k for k in dict_modeles_comp.keys() if k != "Choisir un chantier pré-configuré..."]
+            
+            if len(liste_selection_comp) < 2:
+                st.info("💡 Deux modèles minimum requis pour exécuter une comparaison.")
+            else:
+                c_cmp1, c_cmp2 = st.columns(2)
+                with c_cmp1: ch_A = st.selectbox("Sélectionner le Chantier A :", liste_selection_comp, key="comp_select_A")
+                with c_cmp2: ch_B = st.selectbox("Sélectionner le Chantier B (Comparatif) :", liste_selection_comp, key="comp_select_B")
+                
+                if ch_A == ch_B:
+                    st.warning("Veuillez cibler deux chantiers distincts.")
+                else:
+                    data_A = dict_modeles_comp[ch_A]
+                    data_B = dict_modeles_comp[ch_B]
+                    
+                    st.markdown("#### 📊 Métriques d'Ouvrages et Écarts Techniques")
+                    
+                    metrics_comparatives = {
+                        "Indicateur structurel": ["Revenus Fixes du Modèle", "Durée Théorique (jours)", "Sable global requis", "Béton global requis", "Terre globale requise"],
+                        f"Chantier A : {data_A.get('nom_modele', ch_A)}": [f"{data_A.get('revenus', 0):,.0f}".replace(",", " ") + " €", f"{data_A.get('jours', 0)} jours", f"{data_A.get('sable', 0)} t", f"{data_A.get('beton', 0)} t", f"{data_A.get('terre', 0)} t"],
+                        f"Chantier B : {data_B.get('nom_modele', ch_B)}": [f"{data_B.get('revenus', 0):,.0f}".replace(",", " ") + " €", f"{data_B.get('jours', 0)} jours", f"{data_B.get('sable', 0)} t", f"{data_B.get('beton', 0)} t", f"{data_B.get('terre', 0)} t"]
+                    }
+                    st.table(pd.DataFrame(metrics_comparatives))
+                    
     elif mot_de_passe != "":
         st.error("🔒 Code d'accès incorrect.")
-
+                    
