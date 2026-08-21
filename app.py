@@ -2,7 +2,7 @@ import streamlit as st
 import database as db  # On importe notre fichier de base de données
 
 # On importe les fonctions d'affichage de nos futurs fichiers onglets
-from onglets.ajouter_chantier import afficher_onglet_ajouter
+from onglets.ajouter_chantier1 import afficher_onglet_ajouter
 from onglets.historique import afficher_onglet_historique
 from onglets.direction import afficher_onglet_direction
 
