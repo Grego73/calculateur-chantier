@@ -11,7 +11,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
     correspondance_cles = {}
     
     # Largeur totale visuelle fixe pour pousser le prix très loin
-    largeur_alignement = 35 
+    largeur_alignement = 50 
     
     for cle_document, donnees in CATALOGUE_CHANTIERS.items():
         if cle_document == "Choisir un chantier pré-configuré...":
