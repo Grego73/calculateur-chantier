@@ -113,8 +113,12 @@ def pop_up_validation_fiches_chantiers(chantiers_detectes):
                     e for e in data["engins_requis"] 
                     if e.get("Type d'engin requis") is not None and str(e["Type d'engin requis"]).strip() != ""
                 ]
-                db.db.collection("modeles_chantiers").document(name).set({
-                    "nom_modele": name, 
+                
+                # 🚀 FIX COMPORTEMENT CLOUD : Clé unique incluant le prix pour éviter l'écrasement NoSQL
+                nom_unique_key = f"{name} - {int(data['revenus'])}€"
+                
+                db.db.collection("modeles_chantiers").document(nom_unique_key).set({
+                    "nom_modele": name, # Le nom affiché reste propre
                     "revenus": float(data["revenus"]), 
                     "jours": int(data["jours"]), 
                     "heures": int(data["heures"]), 
@@ -140,6 +144,7 @@ def pop_up_validation_fiches_chantiers(chantiers_detectes):
                 compteur += 1
             st.toast(f"🚀 {compteur} modèle(s) synchronisé(s) avec succès !")
             st.rerun()
+
     with col_c2:
         if st.button("❌ ANNULER", use_container_width=True, key="btn_cancel_cloud_import_fiches"):
             st.rerun()
