@@ -6,13 +6,22 @@ import database as db
 def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_ENGINS_BRUTS, CATALOGUE_CHANTIERS):
     st.subheader("Formulaire de saisie")
     
-    # 🚀 CONFIGURATION DE L'ESPACEMENT INSECABLE GÉANT
     options_menu = ["Choisir un chantier pré-configuré..."]
     correspondance_cles = {}
     
-    # Largeur totale visuelle fixe pour pousser le prix très loin
-    largeur_alignement = 50 
+    # 🔎 DÉTERMINATION DYNAMIQUE DU CHANTIER LE PLUS LONG
+    longueur_max_nom = 0
+    for cle_document, donnees in CATALOGUE_CHANTIERS.items():
+        if cle_document == "Choisir un chantier pré-configuré...":
+            continue
+        nom_propre = donnees.get("nom_modele", cle_document)
+        if len(nom_propre) > longueur_max_nom:
+            longueur_max_nom = len(nom_propre)
+            
+    # On ajoute une petite marge de sécurité pour éloigner le prix du texte le plus long
+    largeur_cible = longueur_max_nom + 4
     
+    # 🚀 ALIGNEMENT DYNAMIQUE DE TOUS LES PRIX
     for cle_document, donnees in CATALOGUE_CHANTIERS.items():
         if cle_document == "Choisir un chantier pré-configuré...":
             continue
@@ -20,13 +29,14 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         nom_propre_affichage = donnees.get("nom_modele", cle_document)
         prix_formate = f"{int(donnees.get('revenus', 0)):,.0f}".replace(",", " ")
         
-        # 🎯 Calcul du nombre d'espaces invisibles requis pour ce chantier précis
-        nb_espaces_requis = max(1, largeur_alignement - len(nom_propre_affichage))
+        longueur_actuelle = len(nom_propre_affichage)
         
-        # \u00A0 est un espace insécable HTML (le navigateur est FORCÉ de l'afficher en entier)
-        espacement_geant = "\u00A0" * nb_espaces_requis
+        # Calcul du nombre d'espaces géants requis pour combler l'écart jusqu'à la largeur cible
+        # \u3000 prenant la place de 2 caractères standards, on divise la différence par 2
+        nb_espaces_geants = max(2, math.ceil((largeur_cible - longueur_actuelle) / 2))
+        espacement_geant = "\u3000" * nb_espaces_geants
         
-        # Construction de l'option avec un écart de colonnes parfait à l'écran
+        # Construction de l'option : tous les prix s'aligneront sur la même colonne invisible
         texte_option = f"{nom_propre_affichage}{espacement_geant}({prix_formate} euros)"
         options_menu.append(texte_option)
         correspondance_cles[texte_option] = cle_document
