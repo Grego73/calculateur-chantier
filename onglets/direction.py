@@ -225,7 +225,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                         l_clean = ligne.strip()
                         if not l_clean: continue
                         
-                        # 1. DÉTECTION DU DEBUT D'UN NOUVEAU CHANTIER
+                        # 1. DÉTECTION DU DEBUT D'UN NOUVEAU CHANTIER (SÉCURISÉE AVEC LE PRIX)
                         if "euros" in l_clean.lower() and not l_clean.lower().startswith("revenus"):
                             match_debut = re.search(r"^(.*?)\s+(\d[\d\s]+)\s+euros", l_clean, re.IGNORECASE)
                             if match_debut:
@@ -236,11 +236,13 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                 prix_ch = 0.0
                                 nom_ch = l_clean.replace("euros", "").replace("Euros", "").strip()
                                 
-                            nom_courant = nom_ch
+                            # 🚀 SÉCURITÉ CRITIQUE : L'identifiant temporaire contient le prix pour éviter la collision de nom
+                            nom_courant = f"{nom_ch} _PLANCHER_ {int(prix_ch)}"
                             etape_courante_num = None
                             
                             if nom_courant not in chantiers_detectes:
                                 chantiers_detectes[nom_courant] = {
+                                    "nom_affiche_propre": nom_ch, # On garde le vrai nom pour l'affichage
                                     "revenus": prix_ch, "jours": 0, "heures": 0, "minutes": 0, "nb_etapes": 1,
                                     "sable": 0.0, "terre": 0.0, "enrobe": 0.0, "armature": 0.0, "tole": 0.0,
                                     "beton": 0.0, "panneaux": 0.0, "tuyaux": 0.0, "canalisations": 0.0, "poutres": 0.0,
@@ -250,9 +252,17 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
 
                         if not nom_courant: continue
                         
+                        # 2. CAPTURE DES REVENUS REPETÉS
                         if l_clean.lower().startswith("revenus :"):
                             prix_txt = "".join(c for c in l_clean if c.isdigit())
-                            if prix_txt: chantiers_detectes[nom_courant]["revenus"] = float(prix_txt)
+                            if prix_txt: 
+                                chantiers_detectes[nom_courant]["revenus"] = float(prix_txt)
+                                # On met à jour la clé au cas où le premier prix était mal lu
+                                old_data = chantiers_detectes[nom_courant]
+                                nom_filtre_secours = f"{old_data['nom_affiche_propre']} _PLANCHER_ {int(prix_txt)}"
+                                if nom_filtre_secours != nom_courant:
+                                    chantiers_detectes[nom_filtre_secours] = old_data
+                                    nom_courant = nom_filtre_secours
                             continue
                             
                         if "nombre d'étapes :" in l_clean.lower():
@@ -272,23 +282,19 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
 
                         if l_clean.lower().startswith("etape") and ":" in l_clean:
                             match_e = re.search(r"etape\s*(\d+)", l_clean, re.IGNORECASE)
-                            if match_e:
-                                etape_courante_num = int(match_e.group(1))
+                            if match_e: etape_courante_num = int(match_e.group(1))
                             continue
 
                         if (l_clean.lower().startswith("durée de l'étape :") or l_clean.lower().startswith("duree de l'etape :")) and etape_courante_num is not None:
                             num_txt = "".join(c for c in l_clean.split(",") if c.isdigit())
-                            if num_txt:
-                                st.session_state[f"duree_{nom_courant}_{etape_courante_num}"] = int(num_txt)
+                            if num_txt: st.session_state[f"duree_{nom_courant}_{etape_courante_num}"] = int(num_txt)
                             continue
                             
-                        # 🛠️ REPARATION LOGIQUE RH : On applique le regex sur la chaîne de caractères brute de droite
                         if ":" in l_clean and etape_courante_num is not None and ("chef" in l_clean.lower() or "ouvrier" in l_clean.lower() or "conducteur" in l_clean.lower()):
                             gauche, droite = l_clean.split(":", 1)
                             gauche_low = gauche.lower()
-                            
-                            droite_propre = droite.split("(")[0].strip() # Extraction sécurisée de la chaîne avant la parenthèse
-                            match_nb = re.search(r"(\d+)", droite_propre)
+                            droite_sans_parenthese = droite.split("(")
+                            match_nb = re.search(r"(\d+)", droite_sans_parenthese[0])
                             
                             if match_nb:
                                 nb_val = float(match_nb.group(1))
@@ -320,50 +326,34 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                         elif "poutre" in sub_mat: chantiers_detectes[nom_courant]["poutres"] = qte_val
                             continue
 
-                        # 9. LECTURE DU NOM DE LA MACHINE (NETTOYAGE ACCENTS ET CASSE)
                         if etape_courante_num is not None and "employés requis" not in l_clean.lower() and "matériaux requis" not in l_clean.lower():
-                            # On retire les accents et les caractères spéciaux pour blinder la détection
                             ligne_brute_clean = l_clean.lower().replace("é", "e").replace("è", "e").replace("ê", "e").replace("à", "a")
                             cat_engin = None
-                            
-                            if "camion benne" in ligne_brute_clean: 
-                                cat_engin = "Camions Benne"
-                            elif "niveleuse" in ligne_brute_clean: 
-                                cat_engin = "Niveleuse"
-                            elif "finisseur" in ligne_brute_clean: 
-                                cat_engin = "Finisseur"
-                            elif "compacteur pour enrobe" in ligne_brute_clean or "compacteur" in ligne_brute_clean: 
-                                cat_engin = "Compacteur pour enrobé"
-                            elif "fraiseuse" in ligne_brute_clean: 
-                                cat_engin = "Fraiseuse"
-                            elif "chargeuse" in ligne_brute_clean: 
-                                cat_engin = "Chargeuse Compacte"
-                            elif "pelleteuse" in ligne_brute_clean: 
-                                cat_engin = "Pelleteuses"
-                            elif "malaxeur" in ligne_brute_clean or "camion beton" in ligne_brute_clean:
-                                cat_engin = "Camion Béton Malaxeur"
+                            if "camion benne" in ligne_brute_clean: cat_engin = "Camions Benne"
+                            elif "niveleuse" in ligne_brute_clean: cat_engin = "Niveleuse"
+                            elif "finisseur" in ligne_brute_clean: cat_engin = "Finisseur"
+                            elif "compacteur pour enrobe" in ligne_brute_clean or "compacteur" in ligne_brute_clean: cat_engin = "Compacteur pour enrobé"
+                            elif "fraiseuse" in ligne_brute_clean: cat_engin = "Fraiseuse"
+                            elif "chargeuse" in ligne_brute_clean: cat_engin = "Chargeuse Compacte"
+                            elif "pelleteuse" in ligne_brute_clean: cat_engin = "Pelleteuses"
+                            elif "malaxeur" in ligne_brute_clean or "camion beton" in ligne_brute_clean: cat_engin = "Camion Béton Malaxeur"
 
                             if cat_engin is not None:
                                 d_etape = st.session_state.get(f"duree_{nom_courant}_{etape_courante_num}", 1)
-                                
-                                doublon_engin = any(
-                                    e["N° Étape"] == etape_courante_num and e["Type d'engin requis"] == cat_engin 
-                                    for e in chantiers_detectes[nom_courant]["engins_requis"]
-                                )
-                                
+                                doublon_engin = any(e["N° Étape"] == etape_courante_num and e["Type d'engin requis"] == cat_engin for e in chantiers_detectes[nom_courant]["engins_requis"])
                                 if not doublon_engin:
                                     chantiers_detectes[nom_courant]["engins_requis"].append({
-                                        "N° Étape": etape_courante_num,
+                                        "N° Étape": etape_courante_num, 
                                         "Durée Étape (jours)": d_etape,
                                         "Type d'engin requis": cat_engin,
                                         "Niveau requis": f"N{re.search(r'niveau\s*(\d+)', ligne_brute_clean).group(1)}" if re.search(r'niveau\s*(\d+)', ligne_brute_clean) else "N1"
                                     })
 
+                    # --- FIN DE LA LECTURE DES LIGNES / ENCLENCHEMENT POP-UP MIEUX CLÔTURÉ ---
                     if len(chantiers_detectes) > 0:
                         pop_up_validation_fiches_chantiers(chantiers_detectes)
                     else:
-                        st.error("❌ L'algorithme n'a détecté aucune fiche de chantier valide.")
-
+                        st.error("❌ L'algorithme n'a détecté aucune fiche de chantier valide dans votre texte brut.")
         # --- 4.2 CONFIGURATION GRILLE SALARIALE ---
         with sub_tab2:
             st.markdown("### 👥 Extracteur et Calculateur de Salaires par Métier & Contrat")
