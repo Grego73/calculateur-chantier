@@ -6,25 +6,30 @@ import database as db
 def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_ENGINS_BRUTS, CATALOGUE_CHANTIERS):
     st.subheader("Formulaire de saisie")
     
+    # 🚀 CONFIGURATION DE L'ESPACEMENT MAXIMAL ALIGNÉ
     options_menu = ["Choisir un chantier pré-configuré..."]
     correspondance_cles = {}
+    
+    # Largeur fixe pour le nom (augmente à 70 ou 80 si tu as des noms de chantiers extrêmement longs)
+    largeur_alignement = 65 
     
     for cle_document, donnees in CATALOGUE_CHANTIERS.items():
         if cle_document == "Choisir un chantier pré-configuré...":
             continue
             
-        # On extrait le nom propre pour l'affichage (ex: Pose de panneaux de signalisation)
         nom_propre_affichage = donnees.get("nom_modele", cle_document)
         prix_formate = f"{int(donnees.get('revenus', 0)):,.0f}".replace(",", " ")
         
-        texte_option = f"{nom_propre_affichage} \t ({prix_formate} euros)"
-        options_menu.append(texte_option)
+        # 🎯 Force le nom à occuper exactement 'largeur_alignement' caractères en complétant avec des espaces
+        nom_aligne = nom_propre_affichage.ljust(largeur_alignement)
         
-        # On fait correspondre le texte du menu avec le nom exact du document Firestore NoSQL
+        # Construction de l'option avec un alignement parfait à droite pour le prix
+        texte_option = f"{nom_aligne} ({prix_formate} euros)"
+        options_menu.append(texte_option)
         correspondance_cles[texte_option] = cle_document
         
     options_menu_triees = ["Choisir un chantier pré-configuré..."] + sorted(options_menu[1:])
-   
+    
     # Fonction de forçage du cache d'affichage des inputs
     def mise_a_jour_cache_modele():
         selection_affichage = st.session_state["select_modele_chantier_dynamique"]
@@ -73,7 +78,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
     vrai_nom_propre = correspondance_cles.get(chantier_selectionne, "")
     valeur_nom_defaut = "" if chantier_selectionne == "Choisir un chantier pré-configuré..." else vrai_nom_propre
     nom_chantier = st.text_input("Nom ou Numéro du chantier :", value=valeur_nom_defaut).strip()
-   
+
     # 2. SECTIONS DE COLONNES (UNIQUEMENT POUR LES INPUTS GENERAUX ET RH)
     col1, col2 = st.columns(2)
 
