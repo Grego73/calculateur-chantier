@@ -195,14 +195,14 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                 if st.button("🗑️ Vider l'Historique des Chantiers", type="secondary", use_container_width=True):
                     docs = db.db.collection("chantiers").stream()
                     for d in docs: d.reference.delete()
-                    db.st.cache_data.clear()  # Purge immédiate après altération
+                    st.cache_data.clear()
                     st.toast("Historique des chantiers supprimé !")
                     st.rerun()
             with col_del2:
                 if st.button("🗑️ Vider les Modèles Préfabriqués", type="secondary", use_container_width=True):
                     docs = db.db.collection("modeles_chantiers").stream()
                     for d in docs: d.reference.delete()
-                    db.st.cache_data.clear()  # Purge immédiate après altération
+                    st.cache_data.clear()
                     st.toast("Catalogue des modèles vidé !")
                     st.rerun()
             with col_del3:
@@ -444,7 +444,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                     if not nom_nouveau_engin or not type_brut_choisi:
                         st.error("❌ Veuillez compléter l'intégralité des champs textuels.")
                     else:
-                        db.db.collection("catalogue_engins").document(nom_nouveau_engin).set({
+                        db.collection("catalogue_engins").document(nom_nouveau_engin).set({
                             "type_brut": type_brut_choisi,
                             "prix_jour": float(prix_jour_choisi)
                         })
@@ -481,6 +481,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                     df_apercu = pd.DataFrame(res)
                     if "engins_requis" in df_apercu.columns: 
                         df_apercu = df_apercu.drop(columns=["engins_requis"])
+                    
                     colonnes_numeriques = df_apercu.select_dtypes(include=['number']).columns
                     df_stylise = df_apercu.style.format({
                         col: lambda x: f"{x:,.0f}".replace(",", " ") if pd.notnull(x) else "-" 
@@ -541,4 +542,3 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                     
     elif mot_de_passe != "":
         st.error("🔒 Code d'accès incorrect.")
-                    
