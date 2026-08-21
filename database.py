@@ -16,6 +16,11 @@ if not firebase_admin._apps:
 
 db = firestore.client()
 
+# ==============================================================================
+# --- FONCTIONS DE LECTURE (SÉCURISÉES PAR CACHE EXTENSIBLE DE 10 MIN) ---
+# ==============================================================================
+
+@st.cache_data(ttl=600)
 def charger_salaires_config():
     try:
         doc_ref = db.collection("configuration_salaires").document("grille")
@@ -29,10 +34,12 @@ def charger_salaires_config():
     data_defaut = {}
     try: 
         db.collection("configuration_salaires").document("grille").set(data_defaut)
+        st.cache_data.clear() # On vide le cache car la DB vient de muter
     except Exception: 
         pass
     return data_defaut
 
+@st.cache_data(ttl=600)
 def charger_materiaux_config():
     try:
         doc_ref = db.collection("configuration_materiaux").document("catalogue")
@@ -46,10 +53,12 @@ def charger_materiaux_config():
     data_defaut = {"Sable": 12.0, "Terre": 16.0, "Enrobé": 42.0, "Armature": 70.0, "Tôle": 55.0, "Béton": 45.0, "Panneaux": 90.0, "Tuyaux": 32.0, "Canalisations": 35.0, "Poutres": 70.0}
     try: 
         db.collection("configuration_materiaux").document("catalogue").set(data_defaut)
+        st.cache_data.clear() # On vide le cache car la DB vient de muter
     except Exception: 
         pass
     return data_defaut
 
+@st.cache_data(ttl=600)
 def charger_catalogue_engins():
     try:
         docs = db.collection("catalogue_engins").stream()
@@ -63,6 +72,7 @@ def charger_catalogue_engins():
         st.warning(f"⚠️ Impossible de charger le catalogue d'engins ({e}).")
         return {}
 
+@st.cache_data(ttl=600)
 def charger_types_engins_bruts():
     try:
         docs = db.collection("catalogue_engins").stream()
@@ -75,6 +85,7 @@ def charger_types_engins_bruts():
     except Exception:
         return ["Pelleteuses", "Camions Benne"]
 
+@st.cache_data(ttl=600)
 def charger_catalogue_chantiers():
     try:
         docs = db.collection("modeles_chantiers").stream()
@@ -87,6 +98,7 @@ def charger_catalogue_chantiers():
     except Exception:
         return {"Choisir un chantier pré-configuré...": {"revenus": 0.0, "jours": 0, "sable": 0.0, "terre": 0.0, "enrobe": 0.0, "armature": 0.0, "tole": 0.0, "beton": 0.0, "panneaux": 0.0, "tuyaux": 0.0, "canalisations": 0.0, "poutres": 0.0, "jh_chef": 0.0, "jh_ouvrier": 0.0, "jh_cond": 0.0, "engins_requis": []}}
 
+@st.cache_data(ttl=600)
 def charger_donnees():
     try:
         docs = db.collection("chantiers").stream()
@@ -99,9 +111,15 @@ def charger_donnees():
     except Exception:
         return pd.DataFrame()
 
+# ==============================================================================
+# --- FONCTIONS D'ÉCRITURE (FORCENT L'EXPULSION IMMÉDIATE DU VIEUX CACHE) ---
+# ==============================================================================
+
 def inserer_chantier(nom, rev, mats, loc, sal, total, net, roi, jours, gpj, rpj):
     try:
         db.collection("chantiers").document(nom).set({"revenus": rev, "cout_materiaux": mats, "cout_location": loc, "cout_salaires": sal, "depenses_totales": total, "benefice_net": net, "roi": roi, "jours": jours, "gain_par_jour": gpj, "roi_par_jour": rpj})
+        # 🚀 LIGNE ANTI-BURST : Force le rafraîchissement au prochain clic sans recharger l'app
+        st.cache_data.clear()
     except Exception as e:
         st.error(f"❌ Échec de l'enregistrement du chantier : {e}")
 
@@ -112,5 +130,8 @@ def reinitialiser_db():
             docs = db.collection(col_name).stream()
             for doc in docs: 
                 doc.reference.delete()
+        # 🚀 LIGNE ANTI-BURST : Purge totale du cache après nettoyage complet
+        st.cache_data.clear()
     except Exception as e:
         st.error(f"❌ Échec de la réinitialisation : {e}")
+
