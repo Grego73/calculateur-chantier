@@ -48,7 +48,7 @@ def pop_up_validation_recrutement(salaires_mensuels, metier, type_contrat, salai
         grille_actuelle[metier] = int(sj_moyen)
 
         db.db.collection("configuration_salaires").document("grille").set(grille_actuelle)
-        st.cache_data.clear()  # Purge du cache anti-burst
+        st.cache_data.clear()
         st.toast("🚀 Tarifs enregistrés sur Firebase !")
         st.rerun()
 
@@ -152,7 +152,7 @@ def pop_up_validation_fiches_chantiers(chantiers_detectes):
                     "engins_requis": engins_propres
                 })
                 compteur += 1
-            st.cache_data.clear()  # Purge du cache anti-burst
+            st.cache_data.clear()
             st.toast(f"🚀 {compteur} modèle(s) synchronisé(s) avec succès !")
             st.rerun()
             
@@ -170,7 +170,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
     if mot_de_passe == "adminBTP2026":
         st.success("🔓 Accès accordé au panneau de contrôle.")
         
-        # FIX ANTI-CRASH : Utilisation de la fonction du cache
         df_stats = db.charger_donnees()
         if not df_stats.empty and "Revenus (€)" in df_stats.columns:
             st.markdown("### 🏢 Bilan Général de l'Entreprise (Consolidé Cloud)")
@@ -219,6 +218,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
             "🧱 Éditer Prix Matériaux", "🚜 Éditer Catalogue Engins", "🗂️ Consulter les Bases Données",
             "🔎 Comparateur de Fiches"
         ])
+
         # --- 4.1 IMPORTATION EN BLOC ET DECODAGE ---
         with sub_tab1:
             st.markdown("### 📥 Extracteur de Fiches Chantiers Multi-Étapes")
@@ -386,7 +386,9 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             if "€" in el:
                                 chiffre_net = "".join(c for c in el if c.isdigit())
                                 if chiffre_net: salaire_trouve = float(chiffre_net); break
-                        if salaire_trouve is not None: liste_salaires_extraits.append(salaire_trouve)
+                        
+                        if salaire_trouve is not None: 
+                            liste_salaires_extraits.append(salaire_trouve)
 
                     if liste_salaires_extraits:
                         pop_up_validation_recrutement(liste_salaires_extraits, metier_cible, type_contrat_cible, SALAIRES_DB)
@@ -428,7 +430,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
         # --- 4.4 CATALOGUE DE LA FLOTTE D'ENGINS ---
         with sub_tab4:
             st.markdown("### 🚜 Administration et Tarification de la Flotte")
-            
             catalogue_engins_brut = db.charger_catalogue_engins()
             
             with st.form("form_ajout_engin_direction", clear_on_submit=True):
@@ -480,7 +481,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                     df_apercu = pd.DataFrame(res)
                     if "engins_requis" in df_apercu.columns: 
                         df_apercu = df_apercu.drop(columns=["engins_requis"])
-                    
                     colonnes_numeriques = df_apercu.select_dtypes(include=['number']).columns
                     df_stylise = df_apercu.style.format({
                         col: lambda x: f"{x:,.0f}".replace(",", " ") if pd.notnull(x) else "-" 
@@ -541,3 +541,4 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                     
     elif mot_de_passe != "":
         st.error("🔒 Code d'accès incorrect.")
+                    
