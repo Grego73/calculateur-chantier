@@ -6,12 +6,12 @@ import database as db
 def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_ENGINS_BRUTS, CATALOGUE_CHANTIERS):
     st.subheader("Formulaire de saisie")
     
-    # 🚀 CONFIGURATION DE L'ALIGNEMENT ULTIME PAR ESPACES GÉANTS TYPOGRAPHIQUES
+    # 🚀 CONFIGURATION DE L'ESPACEMENT INSECABLE GÉANT
     options_menu = ["Choisir un chantier pré-configuré..."]
     correspondance_cles = {}
     
-    # Largeur fixe pour pousser le prix sur une colonne droite propre
-    largeur_alignement = 60 
+    # Largeur totale visuelle fixe pour pousser le prix très loin
+    largeur_alignement = 50 
     
     for cle_document, donnees in CATALOGUE_CHANTIERS.items():
         if cle_document == "Choisir un chantier pré-configuré...":
@@ -20,17 +20,13 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         nom_propre_affichage = donnees.get("nom_modele", cle_document)
         prix_formate = f"{int(donnees.get('revenus', 0)):,.0f}".replace(",", " ")
         
-        # Calcul de la longueur actuelle du nom propre
-        longueur_nom = len(nom_propre_affichage)
+        # 🎯 Calcul du nombre d'espaces invisibles requis pour ce chantier précis
+        nb_espaces_requis = max(1, largeur_alignement - len(nom_propre_affichage))
         
-        # On calcule combien d'espaces géants il faut ajouter
-        # On divise par 2 car l'espace idéographique \u3000 est deux fois plus large qu'un caractère normal
-        nb_espaces_geants = max(2, math.ceil((largeur_alignement - longueur_nom) / 2))
+        # \u00A0 est un espace insécable HTML (le navigateur est FORCÉ de l'afficher en entier)
+        espacement_geant = "\u00A0" * nb_espaces_requis
         
-        # \u3000 est un espace plein typographique géant (interdit à la réduction par les navigateurs)
-        espacement_geant = "\u3000" * nb_espaces_geants
-        
-        # Construction de la ligne du menu déroulant
+        # Construction de l'option avec un écart de colonnes parfait à l'écran
         texte_option = f"{nom_propre_affichage}{espacement_geant}({prix_formate} euros)"
         options_menu.append(texte_option)
         correspondance_cles[texte_option] = cle_document
