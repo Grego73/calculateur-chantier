@@ -610,11 +610,17 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                     st.table(pd.DataFrame(metrics_comparatives))
 
         # ==============================================================================
-        # --- sub_tab7 : NOUVEL OUTIL DISTINCT DE VÉRIFICATION EN BLOC ---
+        # --- sub_tab7 : OUTIL DE VÉRIFICATION PASSIVE DE DOUBLONS ---
         # ==============================================================================
         with sub_tab7:
-            st.markdown("### 🔍 Vérificateur de Chantiers en Bloc (Doublons Base Cloud)")
-            st.write("Collez vos fiches brutes ci-dessous pour savoir instantanément si elles sont déjà présentes dans l'historique de l'entreprise.")
+            # 1. Chargement du catalogue actuel pour afficher le compte exact dans le titre
+            dict_modeles_verification = db.charger_catalogue_chantiers()
+            res_modeles_existants = [dict_modeles_verification[k] for k in dict_modeles_verification if k != "Choisir un chantier pré-configuré..."]
+            total_modeles_base = len(res_modeles_existants)
+
+            # Titre mis à jour avec le nombre de modèles actuellement en base
+            st.markdown(f"### 🔍 Vérificateur de Chantiers en Bloc ({total_modeles_base} modèles en base)")
+            st.write("Collez vos fiches brutes ci-dessous pour savoir instantanément si elles sont déjà présentes dans le catalogue cloud.")
 
             texte_verification_brut = st.text_area(
                 "Collez les chantiers à vérifier (Nom + Prix) :", 
@@ -627,20 +633,16 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                 if not texte_verification_brut.strip():
                     st.error("❌ La zone de texte est vide.")
                 else:
-                    # 🚀 FIX MAJEUR : On interroge les modèles préconfigurés et non l'historique des saisies
-                    dict_modeles_actuels = db.charger_catalogue_chantiers()
-                    
-                    # Extraction et normalisation des couples (Nom, Prix) existants dans modeles_chantiers
+                    # 2. Construction du set de comparaison
                     chantiers_existants = set()
-                    for doc_id, data_m in dict_modeles_actuels.items():
+                    for doc_id, data_m in dict_modeles_verification.items():
                         if doc_id == "Choisir un chantier pré-configuré...": 
                             continue
-                        
-                        # On utilise de préférence le nom stocké, sinon l'ID du document
                         nom_m = str(data_m.get("nom_modele", doc_id)).strip().lower()
                         prix_m = float(data_m.get("revenus", 0.0))
                         chantiers_existants.add((nom_m, prix_m))
 
+                    # 3. Extraction et analyse des lignes collées
                     lignes_verif = texte_verification_brut.split("\n")
                     resultats_analyse = []
                     
@@ -657,7 +659,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             
                             cle_recherche = (nom_extrait.lower(), prix_extrait)
                             
-                            # Comparaison ultra-précise
                             if cle_recherche in chantiers_existants:
                                 statut = "🟢 Déjà enregistré (Doublon)"
                             else:
@@ -669,10 +670,10 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                 "Statut Base Cloud": statut
                             })
 
+                    # 4. Affichage du rapport avec les 3 compteurs métriques
                     if resultats_analyse:
                         df_resultats = pd.DataFrame(resultats_analyse)
                         
-                        # --- MODIFICATION DEMANDÉE : AJOUT DES 3 COMPTEURS MÉTRIQUES ---
                         total_analyses = len(df_resultats)
                         nb_nouveaux = len(df_resultats[df_resultats["Statut Base Cloud"].str.contains("🔴")])
                         nb_doublons = len(df_resultats[df_resultats["Statut Base Cloud"].str.contains("🟢")])
@@ -682,7 +683,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                         with c_v2: st.metric("Nouveaux chantiers (Absents)", f"{nb_nouveaux}")
                         with c_v3: st.metric("Doublons détectés (À éviter)", f"{nb_doublons}")
                         
-                        # Affichage du titre corrigé (correction de la faute d'orthographe "Ré Real")
                         st.markdown("#### 📊 Rapport de présence NoSQL en Temps Réel :")
                         
                         st.dataframe(
@@ -696,7 +696,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             }
                         )
                     else:
-                        st.error("❌ L'algorithme n'a pas réussi à extraire de couples 'Nom + Prix euros' valides. Vérifiez le format de votre texte.")
-        
+                        st.error("❌ L'algorithme n'a pas réussi à extraire de couples 'Nom + Prix' valides. Vérifiez le format de votre texte.")
+  
     elif mot_de_passe != "":
         st.error("🔒 Code d'accès incorrect.")
