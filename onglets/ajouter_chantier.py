@@ -175,11 +175,25 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         with c_rh_ch: type_contrat_chef = st.selectbox("Contrat Chefs :", ["CDI", "CDD"], key="type_contrat_chef")
         with c_rh_ou: type_contrat_ouv = st.selectbox("Contrat Ouvriers :", ["CDI", "CDD"], key="type_contrat_ouv")
         
-        px_cond = float(SALAIRES_DB.get(f"Conducteur_{type_contrat_cond}_Moyen", SALAIRES_DB.get("Conducteur", 230.0)))
-        px_chef = float(SALAIRES_DB.get(f"Chef_{type_contrat_chef}_Moyen", SALAIRES_DB.get("Chef", 230.0)))
-        px_ouvrier = float(SALAIRES_DB.get(f"Ouvrier_{type_contrat_ouv}_Moyen", SALAIRES_DB.get("Ouvrier", 230.0)))
+        # --- RÉCUPÉRATION SÉCURISÉE DES VRAIS TARIFS FIREBASE (SANS FAILLES) ---
+        # On force la recherche sur toutes les variantes possibles de vos clés NoSQL
+        px_cond = float(
+            SALAIRES_DB.get(f"Conducteur_{type_contrat_cond}_Moyen") or 
+            SALAIRES_DB.get(f"Conducteur_{type_contrat_cond}") or 
+            SALAIRES_DB.get("Conducteur") or 230.0
+        )
+        px_chef = float(
+            SALAIRES_DB.get(f"Chef_{type_contrat_chef}_Moyen") or 
+            SALAIRES_DB.get(f"Chef_{type_contrat_chef}") or 
+            SALAIRES_DB.get("Chef") or 230.0
+        )
+        px_ouvrier = float(
+            SALAIRES_DB.get(f"Ouvrier_{type_contrat_ouv}_Moyen") or 
+            SALAIRES_DB.get(f"Ouvrier_{type_contrat_ouv}") or 
+            SALAIRES_DB.get("Ouvrier") or 230.0
+        )
 
-        st.info(f"💰 Tarifs : 🕹️ Cond : {px_cond:.0f}€/j | 🧑‍💼 Chef : {px_chef:.0f}€/j | 👷 Ouv : {px_ouvrier:.0f}€/j")
+        st.info(f"💰 Tarifs Cloud : 🕹️ Cond : {px_cond:.0f}€/j | 🧑‍💼 Chef : {px_chef:.0f}€/j | 👷 Ouv : {px_ouvrier:.0f}€/j")
 
         st.markdown("**👥 Planification des Effectifs requis à l'Étape :**")
         
@@ -195,23 +209,30 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                 if num_e not in etapes_vues:
                     etapes_vues.add(num_e)
                     lignes_employes_modele.append({
-                        "N° Étape": int(num_e), "Durée Étape (jours)": int(item.get("Durée Étape (jours)", 1)),
-                        "🕹️ Conducteurs": int(donnees_modele.get("jh_cond", 1)), "🧑‍💼 Chefs": int(donnees_modele.get("jh_chef", 0)), "👷 Ouvriers": int(donnees_modele.get("jh_ouvrier", 0))
+                        "N° Étape": int(num_e), 
+                        "Durée Étape (jours)": int(item.get("Durée Étape (jours)", 1)),
+                        "🕹️ Conducteurs": int(donnees_modele.get("jh_cond", 1)), 
+                        "🧑‍💼 Chefs": int(donnees_modele.get("jh_chef", 0)), 
+                        "👷 Ouvriers": int(donnees_modele.get("jh_ouvrier", 0))
                     })
         
         df_rh_init = pd.DataFrame(lignes_employes_modele)
-        if df_rh_init.empty: df_rh_init = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "🕹️ Conducteurs", "🧑‍💼 Chefs", "👷 Ouvriers"])
+        if df_rh_init.empty: 
+            df_rh_init = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "🕹️ Conducteurs", "🧑‍💼 Chefs", "👷 Ouvriers"])
 
+        # --- FIX STREAMLIT : RE-COUPLEMENT COMPTABLE DU TABLEAU ---
         tableau_employes_etapes = st.data_editor(
             df_rh_init, num_rows="dynamic", use_container_width=True, key="table_employes_planification_etapes",
             column_config={
                 "N° Étape": st.column_config.NumberColumn("N°", min_value=1, step=1, required=True, width="small"),
                 "Durée Étape (jours)": st.column_config.NumberColumn("Jours", min_value=1, step=1, required=True, width="small"),
-                "🕹️ Conducteurs": st.column_config.NumberColumn("Cond", min_value=0, step=1, default=1, width="small"),
-                "🧑‍💼 Chefs": st.column_config.NumberColumn("Chef", min_value=0, step=1, default=0, width="small"),
-                "👷 Ouvriers": st.column_config.NumberColumn("Ouv", min_value=0, step=1, default=0, width="small")
+                # On injecte les libellés avec les vrais prix calculés pour que le composant se mette à jour de force
+                "🕹️ Conducteurs": st.column_config.NumberColumn(f"Cond ({px_cond:.0f}€)", min_value=0, step=1, default=1, width="small"),
+                "🧑‍💼 Chefs": st.column_config.NumberColumn(f"Chef ({px_chef:.0f}€)", min_value=0, step=1, default=0, width="small"),
+                "👷 Ouvriers": st.column_config.NumberColumn(f"Ouv ({px_ouvrier:.0f}€)", min_value=0, step=1, default=0, width="small")
             }
         )
+
 
         st.markdown("### 🚜 --- TABLE DES ENGINS NÉCESSAIRES ---")
         engins_bruts_modele = []
