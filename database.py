@@ -4,22 +4,15 @@ from google.cloud import firestore
 import json
 from google.oauth2 import service_account
 
-# ==============================================================================
-# --- 1. CONNEXION SÉCURISÉE EN PRODUCTION À FIREBASE CLOUD ---
-# ==============================================================================
-
 if "text_key" in st.secrets:
-    # Lecture des identifiants JSON stockés de manière invisible et sécurisée dans le Cloud
     info_cles = json.loads(st.secrets["text_key"])
     creds = service_account.Credentials.from_service_account_info(info_cles)
-    
-    db = firestore.Client(
-        project="calculateur-chantier-dc921",
-        credentials=creds
-    )
+    db = firestore.Client(project="calculateur-chantier-dc921", credentials=creds)
 else:
-    # Mode de secours si vous lancez en local avec la variable d'environnement système
     db = firestore.Client(project="calculateur-chantier-dc921")
+
+# Vos fonctions (charger_salaires_config, etc.) restent en dessous...
+
 
 # ==============================================================================
 # --- FONCTIONS DE LECTURE (SÉCURISÉES PAR CACHE EXTENSIBLE DE 10 MIN) ---
