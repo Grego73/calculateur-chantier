@@ -627,14 +627,19 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                 if not texte_verification_brut.strip():
                     st.error("❌ La zone de texte est vide.")
                 else:
-                    df_base_actuelle = db.charger_donnees()
+                    # 🚀 FIX MAJEUR : On interroge les modèles préconfigurés et non l'historique des saisies
+                    dict_modeles_actuels = db.charger_catalogue_chantiers()
                     
+                    # Extraction et normalisation des couples (Nom, Prix) existants dans modeles_chantiers
                     chantiers_existants = set()
-                    if not df_base_actuelle.empty and "Nom du Chantier" in df_base_actuelle.columns and "Revenus (€)" in df_base_actuelle.columns:
-                        for _, row_b in df_base_actuelle.iterrows():
-                            nom_b = str(row_b["Nom du Chantier"]).strip().lower()
-                            prix_b = float(row_b["Revenus (€)"])
-                            chantiers_existants.add((nom_b, prix_b))
+                    for doc_id, data_m in dict_modeles_actuels.items():
+                        if doc_id == "Choisir un chantier pré-configuré...": 
+                            continue
+                        
+                        # On utilise de préférence le nom stocké, sinon l'ID du document
+                        nom_m = str(data_m.get("nom_modele", doc_id)).strip().lower()
+                        prix_m = float(data_m.get("revenus", 0.0))
+                        chantiers_existants.add((nom_m, prix_m))
 
                     lignes_verif = texte_verification_brut.split("\n")
                     resultats_analyse = []
@@ -652,6 +657,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             
                             cle_recherche = (nom_extrait.lower(), prix_extrait)
                             
+                            # Comparaison ultra-précise
                             if cle_recherche in chantiers_existants:
                                 statut = "🟢 Déjà enregistré (Doublon)"
                             else:
@@ -665,14 +671,19 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
 
                     if resultats_analyse:
                         df_resultats = pd.DataFrame(resultats_analyse)
-                        st.markdown("#### 📊 Rapport de présence NoSQL en Temps Ré Real :")
                         
+                        # --- MODIFICATION DEMANDÉE : AJOUT DES 3 COMPTEURS MÉTRIQUES ---
+                        total_analyses = len(df_resultats)
                         nb_nouveaux = len(df_resultats[df_resultats["Statut Base Cloud"].str.contains("🔴")])
                         nb_doublons = len(df_resultats[df_resultats["Statut Base Cloud"].str.contains("🟢")])
                         
-                        c_v1, c_v2 = st.columns(2)
-                        c_v1.metric("Nouveaux chantiers exploitables", f"{nb_nouveaux}")
-                        c_v2.metric("Doublons détectés (À éviter)", f"{nb_doublons}")
+                        c_v1, c_v2, c_v3 = st.columns(3)
+                        with c_v1: st.metric("Chantiers analysés", f"{total_analyses}")
+                        with c_v2: st.metric("Nouveaux chantiers (Absents)", f"{nb_nouveaux}")
+                        with c_v3: st.metric("Doublons détectés (À éviter)", f"{nb_doublons}")
+                        
+                        # Affichage du titre corrigé (correction de la faute d'orthographe "Ré Real")
+                        st.markdown("#### 📊 Rapport de présence NoSQL en Temps Réel :")
                         
                         st.dataframe(
                             df_resultats, 
@@ -686,6 +697,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                         )
                     else:
                         st.error("❌ L'algorithme n'a pas réussi à extraire de couples 'Nom + Prix euros' valides. Vérifiez le format de votre texte.")
-                    
+        
     elif mot_de_passe != "":
         st.error("🔒 Code d'accès incorrect.")
