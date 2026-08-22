@@ -1,3 +1,5 @@
+# Contenu complet validé pour : onglets/historique.py
+
 import streamlit as st
 import pandas as pd
 import database as db  # Connexion aux fonctions de lecture Firebase
@@ -29,7 +31,7 @@ def afficher_onglet_historique():
         moyenne_roi_jour = float(df_affichage["ROI / Jour (%)"].mean())
         df_visuel = df_affichage.copy()
         
-        # Fonction interne pour générer les pastilles de couleur (Gameplay de comparaison)
+        # Fonction interne pour générer les pastilles de couleur
         def calculer_comparaison(row):
             valeur_chantier = float(row["ROI / Jour (%)"])
             difference = valeur_chantier - moyenne_roi_jour
@@ -52,44 +54,22 @@ def afficher_onglet_historique():
         ]
         df_visuel = df_visuel[[c for c in cols_ordre if c in df_visuel.columns]]
 
-        # --- APPLICATION DU SEPARATEUR D'ESPACE VIA PANDAS STYLER ---
-        # Cette fonction applique l'espace pour les milliers et conserve la nature numérique des données
-        format_monnaie = lambda x: f"{x:,.0f}".replace(",", " ") + " €" if pd.notnull(x) else "-"
-        format_gain_jour = lambda x: f"{x:,.0f}".replace(",", " ") + " €/j" if pd.notnull(x) else "-"
-        format_duree = lambda x: f"{x:.2f} j" if pd.notnull(x) else "-"
-        format_pourcent = lambda x: f"{x:.2f} %" if pd.notnull(x) else "-"
-        format_pourcent_jour = lambda x: f"{x:.2f} %/j" if pd.notnull(x) else "-"
-
-        dict_formatage = {}
-        
-        # Mappage dynamique selon les colonnes présentes
-        colonnes_argent = ["Revenus (€)", "Coût Matériaux (€)", "Coût Location Engins (€)", "Coût Salaires (€)", "Dépenses Totales (€)", "Bénéfice Net (€)"]
-        for c in colonnes_argent:
-            if c in df_visuel.columns: dict_formatage[c] = format_monnaie
-            
-        if "Gain / Jour (€)" in df_visuel.columns: dict_formatage["Gain / Jour (€)"] = format_gain_jour
-        if "Durée (Jours)" in df_visuel.columns: dict_formatage["Durée (Jours)"] = format_duree
-        if "ROI (%)" in df_visuel.columns: dict_formatage["ROI (%)"] = format_pourcent
-        if "ROI / Jour (%)" in df_visuel.columns: dict_formatage["ROI / Jour (%)"] = format_pourcent_jour
-
-        df_stylise = df_visuel.style.format(dict_formatage)
-
-        # Affichage du grand tableau interactif stylisé
-        # Les chaînes de format personnalisées ont été retirées de column_config car gérées en amont par df_stylise
+        # --- FORMATAGE PROPRE VIA STREAMLIT COLUMN_CONFIG (RECOMMANDÉ) ---
+        # Au lieu de casser l'interactivité avec pandas.style, on laisse Streamlit formater nativement
         st.dataframe(
-            df_stylise, use_container_width=True, hide_index=True,
+            df_visuel, use_container_width=True, hide_index=True,
             column_config={
                 "Nom du Chantier": st.column_config.TextColumn("Nom du Chantier"), 
-                "Revenus (€)": st.column_config.NumberColumn("Revenus"), 
-                "Durée (Jours)": st.column_config.NumberColumn("Durée"),
-                "Coût Matériaux (€)": st.column_config.NumberColumn("Matériaux"), 
-                "Coût Location Engins (€)": st.column_config.NumberColumn("Location Engins"), 
-                "Coût Salaires (€)": st.column_config.NumberColumn("Salaires + Intérim"),
-                "Dépenses Totales (€)": st.column_config.NumberColumn("Dépenses Totales"), 
-                "Bénéfice Net (€)": st.column_config.NumberColumn("Bénéfice Net"), 
-                "Gain / Jour (€)": st.column_config.NumberColumn("Gain / Jour"),
-                "ROI (%)": st.column_config.NumberColumn("ROI (%)"), 
-                "ROI / Jour (%)": st.column_config.NumberColumn("ROI / Jour"), 
+                "Revenus (€)": st.column_config.NumberColumn("Revenus", format="%.0f €"), 
+                "Durée (Jours)": st.column_config.NumberColumn("Durée", format="%.2f j"),
+                "Coût Matériaux (€)": st.column_config.NumberColumn("Matériaux", format="%.0f €"), 
+                "Coût Location Engins (€)": st.column_config.NumberColumn("Location Engins", format="%.0f €"), 
+                "Coût Salaires (€)": st.column_config.NumberColumn("Salaires + Intérim", format="%.0f €"),
+                "Dépenses Totales (€)": st.column_config.NumberColumn("Dépenses Totales", format="%.0f €"), 
+                "Bénéfice Net (€)": st.column_config.NumberColumn("Bénéfice Net", format="%.0f €"), 
+                "Gain / Jour (€)": st.column_config.NumberColumn("Gain / Jour", format="%.0f €/j"),
+                "ROI (%)": st.column_config.NumberColumn("ROI (%)", format="%.2f %%"), 
+                "ROI / Jour (%)": st.column_config.NumberColumn("ROI / Jour", format="%.2f %%/j"), 
                 "Comparaison Moyenne Enterprise": st.column_config.TextColumn("Comparaison Moyenne")
             }
         )
