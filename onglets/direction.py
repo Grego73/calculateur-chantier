@@ -660,6 +660,29 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
             st.markdown("### 📊 Suivi de Consommation & Quotas Journaliers (Plan Gratuit)")
             st.write("Firestore comptabilise l'usage quotidien. Voici l'état estimé de vos limites système réinitialisées toutes les 24h par Google.")
 
+            # --- NOUVEAUTÉ : CALCUL DU TEMPS RESTANT AVANT LA RÉINITIALISATION (09h00 Paris) ---
+            import datetime
+            import pytz
+            
+            # On se calfeutre sur le fuseau horaire de Paris
+            tz_paris = pytz.timezone('Europe/Paris')
+            maintenant = datetime.datetime.now(tz_paris)
+            
+            # La réinitialisation Firebase se fait à 09:00 heure de Paris
+            cible_aujourdhui = maintenant.replace(hour=9, minute=0, second=0, microsecond=0)
+            
+            if maintenant < cible_aujourdhui:
+                echeance_reinit = cible_aujourdhui
+            else:
+                echeance_reinit = cible_aujourdhui + datetime.timedelta(days=1)
+                
+            temps_restant = echeance_reinit - maintenant
+            heures_r, secondes_restantes = divmod(temps_restant.seconds, 3600)
+            minutes_r, _ = divmod(secondes_restantes, 60)
+            
+            # Affichage du compte à rebours sous forme de badge d'information
+            st.warning(f"⏱️ **Prochaine réinitialisation des quotas Google Firebase dans :** `{heures_r} heure(s) et {minutes_r} minute(s)` (chaque jour à 09h00)")
+
             # 1. Tentative de lecture du document des compteurs réels dans Firebase
             try:
                 quota_doc = db.db.collection("configuration_systeme").document("quotas_journaliers").get()
@@ -671,7 +694,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                 donnees_quota = {}
 
             # Récupération des valeurs enregistrées ou valeurs de secours par défaut si vide
-            lectures_faites = int(donnees_quota.get("lectures", 1240)) # Exemple de départ simulé s'il n'existe pas
+            lectures_faites = int(donnees_quota.get("lectures", 1240))
             ecritures_faites = int(donnees_quota.get("ecritures", 315))
             suppressions_faites = int(donnees_quota.get("suppressions", 45))
 
@@ -689,7 +712,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
             reste_ecritures = LIMITE_ECRITURES - ecritures_faites
             reste_suppressions = LIMITE_SUPPRESSIONS - suppressions_faites
 
-            # 3. Affichage visuel sous forme de cartes d'indicateurs (Mriques)
+            # 3. Affichage visuel sous forme de cartes d'indicateurs (Metrics)
             c_q1, c_q2, c_v3 = st.columns(3)
             with c_q1:
                 st.metric("Lectures Restantes", f"{reste_lectures:,.0f}".replace(",", " "), f"-{lectures_faites} faites", delta_color="inverse")
@@ -700,7 +723,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
 
             st.markdown("<br>", unsafe_allow_html=True)
 
-            # 4. Rendu visuel avec des barres de progression interactives (Vert -> Orange -> Rouge)
+            # 4. Rendu visuel avec des barres de progression interactives
             st.markdown("**📉 Jauge d'utilisation des Lectures (Limite : 50 000 / jour) :**")
             st.progress(pct_lectures, text=f"{lectures_faites} / {LIMITE_LECTURES} ({pct_lectures*100:.1f}%)")
 
