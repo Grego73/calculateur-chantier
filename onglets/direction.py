@@ -236,10 +236,10 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
         st.markdown("---")
 
         st.markdown("## ⚙️ Administration Suprême des Bases NoSQL")
-        sub_tab1, sub_tab2, sub_tab3, sub_tab4, sub_tab5, sub_tab6 = st.tabs([
+        sub_tab1, sub_tab2, sub_tab3, sub_tab4, sub_tab5, sub_tab6, sub_tab7 = st.tabs([
             "🏗️ Saisie Multi-Chantiers en Bloc", "👥 Éditer Grille Salariale", 
             "🧱 Éditer Prix Matériaux", "🚜 Éditer Catalogue Engins", "🗂️ Consulter les Bases Données",
-            "🔎 Comparateur de Fiches"
+            "🔎 Comparateur de Fiches", "🔍 Vérificateur de Doublons"
         ])
 
         # --- sub_tab1 : IMPORTATION EN BLOC ET DECODAGE ---
@@ -574,8 +574,17 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                 else: 
                     st.info("Catalogue vide.")
 
+        # --- AJOUT DU 7È ME ONGLET DANS LA LISTE ---
+        sub_tab1, sub_tab2, sub_tab3, sub_tab4, sub_tab5, sub_tab6, sub_tab7 = st.tabs([
+            "🏗️ Saisie Multi-Chantiers en Bloc", "👥 Éditer Grille Salariale", 
+            "🧱 Éditer Prix Matériaux", "🚜 Éditer Catalogue Engins", "🗂️ Consulter les Bases Données",
+            "🔎 Comparateur de Fiches", "🔍 Vérificateur de Doublons"
+        ])
+
+        # [Les codes de sub_tab1, sub_tab2, sub_tab3, sub_tab4, sub_tab5 restent inchangés...]
+
         # ==============================================================================
-        # --- sub_tab6 : COMPARATEUR DE FICHES CHANTIERS ---
+        # --- sub_tab6 : COMPARATEUR DE FICHES CHANTIERS (Laissé intact pour plus tard) ---
         # ==============================================================================
         with sub_tab6:
             st.markdown("### 🔎 Outil de Comparaison de Modèles Préfabriqués")
@@ -603,6 +612,84 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                         f"Chantier B : {data_B.get('nom_modele', ch_B)}": [f"{data_B.get('revenus', 0):,.0f}".replace(",", " ") + " €", f"{data_B.get('jours', 0)} jours", f"{data_B.get('sable', 0)} t", f"{data_B.get('beton', 0)} t", f"{data_B.get('terre', 0)} t"]
                     }
                     st.table(pd.DataFrame(metrics_comparatives))
+
+        # ==============================================================================
+        # --- sub_tab7 : NOUVEL OUTIL DISTINCT DE VÉRIFICATION EN BLOC ---
+        # ==============================================================================
+        with sub_tab7:
+            st.markdown("### 🔍 Vérificateur de Chantiers en Bloc (Doublons Base Cloud)")
+            st.write("Collez vos fiches brutes ci-dessous pour savoir instantanément si elles sont déjà présentes dans l'historique de l'entreprise.")
+
+            texte_verification_brut = st.text_area(
+                "Collez les chantiers à vérifier (Nom + Prix) :", 
+                value="", 
+                height=250, 
+                key="zone_texte_verif_bloc_doublons"
+            )
+            
+            if st.button("🔍 ANALYSER ET VÉRIFIER LA PRÉSENCE EN BASE", type="primary", use_container_width=True):
+                if not texte_verification_brut.strip():
+                    st.error("❌ La zone de texte est vide.")
+                else:
+                    df_base_actuelle = db.charger_donnees()
+                    
+                    chantiers_existants = set()
+                    if not df_base_actuelle.empty and "Nom du Chantier" in df_base_actuelle.columns and "Revenus (€)" in df_base_actuelle.columns:
+                        for _, row_b in df_base_actuelle.iterrows():
+                            nom_b = str(row_b["Nom du Chantier"]).strip().lower()
+                            prix_b = float(row_b["Revenus (€)"])
+                            chantiers_existants.add((nom_b, prix_b))
+
+                    lignes_verif = texte_verification_brut.split("\n")
+                    resultats_analyse = []
+                    
+                    for ligne in lignes_verif:
+                        l_clean = ligne.strip()
+                        if not l_clean: 
+                            continue
+                        
+                        match_verif = re.search(r"^(.*?)\s+(\d[\d\s]+)\s+euros", l_clean, re.IGNORECASE)
+                        if match_verif:
+                            nom_extrait = match_verif.group(1).strip()
+                            prix_net_txt = "".join(c for c in match_verif.group(2) if c.isdigit())
+                            prix_extrait = float(prix_net_txt) if prix_net_txt else 0.0
+                            
+                            cle_recherche = (nom_extrait.lower(), prix_extrait)
+                            
+                            if cle_recherche in chantiers_existants:
+                                statut = "🟢 Déjà enregistré (Doublon)"
+                            else:
+                                statut = "🔴 Absent de la base (Nouveau)"
+                                
+                            resultats_analyse.append({
+                                "Nom du Chantier Détecté": nom_extrait,
+                                "Revenus (€)": prix_extrait,
+                                "Statut Base Cloud": statut
+                            })
+
+                    if resultats_analyse:
+                        df_resultats = pd.DataFrame(resultats_analyse)
+                        st.markdown("#### 📊 Rapport de présence NoSQL en Temps Ré Real :")
+                        
+                        nb_nouveaux = len(df_resultats[df_resultats["Statut Base Cloud"].str.contains("🔴")])
+                        nb_doublons = len(df_resultats[df_resultats["Statut Base Cloud"].str.contains("🟢")])
+                        
+                        c_v1, c_v2 = st.columns(2)
+                        c_v1.metric("Nouveaux chantiers exploitables", f"{nb_nouveaux}")
+                        c_v2.metric("Doublons détectés (À éviter)", f"{nb_doublons}")
+                        
+                        st.dataframe(
+                            df_resultats, 
+                            use_container_width=True, 
+                            hide_index=True,
+                            column_config={
+                                "Nom du Chantier Détecté": st.column_config.TextColumn("Nom de la Fiche"),
+                                "Revenus (€)": st.column_config.NumberColumn("Prix de l'Ouvrage", format="%d €"),
+                                "Statut Base Cloud": st.column_config.TextColumn("Disponibilité")
+                            }
+                        )
+                    else:
+                        st.error("❌ L'algorithme n'a pas réussi à extraire de couples 'Nom + Prix euros' valides. Vérifiez le format de votre texte.")
                     
     elif mot_de_passe != "":
         st.error("🔒 Code d'accès incorrect.")
