@@ -63,14 +63,15 @@ def pop_up_validation_recrutement(salaires_mensuels, metier, type_contrat, salai
 
     if st.button("✅ ENREGISTRER SUR FIREBASE", type="primary", use_container_width=True, key=f"btn_save_cloud_{metier_clean}_{prefixe_cle}"):
         grille_actuelle = dict(salaires_db_dict)
+        
+        # FIX COMPTABLE : On enregistre UNIQUEMENT les paliers techniques indispensables
         grille_actuelle[f"{prefixe_cle}_Min"] = int(sj_min)
         grille_actuelle[f"{prefixe_cle}_Moyen"] = int(sj_moyen)
         grille_actuelle[f"{prefixe_cle}_Max"] = int(sj_max)
-        grille_actuelle[metier_clean] = int(sj_moyen)
 
         db.db.collection("configuration_salaires").document("grille").set(grille_actuelle)
         st.cache_data.clear()
-        st.toast(f"🚀 Tarifs de référence pour {metier_clean} synchronisés !")
+        st.toast(f"🚀 Tarifs de référence pour {prefixe_cle} synchronisés !")
         st.rerun()
 
 # ==============================================================================
