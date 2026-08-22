@@ -425,14 +425,42 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                         st.error("❌ Impossible d'extraire des montants de salaires valides (€).")
 
             st.markdown("#### 📄 Grille Salariale Active dans le Cloud :")
+            # --- FIX SÉCURITÉ : TABLEAU INTERACTIF AVEC CASE DE SUPPRESSION ---
             if not SALAIRES_DB:
                 st.info("La grille salariale cloud est actuellement vide.")
             else:
-                df_sal_visuel = pd.DataFrame(list(SALAIRES_DB.items()), columns=["Poste / Contrat", "Tarif Journalier (€)"])
-                df_sal_style = df_sal_visuel.style.format({
-                    "Tarif Journalier (€)": lambda x: f"{x:,.0f}".replace(",", " ") + " €" if pd.notnull(x) else "-"
-                })
-                st.dataframe(df_sal_style, use_container_width=True, hide_index=True)
+                # 1. Préparation des lignes sous forme de DataFrame modifiable
+                lignes_grille = [{"Clé technique NoSQL": k, "Tarif (€/j)": v, "Supprimer l'entrée 🗑️": False} for k, v in SALAIRES_DB.items()]
+                df_sal_visuel = pd.DataFrame(lignes_grille)
+                
+                # 2. Rendu via st.data_editor pour capter les clics sur les cases à cocher
+                grille_editee = st.data_editor(
+                    df_sal_visuel, use_container_width=True, hide_index=True, key="editeur_suppression_salaires",
+                    column_config={
+                        "Clé technique NoSQL": st.column_config.TextColumn("Poste / Contrat / Palier", disabled=True),
+                        "Tarif (€/j)": st.column_config.NumberColumn("Tarif Journalier", format="%d €", disabled=True),
+                        "Supprimer l'entrée 🗑️": st.column_config.CheckboxColumn("Supprimer ?", default=False)
+                    }
+                )
+                
+                # 3. Traitement des suppressions s'il y a eu un changement coché
+                if grille_editee is not None and not grille_editee.empty:
+                    # On filtre pour extraire les clés que l'utilisateur a décidé de jeter
+                    cles_a_supprimer = grille_editee[grille_editee["Supprimer l'entrée 🗑️"] == True]["Clé technique NoSQL"].tolist()
+                    
+                    if cles_a_supprimer:
+                        st.warning(f"🚨 Vous avez sélectionné {len(cles_a_supprimer)} entrée(s) pour suppression définitive.")
+                        if st.button("💥 VALIDER LA SUPPRESSION DÉFINITIVE", type="primary", use_container_width=True):
+                            grille_nettoyee = dict(SALAIRES_DB)
+                            for cle in cles_a_supprimer:
+                                if cle in grille_nettoyee:
+                                    del grille_nettoyee[cle]
+                                    
+                            # On ré-injecte la grille nettoyée dans le cloud
+                            db.db.collection("configuration_salaires").document("grille").set(grille_nettoyee)
+                            st.cache_data.clear()
+                            st.toast("🗑️ Entrées supprimées de la base Firebase Cloud avec succès !")
+                            st.rerun()
 
         # ==============================================================================
         # --- sub_tab3 : PRIX DES MATÉRIAUX ---
