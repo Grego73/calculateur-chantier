@@ -1,18 +1,17 @@
 import streamlit as st
 import pandas as pd
 import firebase_admin
-from firebase_admin import credentials, firestore
-from google.api_core.client_options import ClientOptions  # Requis pour le tunnel
+from firebase_admin import firestore
+from google.api_core.client_options import ClientOptions
+from google.auth import credentials as google_credentials # <- Solution anti-bug
 
-# Initialisation unique de Firebase
+# Initialisation unique de Firebase pour l'émulateur local
 if not firebase_admin._apps:
     try:
-        firebase_info = dict(st.secrets["firebase"])
-        if "private_key" in firebase_info:
-            firebase_info["private_key"] = firebase_info["private_key"].replace("\\n", "\n")
-        cred = credentials.Certificate(firebase_info)
+        # On utilise des identifiants anonymes pour éviter les erreurs de clé PEM/ASN.1
+        cred = google_credentials.AnonymousCredentials()
         
-        # Configuration du tunnel local pour éviter les quotas cloud
+        # Redirection des données vers votre tunnel LocalTunnel
         local_options = ClientOptions(api_endpoint="wild-rice-yell.loca.lt:443")
         
         firebase_admin.initialize_app(cred, options={
@@ -125,7 +124,7 @@ def charger_donnees():
 def inserer_chantier(nom, rev, mats, loc, sal, total, net, roi, jours, gpj, rpj):
     try:
         db.collection("chantiers").document(nom).set({"revenus": rev, "cout_materiaux": mats, "cout_location": loc, "cout_salaires": sal, "depenses_totales": total, "benefice_net": net, "roi": roi, "jours": jours, "gain_par_jour": gpj, "roi_par_jour": rpj})
-        st.cache_data.clear()  # Force l'actualisation visuelle immédiate
+        st.cache_data.clear()
     except Exception as e:
         st.error(f"❌ Échec de l'enregistrement du chantier : {e}")
 
@@ -136,7 +135,6 @@ def reinitialiser_db():
             docs = db.collection(col_name).stream()
             for doc in docs: 
                 doc.reference.delete()
-        st.cache_data.clear()  # Purge totale du cache après nettoyage
+        st.cache_data.clear()
     except Exception as e:
         st.error(f"❌ Échec de la réinitialisation : {e}")
-
