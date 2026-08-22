@@ -1,23 +1,30 @@
 import streamlit as st
 import pandas as pd
-from google.cloud import firestore  # Connexion directe sans passer par firebase_admin
-from google.api_core.client_options import ClientOptions
-from google.auth.credentials import AnonymousCredentials
+from google.cloud import firestore
+import json
+from google.oauth2 import service_account
 
-# 1. Configuration de l'adresse de votre passerelle Internet (votre PC)
-local_options = ClientOptions(api_endpoint="wild-rice-yell.loca.lt:443")
+# ==============================================================================
+# --- 1. CONNEXION SÉCURISÉE EN PRODUCTION À FIREBASE CLOUD ---
+# ==============================================================================
 
-# 2. Création directe du client connecté à votre émulateur à la maison
-# On utilise AnonymousCredentials() pour désactiver la vérification des clés secrètes
-db = firestore.Client(
-    project="calculateur-chantier-dc921",
-    credentials=AnonymousCredentials(),
-    client_options=local_options
-)
+if "text_key" in st.secrets:
+    # Lecture des identifiants JSON stockés de manière invisible et sécurisée dans le Cloud
+    info_cles = json.loads(st.secrets["text_key"])
+    creds = service_account.Credentials.from_service_account_info(info_cles)
+    
+    db = firestore.Client(
+        project="calculateur-chantier-dc921",
+        credentials=creds
+    )
+else:
+    # Mode de secours si vous lancez en local avec la variable d'environnement système
+    db = firestore.Client(project="calculateur-chantier-dc921")
 
 # ==============================================================================
 # --- FONCTIONS DE LECTURE (SÉCURISÉES PAR CACHE EXTENSIBLE DE 10 MIN) ---
 # ==============================================================================
+# Le reste de votre fichier database.py d'origine reste inchangé...
 
 @st.cache_data(ttl=600)
 def charger_salaires_config():
