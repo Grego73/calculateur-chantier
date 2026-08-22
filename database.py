@@ -129,3 +129,19 @@ def reinitialiser_db():
         st.cache_data.clear()
     except Exception as e:
         st.error(f"❌ Échec de la réinitialisation : {e}")
+def enregistrer_log(type_action, details):
+    import datetime
+    import pytz
+    try:
+        tz_paris = pytz.timezone('Europe/Paris')
+        maintenant = datetime.datetime.now(tz_paris)
+        timestamp_txt = maintenant.strftime("%Y-%m-%d %H:%M:%S")
+        
+        # Écriture NoSQL dans la collection de traçabilité
+        db.collection("journaux_actions").add({
+            "timestamp": timestamp_txt,
+            "type_action": type_action,
+            "details": details
+        })
+    except Exception as e:
+        pass
