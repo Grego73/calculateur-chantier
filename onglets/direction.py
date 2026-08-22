@@ -70,7 +70,6 @@ def pop_up_validation_recrutement(salaires_mensuels, metier, type_contrat, salai
         st.cache_data.clear()
         st.toast(f"🚀 Tarifs de référence pour {prefixe_cle} synchronisés !")
         st.rerun()
-
 # ==============================================================================
 # --- 2. POP-UP DE VALIDATION POUR L'EXTRACTEUR DE FICHES CHANTIERS ---
 # ==============================================================================
@@ -131,7 +130,6 @@ def pop_up_validation_fiches_chantiers(chantiers_detectes):
             st.write("*Aucun personnel requis détecté.*")
             
         st.markdown("---")
-        
     st.warning("🚨 Confirmez-vous l'injection de ces structures NoSQL dans votre catalogue de modèles ?")
     
     col_c1, col_c2 = st.columns(2)
@@ -205,7 +203,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
             with c_st4: st.metric(label="📈 Résultat Net / Bénéfice", value=f"{somme_benefices:,.0f}".replace(",", " ") + " €")
         else:
             st.info("💡 Historique vierge : Aucun chantier n'est encore enregistré en base de données.")
-
         st.markdown("<br>", unsafe_allow_html=True)
         
         with st.expander("🚨 Zone de Danger : Réinitialisation et Nettoyage des Tables"):
@@ -269,7 +266,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                     nom_courant = None
                     etape_courante_num = None
                     compteur_doublons_bloques = 0
-                    
                     for ligne in lignes:
                         l_clean = ligne.strip()
                         if not l_clean: continue
@@ -340,7 +336,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             if num_txt: 
                                 durees_etapes_locales[f"duree_{nom_courant}_{etape_courante_num}"] = int(num_txt)
                             continue
-                            
                         if ":" in l_clean and etape_courante_num is not None and ("chef" in l_clean.lower() or "ouvrier" in l_clean.lower() or "conducteur" in l_clean.lower()):
                             gauche, droite = l_clean.split(":", 1)
                             gauche_low = gauche.lower()
@@ -351,13 +346,11 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                 if "conducteur" in gauche_low or "engin" in gauche_low:
                                     chantiers_detectes[nom_courant]["jh_cond"] = max(chantiers_detectes[nom_courant]["jh_cond"], nb_val)
                                 elif "chef" in gauche_low:
-                                elif "chef" in gauche_low:
                                     chantiers_detectes[nom_courant]["jh_chef"] = max(chantiers_detectes[nom_courant]["jh_chef"], nb_val)
                                 elif "ouvrier" in gauche_low:
                                     chantiers_detectes[nom_courant]["jh_ouvrier"] = max(chantiers_detectes[nom_courant]["jh_ouvrier"], nb_val)
                             continue
 
-                        # 8. Extraction et routage des volumes de matériaux requis
                         if "matériaux requis :" in l_clean.lower() or "materiaux requis :" in l_clean.lower():
                             partie_mats = l_clean.split(":")[-1].lower()
                             if "aucun" not in partie_mats:
@@ -377,8 +370,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                         elif "tuyau" in sub_mat: chantiers_detectes[nom_courant]["tuyaux"] = qte_val
                                         elif "poutre" in sub_mat: chantiers_detectes[nom_courant]["poutres"] = qte_val
                             continue
-
-                        # 9. Typologie des matériels et engins nécessaires à l'étape
                         if etape_courante_num is not None and "employés requis" not in l_clean.lower() and "matériaux requis" not in l_clean.lower():
                             ligne_brute_clean = l_clean.lower().replace("é", "e").replace("è", "e").replace("ê", "e").replace("à", "a")
                             cat_engin = None
@@ -402,7 +393,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                         "Niveau requis": f"N{re.search(r'niveau\s*(\d+)', ligne_brute_clean).group(1)}" if re.search(r'niveau\s*(\d+)', ligne_brute_clean) else "N1"
                                     })
 
-                    # --- FIN DE LA BOUCLE DE RECHERCHE : ANALYSE ET FILTRAGE TERMINÉS ---
                     if len(chantiers_detectes) > 0:
                         if compteur_doublons_bloques > 0:
                             st.toast(f"ℹ️ {compteur_doublons_bloques} doublon(s) détecté(s) ont été automatiquement filtré(s).")
@@ -412,9 +402,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             st.error(f"❌ Aucun nouveau modèle : Les {compteur_doublons_bloques} chantiers soumis existent déjà.")
                         else:
                             st.error("❌ L'algorithme n'a pas réussi à extraire de fiches de chantiers valides dans votre texte brut.")
-                        else:
-                            st.error("❌ L'algorithme n'a pas réussi à extraire de fiches de chantiers valides dans votre texte brut.")
-
         # ==============================================================================
         # --- sub_tab2 : CONFIGURATION GRILLE SALARIALE ---
         # ==============================================================================
@@ -449,7 +436,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                     if liste_salaires_extraits:
                         pop_up_validation_recrutement(liste_salaires_extraits, metier_cible, type_contrat_cible, SALAIRES_DB)
                     else:
-                        st.error("❌ Impossible d'extraire des montants de salaires valides (€).")
+                        st.error("❌ Impossible d'extraire des montants de salaires valides.")
 
             st.markdown("#### 📄 Grille Salariale Active dans le Cloud :")
             if not SALAIRES_DB:
@@ -479,7 +466,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             st.cache_data.clear()
                             st.toast("🗑️ Entrées supprimées de la base Firebase Cloud avec succès !")
                             st.rerun()
-
         # ==============================================================================
         # --- sub_tab3 : PRIX DES MATÉRIAUX ---
         # ==============================================================================
@@ -537,7 +523,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                 df_liste_engins = pd.DataFrame([{"Nom de l'engin": k, "Prix / Jour (€)": v} for k, v in catalogue_engins_brut.items()])
                 df_liste_engins_style = df_liste_engins.style.format({"Prix / Jour (€)": lambda x: f"{x:,.0f}".replace(",", " ") + " €" if pd.notnull(x) else "-"})
                 st.dataframe(df_liste_engins_style, use_container_width=True, hide_index=True)
-
         # ==============================================================================
         # --- sub_tab5 : CONSULTATION BRUTE DES TABLES ---
         # ==============================================================================
@@ -560,14 +545,11 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                 else: 
                     st.info("Aucun modèle configuré sur votre base Firebase.")
             elif choix_table == "Grille Salariale Actuelle": 
-            elif choix_table == "Grille Salariale Actuelle": 
                 salaires_formates = {k: f"{v:,.0f}".replace(",", " ") + " €" for k, v in SALAIRES_DB.items()}
                 st.json(salaires_formates)
-                
             elif choix_table == "Prix des Matériaux de base": 
                 materiaux_formates = {k: f"{v:,.0f}".replace(",", " ") + " €" for k, v in MATERIAUX_DB.items()}
                 st.json(materiaux_formates)
-                
             elif choix_table == "Catalogue de Location des Engins":
                 catalogue_engins_brut = db.charger_catalogue_engins()
                 if catalogue_engins_brut: 
@@ -606,9 +588,8 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                         f"Chantier B : {data_B.get('nom_modele', ch_B)}": [f"{data_B.get('revenus', 0):,.0f}".replace(",", " ") + " €", f"{data_B.get('jours', 0)} jours", f"{data_B.get('sable', 0)} t", f"{data_B.get('beton', 0)} t", f"{data_B.get('terre', 0)} t"]
                     }
                     st.table(pd.DataFrame(metrics_comparatives))
-
         # ==============================================================================
-        # --- sub_tab7 : VÉRIFICATEUR DE DOUBLONS AVEC FUSION INTERNE ET COMPTEURS UNIQ ---
+        # --- sub_tab7 : VÉRIFICATEUR DE DOUBLONS EN BLOC (PASSIF) ---
         # ==============================================================================
         with sub_tab7:
             st.markdown(f"### 🔍 Vérificateur de Chantiers en Bloc ({total_modeles} modèles en base)")
