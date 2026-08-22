@@ -530,24 +530,24 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
         # --- sub_tab5 : CONSULTATION BRUTE DES TABLES ---
         # ==============================================================================
         with sub_tab5:
-            st.markdown("### 🗂️ Consultation brute complète")
+            # 1. On charge d'abord les données pour connaître le compte exact
+            dict_modeles = db.charger_catalogue_chantiers()
+            res_modeles = [dict_modeles[k] for k in dict_modeles if k != "Choisir un chantier pré-configuré..."]
+            total_modeles = len(res_modeles)
+
+            # 2. On affiche le titre principal en y injectant dynamiquement le nombre total de chantiers
+            st.markdown(f"### 🗂️ Consultation brute complète ({total_modeles} chantiers en base)")
+            
             choix_table = st.selectbox(
                 "Choisir la table :", 
                 ["Modèles de Chantiers Pré-configurés", "Grille Salariale Actuelle", "Prix des Matériaux de base", "Catalogue de Location des Engins"]
             )
+            
             if choix_table == "Modèles de Chantiers Pré-configurés":
-                dict_modeles = db.charger_catalogue_chantiers()
-                # On filtre la clé par défaut pour ne compter que les vrais chantiers
-                res = [dict_modeles[k] for k in dict_modeles if k != "Choisir un chantier pré-configuré..."]
-                
-                if res:
-                    df_apercu = pd.DataFrame(res)
+                if res_modeles:
+                    df_apercu = pd.DataFrame(res_modeles)
                     if "engins_requis" in df_apercu.columns: 
                         df_apercu = df_apercu.drop(columns=["engins_requis"])
-                    
-                    # --- NOUVEAUTÉ : AFFICHAGE DU COMPTEUR DE MODÈLES ---
-                    total_modeles_base = len(res)
-                    st.info(f"📋 **Nombre de modèles pré-configurés analysés et disponibles en base NoSQL :** {total_modeles_base} modèle(s)")
                     
                     colonnes_numeriques = df_apercu.select_dtypes(include=['number']).columns
                     df_stylise = df_apercu.style.format({
@@ -557,7 +557,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                     st.dataframe(df_stylise, use_container_width=True, hide_index=True)
                 else: 
                     st.info("Aucun modèle configuré sur votre base Firebase.")
-            
+       
             elif choix_table == "Grille Salariale Actuelle": 
                 salaires_formates = {k: f"{v:,.0f}".replace(",", " ") + " €" for k, v in SALAIRES_DB.items()}
                 st.json(salaires_formates)
