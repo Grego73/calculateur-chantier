@@ -574,15 +574,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                 else: 
                     st.info("Catalogue vide.")
 
-        # --- AJOUT DU 7È ME ONGLET DANS LA LISTE ---
-        sub_tab1, sub_tab2, sub_tab3, sub_tab4, sub_tab5, sub_tab6, sub_tab7 = st.tabs([
-            "🏗️ Saisie Multi-Chantiers en Bloc", "👥 Éditer Grille Salariale", 
-            "🧱 Éditer Prix Matériaux", "🚜 Éditer Catalogue Engins", "🗂️ Consulter les Bases Données",
-            "🔎 Comparateur de Fiches", "🔍 Vérificateur de Doublons"
-        ])
-
-        # [Les codes de sub_tab1, sub_tab2, sub_tab3, sub_tab4, sub_tab5 restent inchangés...]
-
         # ==============================================================================
         # --- sub_tab6 : COMPARATEUR DE FICHES CHANTIERS (Laissé intact pour plus tard) ---
         # ==============================================================================
