@@ -645,47 +645,41 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                     }
                     st.table(pd.DataFrame(metrics_comparatives))
 
-        # ==============================================================================
-        # --- sub_tab7 : OUTIL DE VÉRIFICATION PASSIVE DE DOUBLONS ---
+          # ==============================================================================
+        # --- sub_tab7 : OUTIL DE VÉRIFICATION PASSIVE DE DOUBLONS DE CATALOGUE ---
         # ==============================================================================
         with sub_tab7:
-            # 1. Chargement du catalogue actuel pour afficher le compte exact dans le titre
             dict_modeles_verification = db.charger_catalogue_chantiers()
             res_modeles_existants = [dict_modeles_verification[k] for k in dict_modeles_verification if k != "Choisir un chantier pré-configuré..."]
             total_modeles_base = len(res_modeles_existants)
 
-            # Titre mis à jour avec le nombre de modèles actuellement en base
             st.markdown(f"### 🔍 Vérificateur de Chantiers en Bloc ({total_modeles_base} modèles en base)")
             st.write("Collez vos fiches brutes ci-dessous pour savoir instantanément si elles sont déjà présentes dans le catalogue cloud.")
 
             texte_verification_brut = st.text_area(
                 "Collez les chantiers à vérifier (Nom + Prix) :", 
-                value="", 
-                height=250, 
-                key="zone_texte_verif_bloc_doublons"
+                value="", height=250, key="zone_texte_verif_bloc_doublons"
             )
             
             if st.button("🔍 ANALYSER ET VÉRIFIER LA PRÉSENCE EN BASE", type="primary", use_container_width=True):
                 if not texte_verification_brut.strip():
                     st.error("❌ La zone de texte est vide.")
                 else:
-                    # 2. Construction du set de comparaison
+                    # 1. Extraction et cartographie de la base NoSQL existante
                     chantiers_existants = set()
                     for doc_id, data_m in dict_modeles_verification.items():
-                        if doc_id == "Choisir un chantier pré-configuré...": 
-                            continue
+                        if doc_id == "Choisir un chantier pré-configuré...": continue
                         nom_m = str(data_m.get("nom_modele", doc_id)).strip().lower()
                         prix_m = float(data_m.get("revenus", 0.0))
                         chantiers_existants.add((nom_m, prix_m))
 
-                    # 3. Extraction et analyse des lignes collées
+                    # 2. Premier filtrage : Élimination des doublons internes au texte copié-collé
                     lignes_verif = texte_verification_brut.split("\n")
-                    resultats_analyse = []
+                    chantiers_uniques_saisis = {} # Clé: (nom, prix) -> Valeur: Nom propre d'affichage
                     
                     for ligne in lignes_verif:
                         l_clean = ligne.strip()
-                        if not l_clean: 
-                            continue
+                        if not l_clean: continue
                         
                         match_verif = re.search(r"^(.*?)\s+(\d[\d\s]+)\s+euros", l_clean, re.IGNORECASE)
                         if match_verif:
@@ -693,38 +687,44 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             prix_net_txt = "".join(c for c in match_verif.group(2) if c.isdigit())
                             prix_extrait = float(prix_net_txt) if prix_net_txt else 0.0
                             
-                            cle_recherche = (nom_extrait.lower(), prix_extrait)
-                            
-                            if cle_recherche in chantiers_existants:
-                                statut = "🟢 Déjà enregistré (Doublon)"
-                            else:
-                                statut = "🔴 Absent de la base (Nouveau)"
-                                
-                            resultats_analyse.append({
-                                "Nom du Chantier Détecté": nom_extrait,
-                                "Revenus (€)": prix_extrait,
-                                "Statut Base Cloud": statut
-                            })
+                            # Si le chantier est déjà dans notre dictionnaire local, la clé écrase la précédente
+                            # Cela supprime instantanément la deuxième ligne identique "Pose de panneaux"
+                            chantiers_uniques_saisis[(nom_extrait.lower(), prix_extrait)] = nom_extrait
 
-                    # 4. Affichage du rapport avec les 3 compteurs métriques
+                    # 3. Deuxième filtrage : Comparaison des éléments uniques avec le Cloud Firebase
+                    resultats_analyse = []
+                    for (nom_low, prix_val), nom_propre in chantiers_uniques_saisis.items():
+                        
+                        if (nom_low, prix_val) in chantiers_existants:
+                            statut = "🟢 Déjà enregistré (Doublon)"
+                        else:
+                            statut = "🔴 Absent de la base (Nouveau)"
+                            
+                        resultats_analyse.append({
+                            "Nom du Chantier Détecté": nom_propre,
+                            "Revenus (€)": prix_val,
+                            "Statut Base Cloud": statut
+                        })
+
+                    # 4. Affichage du tableau de bord consolidé sans aucun doublon
                     if resultats_analyse:
                         df_resultats = pd.DataFrame(resultats_analyse)
+                        
+                        # Tri par prix pour un meilleur confort visuel comme sur votre capture
+                        df_resultats = df_resultats.sort_values(by="Revenus (€)", ascending=True)
                         
                         total_analyses = len(df_resultats)
                         nb_nouveaux = len(df_resultats[df_resultats["Statut Base Cloud"].str.contains("🔴")])
                         nb_doublons = len(df_resultats[df_resultats["Statut Base Cloud"].str.contains("🟢")])
                         
                         c_v1, c_v2, c_v3 = st.columns(3)
-                        with c_v1: st.metric("Chantiers analysés", f"{total_analyses}")
+                        with c_v1: st.metric("Chantiers uniques analysés", f"{total_analyses}")
                         with c_v2: st.metric("Nouveaux chantiers (Absents)", f"{nb_nouveaux}")
                         with c_v3: st.metric("Doublons détectés (À éviter)", f"{nb_doublons}")
                         
                         st.markdown("#### 📊 Rapport de présence NoSQL en Temps Réel :")
-                        
                         st.dataframe(
-                            df_resultats, 
-                            use_container_width=True, 
-                            hide_index=True,
+                            df_resultats, use_container_width=True, hide_index=True,
                             column_config={
                                 "Nom du Chantier Détecté": st.column_config.TextColumn("Nom de la Fiche"),
                                 "Revenus (€)": st.column_config.NumberColumn("Prix de l'Ouvrage", format="%d €"),
@@ -733,6 +733,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                         )
                     else:
                         st.error("❌ L'algorithme n'a pas réussi à extraire de couples 'Nom + Prix' valides. Vérifiez le format de votre texte.")
-  
+
     elif mot_de_passe != "":
         st.error("🔒 Code d'accès incorrect.")
