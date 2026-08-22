@@ -242,25 +242,44 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
             "🔎 Comparateur de Fiches", "🔍 Vérificateur de Doublons"
         ])
 
-        # --- sub_tab1 : IMPORTATION EN BLOC ET DECODAGE ---
+        # ==============================================================================
+        # --- sub_tab1 : IMPORTATION EN BLOC AVEC FILTRE ET NETTOYAGE DES DOUBLONS ---
+        # ==============================================================================
         with sub_tab1:
-            st.markdown("### 📥 Extracteur de Fiches Chantiers Multi-Étapes")
+            # 1. Chargement du catalogue cloud pour afficher le compte exact
+            dict_modeles_cloud = db.charger_catalogue_chantiers()
+            res_modeles_base = [dict_modeles_cloud[k] for k in dict_modeles_cloud if k != "Choisir un chantier pré-configuré..."]
+            total_modeles_base = len(res_modeles_base)
+
+            st.markdown(f"### 📥 Extracteur de Fiches Chantiers Multi-Étapes ({total_modeles_base} modèles en base)")
             texte_fiches_brutes = st.text_area("Zone de saisie des fiches :", value="", height=350, key="zone_texte_import_unique_fusionne")
             
             if st.button("🏗️ ANALYSER, NETTOYER ET IMPORTER LES MODÈLES", type="primary"):
                 if not texte_fiches_brutes.strip():
                     st.error("❌ La zone de texte est vide.")
                 else:
+                    # 2. Cartographie des chantiers déjà enregistrés dans Firebase (Nom, Prix)
+                    modeles_deja_presents = set()
+                    for doc_id, data_m in dict_modeles_cloud.items():
+                        if doc_id == "Choisir un chantier pré-configuré...": 
+                            continue
+                        nom_base = str(data_m.get("nom_modele", doc_id)).strip().lower()
+                        prix_base = float(data_m.get("revenus", 0.0))
+                        modeles_deja_presents.add((nom_base, prix_base))
+
                     lignes = texte_fiches_brutes.split("\n")
                     chantiers_detectes = {}
-                    durees_etapes_locales = {}  # Utilisation d'un dictionnaire local pour fiabiliser le state
+                    durees_etapes_locales = {}  
                     nom_courant = None
                     etape_courante_num = None
+                    compteur_doublons_bloques = 0
                     
                     for ligne in lignes:
                         l_clean = ligne.strip()
-                        if not l_clean: continue
+                        if not l_clean: 
+                            continue
                         
+                        # Détection de l'en-tête du chantier
                         if "euros" in l_clean.lower() and not l_clean.lower().startswith("revenus"):
                             match_debut = re.search(r"^(.*?)\s+(\d[\d\s]+)\s+euros", l_clean, re.IGNORECASE)
                             if match_debut:
@@ -270,6 +289,12 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             else:
                                 prix_ch = 0.0
                                 nom_ch = l_clean.replace("euros", "").replace("Euros", "").strip()
+                                
+                            # 🚀 FILTRE CLOUD : Si le chantier existe déjà, on l'écarte immédiatement de l'analyse
+                            if (nom_ch.lower(), prix_ch) in modeles_deja_presents:
+                                nom_courant = None # Désactive la lecture des lignes rattachées à ce doublon
+                                compteur_doublons_bloques += 1
+                                continue
                                 
                             nom_courant = f"{nom_ch} _PLANCHER_ {int(prix_ch)}"
                             etape_courante_num = None
@@ -284,7 +309,8 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                 }
                             continue
 
-                        if not nom_courant: continue
+                        if not nom_courant: 
+                            continue
                         
                         if l_clean.lower().startswith("revenus :"):
                             prix_txt = "".join(c for c in l_clean if c.isdigit())
@@ -357,6 +383,10 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                         elif "tuyau" in sub_mat: chantiers_detectes[nom_courant]["tuyaux"] = qte_val
                                         elif "poutre" in sub_mat: chantiers_detectes[nom_courant]["poutres"] = qte_val
                             continue
+                                        elif "panneau" in sub_mat: chantiers_detectes[nom_courant]["panneaux"] = qte_val
+                                        elif "tuyau" in sub_mat: chantiers_detectes[nom_courant]["tuyaux"] = qte_val
+                                        elif "poutre" in sub_mat: chantiers_detectes[nom_courant]["poutres"] = qte_val
+                            continue
 
                         # 9. Typologie des matériels et engins nécessaires à l'étape
                         if etape_courante_num is not None and "employés requis" not in l_clean.lower() and "matériaux requis" not in l_clean.lower():
@@ -382,11 +412,17 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                         "Niveau requis": f"N{re.search(r'niveau\s*(\d+)', ligne_brute_clean).group(1)}" if re.search(r'niveau\s*(\d+)', ligne_brute_clean) else "N1"
                                     })
 
-                    # --- ANALYSE TERMINÉE : AFFICHAGE DU RAPPORT SÉCURISÉ ---
+                    # --- FIN DE LA BOUCLE RE RECHERCHE : ANALYSE ET FILTRAGE TERMINÉS ---
                     if len(chantiers_detectes) > 0:
+                        if compteur_doublons_bloques > 0:
+                            st.toast(f"ℹ️ {compteur_doublons_bloques} doublon(s) déjà présent(s) en base ou dans le texte ont été retiré(s) avant l'affichage.")
                         pop_up_validation_fiches_chantiers(chantiers_detectes)
                     else:
-                        st.error("❌ L'algorithme n'a détecté aucune fiche de chantier valide dans votre texte brut.")
+                        if compteur_doublons_bloques > 0:
+                            st.error(f"❌ Aucun nouveau modèle détecté : Les {compteur_doublons_bloques} chantiers soumis existent déjà tous dans la base cloud.")
+                        else:
+                            st.error("❌ L'algorithme n'a pas réussi à extraire de fiches de chantiers valides dans votre texte brut.")
+
 
         # ==============================================================================
         # --- sub_tab2 : CONFIGURATION GRILLE SALARIALE ---
