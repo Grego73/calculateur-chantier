@@ -231,10 +231,10 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
 
         st.markdown("## ⚙️ Administration Suprême des Bases NoSQL")
         
-        sub_tab1, sub_tab2, sub_tab3, sub_tab4, sub_tab5, sub_tab6, sub_tab7 = st.tabs([
+        sub_tab1, sub_tab2, sub_tab3, sub_tab4, sub_tab5, sub_tab6, sub_tab7, sub_tab8 = st.tabs([
             "🏗️ Saisie Multi-Chantiers en Bloc", "👥 Éditer Grille Salariale", 
             "🧱 Éditer Prix Matériaux", "🚜 Éditer Catalogue Engins", "🗂️ Consulter les Bases Données",
-            "🔎 Comparateur de Fiches", "🔍 Vérificateur de Doublons"
+            "🔎 Comparateur de Fiches", "🔍 Vérificateur de Doublons", "📊 Quotas Firebase"
         ])
 
         # ==============================================================================
