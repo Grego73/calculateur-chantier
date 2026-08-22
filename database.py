@@ -1,28 +1,19 @@
 import streamlit as st
 import pandas as pd
-import firebase_admin
-from firebase_admin import firestore
+from google.cloud import firestore  # Connexion directe sans passer par firebase_admin
 from google.api_core.client_options import ClientOptions
-from google.auth import credentials as google_credentials # <- Solution anti-bug
+from google.auth.credentials import AnonymousCredentials
 
-# Initialisation unique de Firebase pour l'émulateur local
-if not firebase_admin._apps:
-    try:
-        # On utilise des identifiants anonymes pour éviter les erreurs de clé PEM/ASN.1
-        cred = google_credentials.AnonymousCredentials()
-        
-        # Redirection des données vers votre tunnel LocalTunnel
-        local_options = ClientOptions(api_endpoint="wild-rice-yell.loca.lt:443")
-        
-        firebase_admin.initialize_app(cred, options={
-            'firestore': {
-                'client_options': local_options
-            }
-        })
-    except Exception as e:
-        st.error(f"❌ Erreur critique d'initialisation Firebase : {e}")
+# 1. Configuration de l'adresse de votre passerelle Internet (votre PC)
+local_options = ClientOptions(api_endpoint="wild-rice-yell.loca.lt:443")
 
-db = firestore.client()
+# 2. Création directe du client connecté à votre émulateur à la maison
+# On utilise AnonymousCredentials() pour désactiver la vérification des clés secrètes
+db = firestore.Client(
+    project="calculateur-chantier-dc921",
+    credentials=AnonymousCredentials(),
+    client_options=local_options
+)
 
 # ==============================================================================
 # --- FONCTIONS DE LECTURE (SÉCURISÉES PAR CACHE EXTENSIBLE DE 10 MIN) ---
