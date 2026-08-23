@@ -454,18 +454,41 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                     }
                 )
                 
-                if grille_editee is not None and not grille_editee.empty:
-                    cles_a_supprimer = grille_editee[grille_editee["Supprimer l'entrée 🗑️"] == True]["Clé technique NoSQL"].tolist()
-                    if cles_a_supprimer:
-                        st.warning(f"🚨 Vous avez sélectionné {len(cles_a_supprimer)} entrée(s) pour suppression définitive.")
-                        if st.button("💥 VALIDER LA SUPPRESSION DÉFINITIVE", type="primary", use_container_width=True):
-                            grille_nettoyee = dict(SALAIRES_DB)
-                            for cle in cles_a_supprimer:
-                                if cle in grille_nettoyee: del grille_nettoyee[cle]
-                            db.db.collection("configuration_salaires").document("grille").set(grille_nettoyee)
+                # --- TRAITEMENT DES SUPPRESSIONS DE LA GRILLE SALARIALE ---
+                if grille_editee is not None:
+                    # On cherche si des lignes ont été cochées pour la suppression
+                    lignes_a_supprimer = grille_editee[grille_editee["Supprimer l'entrée 🗑️"] == True]
+                    
+                    if not lignes_a_supprimer.empty:
+                        # Bouton de confirmation dynamique si des cases sont cochées
+                        if st.button("💥 CONFIRMER LA SUPPRESSION DES ENTRÉES SÉLECTIONNÉES", type="primary", use_container_width=True):
+                            # On repart de la grille cloud actuelle
+                            nouvelle_grille = dict(SALAIRES_DB)
+                            
+                            # On retire les clés cochées
+                            for cle_technique in lignes_a_supprimer["Clé technique NoSQL"]:
+                                if cle_technique in nouvelle_grille:
+                                    del nouvelle_grille[cle_technique]
+                            
+                            # Mise à jour sur Firebase Firestore
+                            db.db.collection("configuration_salaires").document("grille").set(nouvelle_grille)
+                            
+                            # Journalisation de l'action (Optionnel mais recommandé pour votre sub_tab9)
+                            try:
+                                timestamp_paris = datetime.datetime.now(pytz.timezone('Europe/Paris')).strftime("%Y-%m-%d %H:%M:%S")
+                                db.db.collection("journaux_actions").add({
+                                    "timestamp": timestamp_paris,
+                                    "type_action": "SALAIRES",
+                                    "details": f"Suppression de {len(lignes_a_supprimer)} entrée(s) dans la grille salariale."
+                                })
+                            except Exception:
+                                pass
+                            
+                            # Nettoyage et rechargement
                             st.cache_data.clear()
-                            st.toast("🗑️ Entrées supprimées de la base Firebase Cloud avec succès !")
+                            st.toast("🔥 Entrées salariales supprimées avec succès !")
                             st.rerun()
+
         # ==============================================================================
         # --- sub_tab3 : PRIX DES MATÉRIAUX ---
         # ==============================================================================
