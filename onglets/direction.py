@@ -682,10 +682,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
         with sub_tab8:
             st.markdown("### 📊 Suivi de Consommation & Quotas Journaliers (Plan Gratuit)")
             st.write("Firestore comptabilise l'usage quotidien. Voici l'état estimé de vos limites système réinitialisées toutes les 24h par Google.")
-
-            # --- NOUVEAUTÉ : CALCUL DU TEMPS RESTANT AVANT LA RÉINITIALISATION (09h00 Paris) ---
-            import datetime
-            import pytz
             
             # On se calfeutre sur le fuseau horaire de Paris
             tz_paris = pytz.timezone('Europe/Paris')
