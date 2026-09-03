@@ -496,11 +496,17 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                 st.dataframe(df_liste_engins_style, use_container_width=True, hide_index=True)
 
         # ==============================================================================
-        # --- sub_tab5 : CONSULTATION BRUTE DES TABLES ---
+        # --- sub_tab5 : CONSULTATION BRUTE DES TABLES (SÉCURISÉE OPTION B) ---
         # ==============================================================================
         with sub_tab5:
             dict_modeles = db.charger_catalogue_chantiers()
-            res_modeles = [dict_modeles[k] for k in dict_modeles if k != "Choisir un chantier pré-configuré..."]
+            
+            # Correction : Sécurisation si dict_modeles est une liste ou un dictionnaire
+            if isinstance(dict_modeles, dict):
+                res_modeles = [dict_modeles[k] for k in dict_modeles if k != "Choisir un chantier pré-configuré..."]
+            else:
+                res_modeles = list(dict_modeles)
+                
             total_modeles = len(res_modeles)
 
             st.markdown(f"### 🗂️ Consultation brute complète ({total_modeles} chantiers en base)")
@@ -511,6 +517,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                 if res_modeles:
                     df_apercu = pd.DataFrame(res_modeles)
                     if "engins_requis" in df_apercu.columns: df_apercu = df_apercu.drop(columns=["engins_requis"])
+                    if "etapes_techniques" in df_apercu.columns: df_apercu = df_apercu.drop(columns=["etapes_techniques"])
                     colonnes_numeriques = df_apercu.select_dtypes(include=['number']).columns
                     df_stylise = df_apercu.style.format({col: lambda x: f"{x:,.0f}".replace(",", " ") if pd.notnull(x) else "-" for col in colonnes_numeriques})
                     st.dataframe(df_stylise, use_container_width=True, hide_index=True)
@@ -533,12 +540,17 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                     st.info("Catalogue vide.")
 
         # ==============================================================================
-        # --- sub_tab6 : COMPARATEUR DE FICHES CHANTIERS ---
+        # --- sub_tab6 : COMPARATEUR DE FICHES CHANTIERS (SÉCURISÉ) ---
         # ==============================================================================
         with sub_tab6:
-            st.markdown("### 🔎 Outil de Comparaison de Modèles Préfabriqués")
+            st.markdown("### 🔎 Outil de Comparison de Modèles Préfabriqués")
             dict_modeles_comp = db.charger_catalogue_chantiers()
-            liste_selection_comp = [k for k in dict_modeles_comp.keys() if k != "Choisir un chantier pré-configuré..."]
+            
+            # Correction de la conversion de sécurité
+            if isinstance(dict_modeles_comp, dict):
+                liste_selection_comp = [k for k in dict_modeles_comp.keys() if k != "Choisir un chantier pré-configuré..."]
+            else:
+                liste_selection_comp = []
             
             if len(liste_selection_comp) < 2:
                 st.info("💡 Deux modèles minimum requis pour exécuter une comparaison.")
@@ -562,7 +574,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                     st.table(pd.DataFrame(metrics_comparatives))
 
         # ==============================================================================
-        # --- sub_tab7 : VÉRIFICATEUR ET INJECTEUR DE NOUVEAUX CHANTIERS (OPTION B) ---
+        # --- sub_tab7 : VÉRIFICATEUR DE DOUBLONS (SÉCURISÉ) ---
         # ==============================================================================
         with sub_tab7:
             st.markdown(f"### 🔍 Vérificateur & Injecteur de Fiches en Bloc ({total_modeles} modèles en base)")
@@ -573,11 +585,15 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
             if texte_verification_brut.strip():
                 dict_modeles_verif = db.charger_catalogue_chantiers()
                 chantiers_existants = set()
-                for doc_id, data_m in dict_modeles_verif.items():
-                    if doc_id == "Choisir un chantier pré-configuré...": continue
-                    nom_base = str(data_m.get("nom_modele", doc_id)).strip().lower()
-                    prix_base = float(data_m.get("revenus", 0.0))
-                    chantiers_existants.add((nom_base, prix_base))
+                
+                # Correction anti-crash si la structure cloud contient de vieux modèles asynchrones
+                if isinstance(dict_modeles_verif, dict):
+                    for doc_id, data_m in dict_modeles_verif.items():
+                        if doc_id == "Choisir un chantier pré-configuré...": continue
+                        nom_base = str(data_m.get("nom_modele", doc_id)).strip().lower()
+                        prix_base = float(data_m.get("revenus", 0.0))
+                        chantiers_existants.add((nom_base, prix_base))
+
 
                 lignes_verif = texte_verification_brut.split("\n")
                 blocs_chantiers_bruts = {}
