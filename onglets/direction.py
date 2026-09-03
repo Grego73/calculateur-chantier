@@ -72,6 +72,7 @@ def pop_up_validation_recrutement(salaires_mensuels, metier, type_contrat, salai
         st.cache_data.clear()
         st.toast(f"🚀 Tarifs de référence pour {prefixe_cle} synchronisés !")
         st.rerun()
+
 # ==============================================================================
 # --- 2. POP-UP DE VALIDATION POUR L'EXTRACTEUR DE FICHES CHANTIERS ---
 # ==============================================================================
@@ -454,26 +455,19 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                     }
                 )
                 
-                # --- TRAITEMENT DES SUPPRESSIONS DE LA GRILLE SALARIALE ---
                 if grille_editee is not None:
-                    # On cherche si des lignes ont été cochées pour la suppression
                     lignes_a_supprimer = grille_editee[grille_editee["Supprimer l'entrée 🗑️"] == True]
                     
                     if not lignes_a_supprimer.empty:
-                        # Bouton de confirmation dynamique si des cases sont cochées
                         if st.button("💥 CONFIRMER LA SUPPRESSION DES ENTRÉES SÉLECTIONNÉES", type="primary", use_container_width=True):
-                            # On repart de la grille cloud actuelle
                             nouvelle_grille = dict(SALAIRES_DB)
                             
-                            # On retire les clés cochées
                             for cle_technique in lignes_a_supprimer["Clé technique NoSQL"]:
                                 if cle_technique in nouvelle_grille:
                                     del nouvelle_grille[cle_technique]
                             
-                            # Mise à jour sur Firebase Firestore
                             db.db.collection("configuration_salaires").document("grille").set(nouvelle_grille)
                             
-                            # Journalisation de l'action (Optionnel)
                             try:
                                 timestamp_paris = datetime.datetime.now(pytz.timezone('Europe/Paris')).strftime("%Y-%m-%d %H:%M:%S")
                                 db.db.collection("journaux_actions").add({
@@ -484,11 +478,9 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             except Exception:
                                 pass
                             
-                            # Nettoyage et rechargement
                             st.cache_data.clear()
                             st.toast("🔥 Entrées salariales supprimées avec succès !")
                             st.rerun()
-
 
         # ==============================================================================
         # --- sub_tab3 : PRIX DES MATÉRIAUX ---
@@ -547,6 +539,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                 df_liste_engins = pd.DataFrame([{"Nom de l'engin": k, "Prix / Jour (€)": v} for k, v in catalogue_engins_brut.items()])
                 df_liste_engins_style = df_liste_engins.style.format({"Prix / Jour (€)": lambda x: f"{x:,.0f}".replace(",", " ") + " €" if pd.notnull(x) else "-"})
                 st.dataframe(df_liste_engins_style, use_container_width=True, hide_index=True)
+
         # ==============================================================================
         # --- sub_tab5 : CONSULTATION BRUTE DES TABLES ---
         # ==============================================================================
@@ -612,6 +605,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                         f"Chantier B : {data_B.get('nom_modele', ch_B)}": [f"{data_B.get('revenus', 0):,.0f}".replace(",", " ") + " €", f"{data_B.get('jours', 0)} jours", f"{data_B.get('sable', 0)} t", f"{data_B.get('beton', 0)} t", f"{data_B.get('terre', 0)} t"]
                     }
                     st.table(pd.DataFrame(metrics_comparatives))
+
         # ==============================================================================
         # --- sub_tab7 : VÉRIFICATEUR ET INJECTEUR DE NOUVEAUX CHANTIERS ---
         # ==============================================================================
@@ -622,7 +616,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
             texte_verification_brut = st.text_area("Zone de dépôt des fiches brutes :", value="", height=250, key="zone_texte_verif_bloc_doublons")
             
             if texte_verification_brut.strip():
-                # 1. Chargement du catalogue pour détection des doublons
                 dict_modeles_verif = db.charger_catalogue_chantiers()
                 chantiers_existants = set()
                 for doc_id, data_m in dict_modeles_verif.items():
@@ -631,7 +624,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                     prix_base = float(data_m.get("revenus", 0.0))
                     chantiers_existants.add((nom_base, prix_base))
 
-                # 2. Premier découpage pour isoler les fiches saisies
                 lignes_verif = texte_verification_brut.split("\n")
                 blocs_chantiers_bruts = {}
                 nom_courant_verif = None
@@ -652,16 +644,13 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             
                         nom_courant_verif = f"{nom_ch} _VERIF_ {int(prix_ch)}"
                         blocs_chantiers_bruts[nom_courant_verif] = {
-                            "nom_propre": nom_ch,
-                            "prix": prix_ch,
-                            "lignes": []
+                            "nom_propre": nom_ch, "prix": prix_ch, "lignes": []
                         }
                         continue
                     
                     if nom_courant_verif and nom_courant_verif in blocs_chantiers_bruts:
                         blocs_chantiers_bruts[nom_courant_verif]["lignes"].append(ligne)
 
-                # 3. Séparation et affichage du bilan initial
                 liste_doublons = []
                 liste_nouveaux_blocs = []
                 
@@ -672,39 +661,32 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                     else:
                         liste_nouveaux_blocs.append(info_b)
                 
-                # Rendu des indicateurs de synthèse (KPIs)
                 c_v1, c_v2, c_v3 = st.columns(3)
                 with c_v1: st.metric("Total détecté", f"{len(blocs_chantiers_bruts)}")
                 with c_v2: st.metric("Doublons bloqués", f"{len(liste_doublons)}", delta="Déjà en base", delta_color="inverse")
                 with c_v3: st.metric("Nouveaux chantiers", f"{len(liste_nouveaux_blocs)}", delta="À configurer", delta_color="normal")
                 
-                # Affichage préventif des doublons trouvés
                 if liste_doublons:
                     with st.expander("🟢 Liste des doublons détectés (Ignorés automatiquement)"):
                         for d_ch in liste_doublons:
                             st.write(f"- **{d_ch['nom_propre']}** ({int(d_ch['prix']):,} €)".replace(",", " "))
 
-                # 4. Traitement dynamique des chantiers absents de la base
                 if liste_nouveaux_blocs:
                     st.markdown("---")
                     st.markdown("### 🛠️ Configuration et Décodage des Nouveaux Chantiers")
-                    st.info("Modifiez ou complétez le texte des fiches ci-dessous. L'algorithme analysera automatiquement les lignes pour en extraire la structure technique complète.")
+                    st.info("Modifiez ou complétez le texte des fiches ci-dessous.")
                     
                     chantiers_prets_a_injecter = {}
                     
                     for idx, n_ch in enumerate(liste_nouveaux_blocs):
                         st.markdown(f"#### 🧱 Fiche : **{n_ch['nom_propre']}** — `{int(n_ch['prix']):,} €`".replace(",", " "))
                         
-                        # Reconstitution du texte initial pour la zone d'édition
                         texte_initial_bloc = "\n".join(n_ch["lignes"])
                         texte_ajuste = st.text_area(
-                            f"Ajuster la structure technique de l'ouvrage (Étapes, Ressources, Matériaux) :",
-                            value=texte_initial_bloc,
-                            height=250,
-                            key=f"area_verif_modif_{idx}_{n_ch['nom_propre']}"
+                            f"Ajuster la structure technique de l'ouvrage :",
+                            value=texte_initial_bloc, height=250, key=f"area_verif_modif_{idx}_{n_ch['nom_propre']}"
                         )
                         
-                        # --- EXÉCUTION DU PARSER TECHNIQUE SUR LE TEXTE AJUSTÉ ---
                         chantiers_detectes_local = {
                             "nom_affiche_propre": n_ch["nom_propre"], "revenus": n_ch["prix"],
                             "jours": 0, "heures": 0, "minutes": 0, "nb_etapes": 1,
@@ -721,13 +703,11 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             l_l_clean = ligne_l.strip()
                             if not l_l_clean: continue
                             
-                            # Détection du nombre d'étapes
                             if "nombre d'étapes :" in l_l_clean.lower():
                                 num_txt = "".join(c for c in l_l_clean.split(":")[-1] if c.isdigit())
                                 if num_txt: chantiers_detectes_local["nb_etapes"] = int(num_txt)
                                 continue
                             
-                            # Détection de la durée globale
                             if "durée du chantier :" in l_l_clean.lower():
                                 partie_duree = l_l_clean.split(":")[-1].lower()
                                 m_j = re.search(r"(\d+)\s*jour", partie_duree)
@@ -942,44 +922,39 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                 st.cache_data.clear()
                 st.rerun()
 
-            # ==============================================================================
+        # ==============================================================================
         # --- sub_tab9 : TRAÇABILITÉ ET JOURNAL DES ACTIONS (LOGS) ---
         # ==============================================================================
-with sub_tab9:
-    st.markdown("### 📜 Journal d'Audit & Traçabilité NoSQL")
-    st.write("Historique chronologique des modifications apportées aux configurations de l'entreprise.")
+        with sub_tab9:
+            st.markdown("### 📜 Journal d'Audit & Traçabilité NoSQL")
+            st.write("Historique chronologique des modifications apportées aux configurations de l'entreprise.")
 
-    # Lecture sécurisée des logs depuis Firebase
-    try:
-        logs_stream = db.db.collection("journaux_actions").order_by("timestamp", direction="DESCENDING").limit(100).stream()
-        liste_logs = [d.to_dict() for d in logs_stream]
-    except Exception as e:
-        st.error(f"⚠️ Erreur de tri Firestore (Vérifiez si l'index cloud est créé) : {e}")
-        # Repli : lecture brute sans tri pour ne pas bloquer l'interface
-        try:
-            logs_stream = db.db.collection("journaux_actions").limit(100).stream()
-            liste_logs = [d.to_dict() for d in logs_stream]
-        except Exception:
-            liste_logs = []
+            # Lecture des logs depuis Firebase
+            try:
+                logs_stream = db.db.collection("journaux_actions").order_by("timestamp", direction="DESCENDING").limit(100).stream()
+                liste_logs = [d.to_dict() for d in logs_stream]
+            except Exception:
+                try:
+                    logs_stream = db.db.collection("journaux_actions").limit(100).stream()
+                    liste_logs = [d.to_dict() for d in logs_stream]
+                except Exception:
+                    liste_logs = []
 
-    if liste_logs:
-        df_logs = pd.DataFrame(liste_logs)
-        # S'assurer que les colonnes existent avant l'affichage
-        for col in ["timestamp", "type_action", "details"]:
-            if col not in df_logs.columns:
-                df_logs[col] = ""
-                
-        st.dataframe(
-            df_logs, use_container_width=True, hide_index=True,
-            column_config={
-                "timestamp": st.column_config.TextColumn("⏱️ Date & Heure (Paris)", width="medium"),
-                "type_action": st.column_config.TextColumn("🏷️ Catégorie", width="small"),
-                "details": st.column_config.TextColumn("📝 Détails de l'opération", width="large")
-            }
-        )
-    else:
-        st.info("💡 Aucun événement n'est encore enregistré dans le journal d'audit.")
-
+            if liste_logs:
+                df_logs = pd.DataFrame(liste_logs)
+                for col in ["timestamp", "type_action", "details"]:
+                    if col not in df_logs.columns: df_logs[col] = ""
+                    
+                st.dataframe(
+                    df_logs, use_container_width=True, hide_index=True,
+                    column_config={
+                        "timestamp": st.column_config.TextColumn("⏱️ Date & Heure (Paris)", width="medium"),
+                        "type_action": st.column_config.TextColumn("🏷️ Catégorie", width="small"),
+                        "details": st.column_config.TextColumn("📝 Détails de l'opération", width="large")
+                    }
+                )
+            else:
+                st.info("💡 Aucun événement n'est encore enregistré dans le journal d'audit.")
 
     elif mot_de_passe != "":
         st.error("🔒 Code d'accès incorrect.")
