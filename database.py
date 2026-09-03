@@ -146,3 +146,76 @@ def enregistrer_log(type_action, details):
     except Exception as e:
         pass
         
+# À ajouter tout en bas de : database.py
+
+def verifier_et_inscrire_joueur(nom_coop, mdp_saisi, pseudo_joueur):
+    """
+    Vérifie le mot de passe de la coopérative et inscrit le joueur si la limite 
+    des 4 membres inscrits n'est pas atteinte.
+    """
+    if not nom_coop or not mdp_saisi or not pseudo_joueur:
+        return False, "⚠️ Veuillez remplir tous les champs."
+        
+    coop_ref = db.collection("cooperatives").document(nom_coop)
+    coop_doc = coop_ref.get()
+    
+    # Si la coopérative n'existe pas encore, on la crée avec le mot de passe fourni
+    if not coop_doc.exists:
+        coop_ref.set({
+            "mot_de_passe": mdp_saisi,
+            "membres": [pseudo_joueur]
+        })
+        return True, f"🟢 Coopérative créée ! Bienvenue à bord, premier membre : {pseudo_joueur}"
+    
+    coop_data = coop_doc.to_dict()
+    
+    # Vérification du mot de passe de la coop
+    if coop_data.get("mot_de_passe") != mdp_saisi:
+        return False, "🔒 Mot de passe de la coopérative incorrect."
+        
+    membres_actuels = coop_data.get("membres", [])
+    
+    # Si le joueur fait déjà partie des inscrits, on le laisse entrer
+    if pseudo_joueur in membres_actuels:
+        return True, f"👋 Content de vous revoir, {pseudo_joueur}."
+        
+    # Si le joueur n'est pas inscrit, on vérifie la jauge limite de 4 joueurs max
+    if len(membres_actuels) >= 4:
+        return False, f"🚫 Accès refusé : La coopérative '{nom_coop}' a atteint sa limite maximale de 4 joueurs inscrits."
+        
+    # Le joueur est valide et il reste de la place, on l'ajoute au tableau NoSQL
+    membres_actuels.append(pseudo_joueur)
+    coop_ref.update({"membres": membres_actuels})
+    return True, f"📝 Inscription réussie ! Bienvenue dans la coopérative, membre n°{len(membres_actuels)} : {pseudo_joueur}"
+
+# À coller tout en bas de : database.py
+
+def enregistrer_mouvement_coop(nom_coop, pseudo_joueur, type_mouvement, materiaux_dict, apport_financier=0.0):
+    """
+    Enregistre un flux financier ou matériel pour un membre de la coopérative.
+    type_mouvement peut être : "APPORT_INITIAL", "REAPPROVISIONNEMENT" ou "ACHAT_INTERNE"
+    """
+    mouvement_id = f"flux_{int(pd.Timestamp.now().timestamp())}_{pseudo_joueur}"
+    db.collection("cooperatives").document(nom_coop).collection("comptabilite_interne").document(mouvement_id).set({
+        "joueur": pseudo_joueur,
+        "type": type_mouvement,
+        "apport_cash": float(apport_financier),
+        "materiaux": materiaux_dict,
+        "timestamp": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
+    })
+
+def charger_tous_les_achats_globaux():
+    """
+    Parcourt toutes les structures pour offrir un récapitulatif complet de chaque joueur
+    inscrit, peu importe sa coopérative.
+    """
+    coops = db.collection("cooperatives").stream()
+    tous_achats = []
+    
+    for coop in coops:
+        flux_stream = coop.reference.collection("comptabilite_interne").stream()
+        for flux in flux_stream:
+            data = flux.to_dict()
+            tous_achats.append(data)
+            
+    return tous_achats
