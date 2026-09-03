@@ -471,8 +471,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                     del nouvelle_grille[cle_technique]
                             
                             # Mise à jour sur Firebase Firestore
-                            db.db.collection("configuration_salaires").document("grille").set(nouvelle_grille)
-                            
+                            db.db.collection("configuration_salaires").document("grille").set(nouvelle_grille)                            
                             # Journalisation de l'action (Optionnel mais recommandé pour votre sub_tab9)
                             try:
                                 timestamp_paris = datetime.datetime.now(pytz.timezone('Europe/Paris')).strftime("%Y-%m-%d %H:%M:%S")
@@ -944,29 +943,41 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
             # ==============================================================================
         # --- sub_tab9 : TRAÇABILITÉ ET JOURNAL DES ACTIONS (LOGS) ---
         # ==============================================================================
-        with sub_tab9:
-            st.markdown("### 📜 Journal d'Audit & Traçabilité NoSQL")
-            st.write("Historique chronologique des modifications apportées aux configurations de l'entreprise.")
+with sub_tab9:
+    st.markdown("### 📜 Journal d'Audit & Traçabilité NoSQL")
+    st.write("Historique chronologique des modifications apportées aux configurations de l'entreprise.")
 
-            # Lecture des logs depuis Firebase
-            try:
-                logs_stream = db.db.collection("journaux_actions").order_by("timestamp", direction="DESCENDING").limit(100).stream()
-                liste_logs = [d.to_dict() for d in logs_stream]
-            except Exception:
-                liste_logs = []
+    # Lecture sécurisée des logs depuis Firebase
+    try:
+        logs_stream = db.db.collection("journaux_actions").order_by("timestamp", direction="DESCENDING").limit(100).stream()
+        liste_logs = [d.to_dict() for d in logs_stream]
+    except Exception as e:
+        st.error(f"⚠️ Erreur de tri Firestore (Vérifiez si l'index cloud est créé) : {e}")
+        # Repli : lecture brute sans tri pour ne pas bloquer l'interface
+        try:
+            logs_stream = db.db.collection("journaux_actions").limit(100).stream()
+            liste_logs = [d.to_dict() for d in logs_stream]
+        except Exception:
+            liste_logs = []
 
-            if liste_logs:
-                df_logs = pd.DataFrame(liste_logs)
-                st.dataframe(
-                    df_logs, use_container_width=True, hide_index=True,
-                    column_config={
-                        "timestamp": st.column_config.TextColumn("⏱️ Date & Heure (Paris)", width="medium"),
-                        "type_action": st.column_config.TextColumn("🏷️ Catégorie", width="small"),
-                        "details": st.column_config.TextColumn("📝 Détails de l'opération", width="large")
-                    }
-                )
-            else:
-                st.info("💡 Aucun événement n'est encore enregistré dans le journal d'audit.")
+    if liste_logs:
+        df_logs = pd.DataFrame(liste_logs)
+        # S'assurer que les colonnes existent avant l'affichage
+        for col in ["timestamp", "type_action", "details"]:
+            if col not in df_logs.columns:
+                df_logs[col] = ""
+                
+        st.dataframe(
+            df_logs, use_container_width=True, hide_index=True,
+            column_config={
+                "timestamp": st.column_config.TextColumn("⏱️ Date & Heure (Paris)", width="medium"),
+                "type_action": st.column_config.TextColumn("🏷️ Catégorie", width="small"),
+                "details": st.column_config.TextColumn("📝 Détails de l'opération", width="large")
+            }
+        )
+    else:
+        st.info("💡 Aucun événement n'est encore enregistré dans le journal d'audit.")
+
 
     elif mot_de_passe != "":
         st.error("🔒 Code d'accès incorrect.")
