@@ -1,3 +1,5 @@
+# Contenu complet et validé pour : onglets/direction.py
+
 import streamlit as st
 import pandas as pd
 import database as db
@@ -62,7 +64,7 @@ def pop_up_validation_recrutement(salaires_mensuels, metier, type_contrat, salai
         st.success(f"**- Tarif Moyen :** `{txt_sj_moyen} € / jour`")
         st.success(f"**- Tarif Maximum :** `{txt_sj_max} € / jour`")
 
-    if st.button("✅ ENREGISTRER SUR FIREBASE", type="primary", use_container_width=True, key=f"btn_save_cloud_{metier_clean}_{prefixe_cle}"):
+    if st.button("✅ ENREGISTRER SUR FIREBASE", type="primary", width="stretch", key=f"btn_save_cloud_{metier_clean}_{prefixe_cle}"):
         grille_actuelle = dict(salaires_db_dict)
         grille_actuelle[f"{prefixe_cle}_Min"] = int(sj_min)
         grille_actuelle[f"{prefixe_cle}_Moyen"] = int(sj_moyen)
@@ -90,95 +92,41 @@ def pop_up_validation_fiches_chantiers(chantiers_detectes):
         st.markdown("**⏱️ Temps configuré pour l'Onglet 1 :**")
         st.code(f"{data['jours']} jour(s), {data['heures']} heure(s), {data['minutes']} minute(s)")
         
-        st.markdown("**🧱 Approvisionnement Matériaux Cumulés :**")
-        mats_list = []
-        for m_key in ["sable", "terre", "enrobe", "armature", "tole", "beton", "panneaux", "tuyaux", "canalisations", "poutres"]:
-            if data[m_key] > 0:
-                txt_mat_qte = f"{int(data[m_key]):,.0f}".replace(",", " ")
-                mats_list.append(f"{m_key.capitalize()} : `{txt_mat_qte}`")
-        if mats_list:
-            st.write(" | ".join(mats_list))
-        else:
-            st.write("*Aucun matériau requis pour ce modèle.*")
-            
-        st.markdown("**🚜 Étapes techniques & Engins détectés :**")
-        df_brut_etapes = pd.DataFrame(data["engins_requis"])
-        cols_engins = ["N° Étape", "Durée Étape (jours)", "Type d'engin requis", "Niveau requis"]
-        df_engins = df_brut_etapes[[c for c in cols_engins if c in df_brut_etapes.columns]] if not df_brut_etapes.empty else pd.DataFrame()
-        st.dataframe(df_engins, use_container_width=True, hide_index=True)
-        
-        st.markdown("**👥 Structure des Employés requis à l'étape :**")
-        lignes_emp = []
-        if not df_brut_etapes.empty:
-            for _, row_e in df_brut_etapes.iterrows():
-                lignes_emp.append({
-                    "N° Étape": row_e.get("N° Étape", 1),
-                    "🕹️ Conducteurs": data.get("jh_cond", 0.0),
-                    "🧑‍💼 Chefs": data.get("jh_chef", 0.0),
-                    "👷 Ouvriers": data.get("jh_ouvrier", 0.0)
-                })
-        else:
-            lignes_emp.append({
-                "N° Étape": 1,
-                "🕹️ Conducteurs": data.get("jh_cond", 0.0),
-                "🧑‍💼 Chefs": data.get("jh_chef", 0.0),
-                "👷 Ouvriers": data.get("jh_ouvrier", 0.0)
-            })
-            
-        df_employes_brut = pd.DataFrame(lignes_emp)
-        if not df_employes_brut.empty:
-            df_employes_fusionne = df_employes_brut.groupby("N° Étape", as_index=False).max()
-            st.dataframe(df_employes_fusionne, use_container_width=True, hide_index=True)
-        else:
-            st.write("*Aucun personnel requis détecté.*")
-            
+        st.markdown("**⚙️ Structure des étapes détectées (Option B) :**")
+        for num, step in data["etapes_techniques"].items():
+            st.markdown(f"**Étape {num} (Durée : {step['duree_jours']} j)**")
+            st.caption(f"🕹️ Cond: {step['jh_cond']} | 🧑‍💼 Chef: {step['jh_chef']} | 👷 Ouv: {step['jh_ouvrier']}")
+            if step["materiaux"]:
+                st.write(f"🧱 Matériaux : {step['materiaux']}")
+            if step["engins"]:
+                st.write(f"🚜 Engins : {step['engins']}")
         st.markdown("---")
-    st.warning("🚨 Confirmez-vous l'injection de ces structures NoSQL dans votre catalogue de modèles ?")
+        
+    st.warning("🚨 Confirmez-vous l'injection de ces structures NoSQL par Étape dans votre catalogue de modèles ?")
     
     col_c1, col_c2 = st.columns(2)
     with col_c1:
-        if st.button("✅ CONFIRMER L'IMPORTATION", type="primary", use_container_width=True, key="btn_confirm_cloud_import_fiches"):
+        if st.button("✅ CONFIRMER L'IMPORTATION", type="primary", width="stretch", key="btn_confirm_cloud_import_fiches"):
             compteur = 0
             for temporary_key, data in chantiers_detectes.items():
-                engins_propres = [
-                    e for e in data["engins_requis"] 
-                    if e.get("Type d'engin requis") is not None and str(e["Type d'engin requis"]).strip() != ""
-                ]
-                
-                vrai_nom_propre = data["nom_affiche_propre"]
-                nom_unique_key = f"{vrai_nom_propre} - {int(data['revenus'])}€"
+                liste_ordonnee = [t_et for k, t_et in sorted(data["etapes_techniques"].items())]
+                nom_unique_key = f"{data['nom_affiche_propre']} - {int(data['revenus'])}€"
                 
                 db.db.collection("modeles_chantiers").document(nom_unique_key).set({
-                    "nom_modele": vrai_nom_propre, 
+                    "nom_modele": data["nom_affiche_propre"], 
                     "revenus": float(data["revenus"]), 
-                    "jours": int(data["jours"]), 
-                    "heures": int(data["heures"]), 
-                    "minutes": int(data["minutes"]),
-                    "sable": float(data["sable"]), 
-                    "terre": float(data["terre"]), 
-                    "enrobe": float(data["enrobe"]), 
-                    "armature": float(data["armature"]), 
-                    "tole": float(data["tole"]), 
-                    "beton": float(data["beton"]),
-                    "panneaux": float(data["panneaux"]), 
-                    "tuyaux": float(data["tuyaux"]), 
-                    "canalisations": float(data["canalisations"]), 
-                    "poutres": float(data["poutres"]),
-                    "jh_cond": float(data.get("jh_cond", 0.0)), 
-                    "max_cond": float(data.get("jh_cond", 0.0)),
-                    "jh_chef": float(data.get("jh_chef", 0.0)), 
-                    "max_chef": float(data.get("jh_chef", 0.0)),
-                    "jh_ouvrier": float(data.get("jh_ouvrier", 0.0)), 
-                    "max_ouvrier": float(data.get("jh_ouvrier", 0.0)),
-                    "engins_requis": engins_propres
+                    "jours_globaux": int(data["jours"]), 
+                    "heures_globales": int(data["heures"]), 
+                    "minutes_globales": int(data["minutes"]),
+                    "etapes_techniques": liste_ordonnee
                 })
                 compteur += 1
             st.cache_data.clear()
-            st.toast(f"🚀 {compteur} modèle(s) synchronisé(s) avec succès !")
+            st.toast(f"🚀 {compteur} modèle(s) synchronisé(s) en Option B !")
             st.rerun()
             
     with col_c2:
-        if st.button("❌ ANNULER", use_container_width=True, key="btn_cancel_cloud_import_fiches"):
+        if st.button("❌ ANNULER", width="stretch", key="btn_cancel_cloud_import_fiches"):
             st.rerun()
 
 # ==============================================================================
@@ -212,21 +160,21 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
             st.warning("Attention : Ces actions suppriment définitivement les données stockées sur Firebase.")
             col_del1, col_del2, col_del3 = st.columns(3)
             with col_del1:
-                if st.button("🗑️ Vider l'Historique des Chantiers", type="secondary", use_container_width=True):
+                if st.button("🗑️ Vider l'Historique des Chantiers", type="secondary", width="stretch"):
                     docs = db.db.collection("chantiers").stream()
                     for d in docs: d.reference.delete()
                     st.cache_data.clear()
                     st.toast("Historique des chantiers supprimé !")
                     st.rerun()
             with col_del2:
-                if st.button("🗑️ Vider les Modèles Préfabriqués", type="secondary", use_container_width=True):
+                if st.button("🗑️ Vider les Modèles Préfabriqués", type="secondary", width="stretch"):
                     docs = db.db.collection("modeles_chantiers").stream()
                     for d in docs: d.reference.delete()
                     st.cache_data.clear()
                     st.toast("Catalogue des modèles vidé !")
                     st.rerun()
             with col_del3:
-                if st.button("💥 TOUT RÉINITIALISER", type="primary", use_container_width=True):
+                if st.button("💥 TOUT RÉINITIALISER", type="primary", width="stretch"):
                     db.reinitialiser_db()
                     st.rerun()
                     
@@ -237,9 +185,8 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
             "🧱 Éditer Prix Matériaux", "🚜 Éditer Catalogue Engins", "🗂️ Consulter les Bases Données",
             "🔎 Comparateur de Fiches", "🔍 Vérificateur de Doublons", "📊 Quotas Firebase", "📜 Historique des Actions"
         ])
-
         # ==============================================================================
-        # --- sub_tab1 : IMPORTATION EN BLOC ET DECODAGE DE NOUVELLE GÉNÉRATION (OPTION B) ---
+        # --- sub_tab1 : IMPORTATION EN BLOC ET DECODAGE PAR ÉTAPE (OPTION B) ---
         # ==============================================================================
         with sub_tab1:
             dict_modeles_cloud = db.charger_catalogue_chantiers()
@@ -253,7 +200,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                 if not texte_fiches_brutes.strip():
                     st.error("❌ La zone de texte est vide.")
                 else:
-                    # Enregistrement des modèles existants pour le filtre anti-doublons
                     modeles_deja_presents = set()
                     for doc_id, data_m in dict_modeles_cloud.items():
                         if doc_id == "Choisir un chantier pré-configuré...": 
@@ -272,7 +218,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                         l_clean = ligne.strip()
                         if not l_clean: continue
                         
-                        # A. Détection de l'en-tête du chantier (ex: Extension Autoroute 250 000 euros)
                         if "euros" in l_clean.lower() and not l_clean.lower().startswith("revenus"):
                             match_debut = re.search(r"^(.*?)\s+(\d[\d\s]+)\s+euros", l_clean, re.IGNORECASE)
                             if match_debut:
@@ -302,14 +247,12 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
 
                         if not nom_courant: continue
                         
-                        # B. Détection alternative ou sécurité sur les revenus
                         if l_clean.lower().startswith("revenus :"):
                             prix_txt = "".join(c for c in l_clean if c.isdigit())
                             if prix_txt: 
                                 chantiers_detectes[nom_courant]["revenus"] = float(prix_txt)
                             continue
 
-                        # C. Extraction de la durée globale du projet
                         if "durée du chantier :" in l_clean.lower():
                             partie_duree = l_clean.split(":")[-1].lower()
                             m_j = re.search(r"(\d+)\s*jour", partie_duree)
@@ -320,7 +263,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             if m_m: chantiers_detectes[nom_courant]["minutes"] = int(m_m.group(1))
                             continue
 
-                        # D. Détection du changement d'Étape
                         if l_clean.lower().startswith("etape") and ":" in l_clean:
                             match_e = re.search(r"etape\s*(\d+)", l_clean, re.IGNORECASE)
                             if match_e: 
@@ -335,17 +277,14 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                     }
                             continue
 
-                        # E. Remplissage des données propres à l'étape active
                         if etape_courante_num is not None:
                             target_etape = chantiers_detectes[nom_courant]["etapes_techniques"][etape_courante_num]
                             
-                            # Durée de la phase
                             if "durée de l'étape :" in l_clean.lower() or "duree de l'etape :" in l_clean.lower():
                                 num_txt = "".join(c for c in l_clean.split(",") if c.isdigit())
                                 if num_txt: target_etape["duree_jours"] = int(num_txt)
                                 continue
                             
-                            # Personnel de la phase
                             if ":" in l_clean and any(k in l_clean.lower() for k in ["chef", "ouvrier", "conducteur"]):
                                 gauche, droite = l_clean.split(":", 1)
                                 match_nb = re.search(r"(\d+)", droite)
@@ -356,7 +295,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                     elif "ouvrier" in gauche.lower(): target_etape["jh_ouvrier"] = val_nb
                                 continue
 
-                            # Matériaux de la phase
                             if "matériaux requis :" in l_clean.lower() or "materiaux requis :" in l_clean.lower():
                                 partie_mats = l_clean.split(":")[-1].lower()
                                 if "aucun" not in partie_mats:
@@ -381,7 +319,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                                 target_etape["materiaux"][mat_nom] = qte_val
                                 continue
 
-                            # Engins de la phase
                             ligne_brute_clean = l_clean.lower().replace("é", "e").replace("è", "e").replace("à", "a")
                             cat_engin = None
                             if "camion benne" in ligne_brute_clean: cat_engin = "Camions Benne"
@@ -396,8 +333,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             if cat_engin:
                                 niv = f"N{re.search(r'niveau\s*(\d+)', ligne_brute_clean).group(1)}" if re.search(r'niveau\s*(\d+)', ligne_brute_clean) else "N1"
                                 target_etape["engins"].append({"type": cat_engin, "niveau": niv})
-
-                    # F. Injection immédiate des chantiers valides décodés en Option B
                     if chantiers_detectes:
                         compteur_importation = 0
                         for key_doc, data_ouvrage in chantiers_detectes.items():
@@ -418,13 +353,14 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             st.toast(f"ℹ️ {compteur_doublons_bloques} doublon(s) détecté(s) ont été ignoré(s).")
                         
                         st.cache_data.clear()
-                        st.success(f"🚀 {compteur_importation} fiche(s) de chantier importée(s) et découpée(s) par étape !")
+                        st.success(f"🚀 {compteur_importation} fiche(s) de chantier importée(s) en Option B !")
                         st.rerun()
                     else:
                         if compteur_doublons_bloques > 0:
                             st.error(f"❌ Aucun nouveau modèle : Les {compteur_doublons_bloques} chantiers soumis existent déjà.")
                         else:
                             st.error("❌ L'algorithme n'a pas réussi à extraire de fiches de chantiers valides dans votre texte brut.")
+
         # ==============================================================================
         # --- sub_tab2 : CONFIGURATION GRILLE SALARIALE ---
         # ==============================================================================
@@ -479,11 +415,9 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                 
                 if grille_editee is not None:
                     lignes_a_supprimer = grille_editee[grille_editee["Supprimer l'entrée 🗑️"] == True]
-                    
                     if not lignes_a_supprimer.empty:
-                        if st.button("💥 CONFIRMER LA SUPPRESSION DES ENTRÉES SÉLECTIONNÉES", type="primary", use_container_width=True):
+                        if st.button("💥 CONFIRMER LA SUPPRESSION DES ENTRÉES SÉLECTIONNÉES", type="primary", width="stretch"):
                             nouvelle_grille = dict(SALAIRES_DB)
-                            
                             for cle_technique in lignes_a_supprimer["Clé technique NoSQL"]:
                                 if cle_technique in nouvelle_grille:
                                     del nouvelle_grille[cle_technique]
@@ -495,7 +429,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                 db.db.collection("journaux_actions").add({
                                     "timestamp": timestamp_paris,
                                     "type_action": "SALAIRES",
-                                    "details": f"Suppression de {len(lignes_a_supprimer)} entrée(s) dans la grille salariale."
+                                    "details": f"Suppression de {len(lignes_a_supprimer)} entrée(s) salariale(s)."
                                 })
                             except Exception:
                                 pass
@@ -522,7 +456,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                 for m_k in liste_cles_mats[milieu:]:
                     form_mats[m_k] = st.number_input(f"Prix {m_k} (€/t ou €/u) :", value=float(form_mats[m_k]), min_value=0.0, step=1.0, format="%.2f")
                     
-            if st.button("✅ METTRE À JOUR LES TARIFS MATÉRIAUX", type="primary", use_container_width=True):
+            if st.button("✅ METTRE À JOUR LES TARIFS MATÉRIAUX", type="primary", width="stretch"):
                 db.db.collection("configuration_materiaux").document("catalogue").set(form_mats)
                 st.cache_data.clear()
                 st.toast("🧱 Catalogue des prix matériaux synchronisé avec succès !")
@@ -541,7 +475,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                 with c_en2: type_brut_choisi = st.text_input("Famille d'engin (ex: Pelleteuses) :").strip()
                 with c_en3: prix_jour_choisi = st.number_input("Prix de location journalier (€) :", min_value=0.0, step=10.0, value=380.0)
                 
-                submit_engin = st.form_submit_button("🚜 INSÉRER L'ENGIN DANS LE CATALOGUE GLOBAL", type="primary", use_container_width=True)
+                submit_engin = st.form_submit_button("🚜 INSÉRER L'ENGIN DANS LE CATALOGUE GLOBAL", type="primary", width="stretch")
                 
                 if submit_engin:
                     if not nom_nouveau_engin or not type_brut_choisi:
@@ -553,7 +487,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                         st.cache_data.clear()
                         st.toast(f"🚀 Engin '{nom_nouveau_engin}' ajouté au catalogue !")
                         st.rerun()
-
             st.markdown("#### Matériels actuellement référencés (Vue Cloud) :")
             if not catalogue_engins_brut:
                 st.info("Le catalogue d'engins est vu comme vide.")
@@ -622,14 +555,14 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                     
                     st.markdown("#### 📊 Métriques d'Ouvrages et Écarts Techniques")
                     metrics_comparatives = {
-                        "Indicateur structurel": ["Revenus Fixes du Modèle", "Durée Théorique (jours)", "Sable global requis", "Béton global requis", "Terre globale requise"],
-                        f"Chantier A : {data_A.get('nom_modele', ch_A)}": [f"{data_A.get('revenus', 0):,.0f}".replace(",", " ") + " €", f"{data_A.get('jours', 0)} jours", f"{data_A.get('sable', 0)} t", f"{data_A.get('beton', 0)} t", f"{data_A.get('terre', 0)} t"],
-                        f"Chantier B : {data_B.get('nom_modele', ch_B)}": [f"{data_B.get('revenus', 0):,.0f}".replace(",", " ") + " €", f"{data_B.get('jours', 0)} jours", f"{data_B.get('sable', 0)} t", f"{data_B.get('beton', 0)} t", f"{data_B.get('terre', 0)} t"]
+                        "Indicateur structurel": ["Revenus Fixes du Modèle", "Durée Théorique (jours)"],
+                        f"Chantier A : {data_A.get('nom_modele', ch_A)}": [f"{data_A.get('revenus', 0):,.0f}".replace(",", " ") + " €", f"{data_A.get('jours_globaux', 0)} jours"],
+                        f"Chantier B : {data_B.get('nom_modele', ch_B)}": [f"{data_B.get('revenus', 0):,.0f}".replace(",", " ") + " €", f"{data_B.get('jours_globaux', 0)} jours"]
                     }
                     st.table(pd.DataFrame(metrics_comparatives))
 
         # ==============================================================================
-        # --- sub_tab7 : VÉRIFICATEUR ET INJECTEUR DE NOUVEAUX CHANTIERS ---
+        # --- sub_tab7 : VÉRIFICATEUR ET INJECTEUR DE NOUVEAUX CHANTIERS (OPTION B) ---
         # ==============================================================================
         with sub_tab7:
             st.markdown(f"### 🔍 Vérificateur & Injecteur de Fiches en Bloc ({total_modeles} modèles en base)")
@@ -708,27 +641,17 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             f"Ajuster la structure technique de l'ouvrage :",
                             value=texte_initial_bloc, height=250, key=f"area_verif_modif_{idx}_{n_ch['nom_propre']}"
                         )
-                        
                         chantiers_detectes_local = {
                             "nom_affiche_propre": n_ch["nom_propre"], "revenus": n_ch["prix"],
-                            "jours": 0, "heures": 0, "minutes": 0, "nb_etapes": 1,
-                            "sable": 0.0, "terre": 0.0, "enrobe": 0.0, "armature": 0.0, "tole": 0.0,
-                            "beton": 0.0, "panneaux": 0.0, "tuyaux": 0.0, "canalisations": 0.0, "poutres": 0.0,
-                            "jh_cond": 0.0, "jh_chef": 0.0, "jh_ouvrier": 0.0, "engins_requis": []
+                            "jours": 0, "heures": 0, "minutes": 0, "etapes_techniques": {}
                         }
                         
                         lignes_locales = texte_ajuste.split("\n")
                         etape_courante_num = None
-                        durees_etapes_locales = {}
                         
                         for ligne_l in lignes_locales:
                             l_l_clean = ligne_l.strip()
                             if not l_l_clean: continue
-                            
-                            if "nombre d'étapes :" in l_l_clean.lower():
-                                num_txt = "".join(c for c in l_l_clean.split(":")[-1] if c.isdigit())
-                                if num_txt: chantiers_detectes_local["nb_etapes"] = int(num_txt)
-                                continue
                             
                             if "durée du chantier :" in l_l_clean.lower():
                                 partie_duree = l_l_clean.split(":")[-1].lower()
@@ -740,214 +663,97 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                 if m_m: chantiers_detectes_local["minutes"] = int(m_m.group(1))
                                 continue
 
-                            # Repérage de l'étape active
                             if l_l_clean.lower().startswith("etape") and ":" in l_l_clean:
                                 match_e = re.search(r"etape\s*(\d+)", l_l_clean, re.IGNORECASE)
-                                if match_e: etape_courante_num = int(match_e.group(1))
+                                if match_e: 
+                                    etape_courante_num = int(match_e.group(1))
+                                    if etape_courante_num not in chantiers_detectes_local["etapes_techniques"]:
+                                        chantiers_detectes_local["etapes_techniques"][etape_courante_num] = {
+                                            "num_etape": etape_courante_num, "duree_jours": 1,
+                                            "jh_cond": 0.0, "jh_chef": 0.0, "jh_ouvrier": 0.0,
+                                            "materiaux": {}, "engins": []
+                                        }
                                 continue
 
-                            # Durée spécifique de l'étape
-                            if (l_l_clean.lower().startswith("durée de l'étape :") or l_l_clean.lower().startswith("duree de l'etape :")) and etape_courante_num is not None:
-                                num_txt = "".join(c for c in l_l_clean.split(",") if c.isdigit())
-                                if num_txt: durees_etapes_locales[f"duree_{etape_courante_num}"] = int(num_txt)
-                                continue
-                            
-                            # Extraction du personnel (Prend le maximum rencontré)
-                            if ":" in l_l_clean and etape_courante_num is not None and ("chef" in l_l_clean.lower() or "ouvrier" in l_l_clean.lower() or "conducteur" in l_l_clean.lower()):
-                                gauche, droite = l_l_clean.split(":", 1)
-                                gauche_low = gauche.lower()
-                                match_nb = re.search(r"(\d+)", droite)
-                                if match_nb:
-                                    nb_val = float(match_nb.group(1))
-                                    if "conducteur" in gauche_low or "engin" in gauche_low:
-                                        chantiers_detectes_local["jh_cond"] = max(chantiers_detectes_local["jh_cond"], nb_val)
-                                    elif "chef" in gauche_low:
-                                        chantiers_detectes_local["jh_chef"] = max(chantiers_detectes_local["jh_chef"], nb_val)
-                                    elif "ouvrier" in gauche_low:
-                                        chantiers_detectes_local["jh_ouvrier"] = max(chantiers_detectes_local["jh_ouvrier"], nb_val)
-                                continue
-                            # --- EXTRACTION DES MATÉRIAUX REQUIS PAR LE CHANTIER ---
-                            if "matériaux requis :" in l_l_clean.lower() or "materiaux requis :" in l_l_clean.lower():
-                                partie_mats = l_l_clean.split(":")[-1].lower()
-                                if "aucun" not in partie_mats:
-                                    sous_elements_mats = partie_mats.split("&")
-                                    for sub_mat in sous_elements_mats:
-                                        qte_txt = "".join(c for c in sub_mat if c.isdigit())
-                                        if qte_txt:
-                                            qte_val = float(qte_txt)
-                                            if "canalisation" in sub_mat: chantiers_detectes_local["canalisations"] = qte_val
-                                            elif "armature" in sub_mat: chantiers_detectes_local["armature"] = qte_val
-                                            elif "enrob" in sub_mat: chantiers_detectes_local["enrobe"] = qte_val
-                                            elif "sable" in sub_mat: chantiers_detectes_local["sable"] = qte_val
-                                            elif "terre" in sub_mat: chantiers_detectes_local["terre"] = qte_val
-                                            elif "tôle" in sub_mat or "tole" in sub_mat: chantiers_detectes_local["tole"] = qte_val
-                                            elif "béton" in sub_mat or "beton" in sub_mat: chantiers_detectes_local["beton"] = qte_val
-                                            elif "panneau" in sub_mat: chantiers_detectes_local["panneaux"] = qte_val
-                                            elif "tuyau" in sub_mat: chantiers_detectes_local["tuyaux"] = qte_val
-                                            elif "poutre" in sub_mat: chantiers_detectes_local["poutres"] = qte_val
-                                continue
+                            if etape_courante_num is not None:
+                                target_etape = chantiers_detectes_local["etapes_techniques"][etape_courante_num]
+                                
+                                if "durée de l'étape :" in l_l_clean.lower() or "duree de l'etape :" in l_l_clean.lower():
+                                    num_txt = "".join(c for c in l_l_clean.split(",") if c.isdigit())
+                                    if num_txt: target_etape["duree_jours"] = int(num_txt)
+                                    continue
+                                
+                                if ":" in l_l_clean and any(k in l_l_clean.lower() for k in ["chef", "ouvrier", "conducteur"]):
+                                    gauche, droite = l_l_clean.split(":", 1)
+                                    match_nb = re.search(r"(\d+)", droite)
+                                    if match_nb:
+                                        val_nb = float(match_nb.group(1))
+                                        if "conducteur" in gauche.lower() or "engin" in gauche.lower(): target_etape["jh_cond"] = val_nb
+                                        elif "chef" in gauche.lower(): target_etape["jh_chef"] = val_nb
+                                        elif "ouvrier" in gauche.lower(): target_etape["jh_ouvrier"] = val_nb
+                                    continue
 
-                            # --- EXTRACTION ET RECONNAISSANCE DE LA FLOTTE D'ENGINS PAR ÉTAPE ---
-                            if etape_courante_num is not None and "employés requis" not in l_l_clean.lower() and "matériaux requis" not in l_l_clean.lower():
-                                ligne_brute_clean = l_l_clean.lower().replace("é", "e").replace("è", "e").replace("ê", "e").replace("à", "a")
+                                if "matériaux requis :" in l_l_clean.lower() or "materiaux requis :" in l_l_clean.lower():
+                                    partie_mats = l_l_clean.split(":")[-1].lower()
+                                    if "aucun" not in partie_mats:
+                                        sous_elements = partie_mats.split("&")
+                                        for sub in sous_elements:
+                                            qte_txt = "".join(c for c in sub if c.isdigit())
+                                            if qte_txt:
+                                                qte_val = float(qte_txt)
+                                                mat_nom = None
+                                                if "canalisation" in sub: mat_nom = "canalisations"
+                                                elif "armature" in sub: mat_nom = "armature"
+                                                elif "enrob" in sub: mat_nom = "enrobe"
+                                                elif "sable" in sub: mat_nom = "sable"
+                                                elif "terre" in sub: mat_nom = "terre"
+                                                elif "tôle" in sub or "tole" in sub: mat_nom = "tole"
+                                                elif "béton" in sub or "beton" in sub: mat_nom = "beton"
+                                                elif "panneau" in sub: mat_nom = "panneaux"
+                                                elif "tuyau" in sub: mat_nom = "tuyaux"
+                                                elif "poutre" in sub: mat_nom = "poutres"
+                                                if mat_nom: target_etape["materiaux"][mat_nom] = qte_val
+                                    continue
+
+                                ligne_brute_clean = l_l_clean.lower().replace("é", "e").replace("è", "e").replace("à", "a")
                                 cat_engin = None
                                 if "camion benne" in ligne_brute_clean: cat_engin = "Camions Benne"
                                 elif "niveleuse" in ligne_brute_clean: cat_engin = "Niveleuse"
                                 elif "finisseur" in ligne_brute_clean: cat_engin = "Finisseur"
-                                elif "compacteur pour enrobe" in ligne_brute_clean or "compacteur" in ligne_brute_clean: cat_engin = "Compacteur pour enrobé"
+                                elif "compacteur" in ligne_brute_clean: cat_engin = "Compacteur pour enrobé"
                                 elif "fraiseuse" in ligne_brute_clean: cat_engin = "Fraiseuse"
                                 elif "chargeuse" in ligne_brute_clean: cat_engin = "Chargeuse Compacte"
                                 elif "pelleteuse" in ligne_brute_clean: cat_engin = "Pelleteuses"
                                 elif "malaxeur" in ligne_brute_clean or "camion beton" in ligne_brute_clean: cat_engin = "Camion Béton Malaxeur"
 
-                                if cat_engin is not None:
-                                    d_etape = durees_etapes_locales.get(f"duree_{etape_courante_num}", 1)
-                                    # Déduplication pour ne pas ajouter deux fois le même engin sur une même étape
-                                    doublon_engin = any(e["N° Étape"] == etape_courante_num and e["Type d'engin requis"] == cat_engin for e in chantiers_detectes_local["engins_requis"])
-                                    if not doublon_engin:
-                                        chantiers_detectes_local["engins_requis"].append({
-                                            "N° Étape": etape_courante_num, 
-                                            "Durée Étape (jours)": d_etape,
-                                            "Type d'engin requis": cat_engin,
-                                            "Niveau requis": f"N{re.search(r'niveau\s*(\d+)', ligne_brute_clean).group(1)}" if re.search(r'niveau\s*(\d+)', ligne_brute_clean) else "N1"
-                                        })
+                                if cat_engin:
+                                    niv = f"N{re.search(r'niveau\s*(\d+)', ligne_brute_clean).group(1)}" if re.search(r'niveau\s*(\d+)', ligne_brute_clean) else "N1"
+                                    target_etape["engins"].append({"type": cat_engin, "niveau": niv})
                         
-                        # Association de la structure finale parsée à la clé du modèle
                         cle_unique_injection = f"{n_ch['nom_propre']} - {int(n_ch['prix'])}€"
                         chantiers_prets_a_injecter[cle_unique_injection] = chantiers_detectes_local
                         st.markdown("---")
                     
-                    # 5. BOUTON GLOBAL D'INJECTION POUR TOUS LES NOUVEAUX MODÈLES VALIDES (OPTION B)
-                    if st.button("🚀 INJECTER LES NOUVEAUX MODÈLES DANS FIREBASE", type="primary", use_container_width=True, key="btn_save_verif_bloc_to_nosql"):
+                    if st.button("🚀 INJECTER LES NOUVEAUX MODÈLES DANS FIREBASE", type="primary", width="stretch", key="btn_save_verif_bloc_to_nosql"):
                         compteur_ins = 0
-                        
-                        # On parcourt chaque chantier détecté dans la zone de texte
-                        for unique_id, data_brute in chantiers_prets_a_injecter.items():
+                        for unique_id, data_save in chantiers_prets_a_injecter.items():
+                            liste_etapes_ordonnee = [t_et for k, t_et in sorted(data_save["etapes_techniques"].items())]
                             
-                            # Ré-exécution du parseur Option B sur le texte final validé de chaque fiche
-                            chantiers_detectes_local = {
-                                "nom_affiche_propre": data_brute["nom_affiche_propre"],
-                                "revenus": data_brute["revenus"],
-                                "jours": 0, "heures": 0, "minutes": 0,
-                                "etapes_techniques": {}
-                            }
-                            
-                            # Utilisation des lignes nettoyées du champ texte éditable
-                            lignes_locales = st.session_state[f"area_verif_modif_{compteur_ins}_{data_brute['nom_affiche_propre']}"].split("\n")
-                            etape_courante_num = None
-                            
-                            for ligne_l in lignes_locales:
-                                l_l_clean = ligne_l.strip()
-                                if not l_l_clean: continue
-                                
-                                # A. Extraction de la durée globale
-                                if "durée du chantier :" in l_l_clean.lower():
-                                    partie_duree = l_l_clean.split(":")[-1].lower()
-                                    m_j = re.search(r"(\d+)\s*jour", partie_duree)
-                                    m_h = re.search(r"(\d+)\s*heure", partie_duree)
-                                    m_m = re.search(r"(\d+)\s*minute", partie_duree)
-                                    if m_j: chantiers_detectes_local["jours"] = int(m_j.group(1))
-                                    if m_h: chantiers_detectes_local["heures"] = int(m_h.group(1))
-                                    if m_m: chantiers_detectes_local["minutes"] = int(m_m.group(1))
-                                    continue
-
-                                # B. Détection et initialisation de l'Étape active
-                                if l_l_clean.lower().startswith("etape") and ":" in l_l_clean:
-                                    match_e = re.search(r"etape\s*(\d+)", l_l_clean, re.IGNORECASE)
-                                    if match_e: 
-                                        etape_courante_num = int(match_e.group(1))
-                                        if etape_courante_num not in chantiers_detectes_local["etapes_techniques"]:
-                                            chantiers_detectes_local["etapes_techniques"][etape_courante_num] = {
-                                                "num_etape": etape_courante_num,
-                                                "duree_jours": 1,
-                                                "jh_cond": 0.0, "jh_chef": 0.0, "jh_ouvrier": 0.0,
-                                                "materiaux": {},
-                                                "engins": []
-                                            }
-                                    continue
-
-                                if etape_courante_num is not None:
-                                    target_etape = chantiers_detectes_local["etapes_techniques"][etape_courante_num]
-                                    
-                                    # C. Durée spécifique de la phase
-                                    if "durée de l'étape :" in l_l_clean.lower() or "duree de l'etape :" in l_l_clean.lower():
-                                        num_txt = "".join(c for c in l_l_clean.split(",") if c.isdigit())
-                                        if num_txt: target_etape["duree_jours"] = int(num_txt)
-                                        continue
-                                        
-                                    # D. Personnel requis à la phase
-                                    if ":" in l_l_clean and any(k in l_l_clean.lower() for k in ["chef", "ouvrier", "conducteur"]):
-                                        gauche, droite = l_l_clean.split(":", 1)
-                                        match_nb = re.search(r"(\d+)", droite)
-                                        if match_nb:
-                                            val_nb = float(match_nb.group(1))
-                                            if "conducteur" in gauche.lower() or "engin" in gauche.lower(): target_etape["jh_cond"] = val_nb
-                                            elif "chef" in gauche.lower(): target_etape["jh_chef"] = val_nb
-                                            elif "ouvrier" in gauche.lower(): target_etape["jh_ouvrier"] = val_nb
-                                        continue
-
-                                    # E. Approvisionnement de la phase
-                                    if "matériaux requis :" in l_l_clean.lower() or "materiaux requis :" in l_l_clean.lower():
-                                        partie_mats = l_l_clean.split(":")[-1].lower()
-                                        if "aucun" not in partie_mats:
-                                            sous_elements = partie_mats.split("&")
-                                            for sub in sous_elements:
-                                                qte_txt = "".join(c for c in sub if c.isdigit())
-                                                if qte_txt:
-                                                    qte_val = float(qte_txt)
-                                                    mat_nom = None
-                                                    if "canalisation" in sub: mat_nom = "canalisations"
-                                                    elif "armature" in sub: mat_nom = "armature"
-                                                    elif "enrob" in sub: mat_nom = "enrobe"
-                                                    elif "sable" in sub: mat_nom = "sable"
-                                                    elif "terre" in sub: mat_nom = "terre"
-                                                    elif "tôle" in sub or "tole" in sub: mat_nom = "tole"
-                                                    elif "béton" in sub or "beton" in sub: mat_nom = "beton"
-                                                    elif "panneau" in sub: mat_nom = "panneaux"
-                                                    elif "tuyau" in sub: mat_nom = "tuyaux"
-                                                    elif "poutre" in sub: mat_nom = "poutres"
-                                                    
-                                                    if mat_nom:
-                                                        target_etape["materiaux"][mat_nom] = qte_val
-                                        continue
-
-                                    # F. Flotte d'engins requis à la phase
-                                    ligne_brute_clean = l_l_clean.lower().replace("é", "e").replace("è", "e").replace("à", "a")
-                                    cat_engin = None
-                                    if "camion benne" in ligne_brute_clean: cat_engin = "Camions Benne"
-                                    elif "niveleuse" in ligne_brute_clean: cat_engin = "Niveleuse"
-                                    elif "finisseur" in ligne_brute_clean: cat_engin = "Finisseur"
-                                    elif "compacteur" in ligne_brute_clean: cat_engin = "Compacteur pour enrobé"
-                                    elif "fraiseuse" in ligne_brute_clean: cat_engin = "Fraiseuse"
-                                    elif "chargeuse" in ligne_brute_clean: cat_engin = "Chargeuse Compacte"
-                                    elif "pelleteuse" in ligne_brute_clean: cat_engin = "Pelleteuses"
-                                    elif "malaxeur" in ligne_brute_clean or "camion beton" in ligne_brute_clean: cat_engin = "Camion Béton Malaxeur"
-
-                                    if cat_engin:
-                                        niv = f"N{re.search(r'niveau\s*(\d+)', ligne_brute_clean).group(1)}" if re.search(r'niveau\s*(\d+)', ligne_brute_clean) else "N1"
-                                        target_etape["engins"].append({"type": cat_engin, "niveau": niv})
-
-                            # Ordonnancement chronologique avant sérialisation
-                            liste_etapes_ordonnee = [t_et for k, t_et in sorted(chantiers_detectes_local["etapes_techniques"].items())]
-
-                            # Injection de la structure NoSQL complète dans la collection Firebase (Option B)
                             db.db.collection("modeles_chantiers").document(unique_id).set({
-                                "nom_modele": chantiers_detectes_local["nom_affiche_propre"],
-                                "revenus": float(chantiers_detectes_local["revenus"]),
-                                "jours_globaux": int(chantiers_detectes_local["jours"]),
-                                "heures_globales": int(chantiers_detectes_local["heures"]),
-                                "minutes_globales": int(chantiers_detectes_local["minutes"]),
+                                "nom_modele": data_save["nom_affiche_propre"], 
+                                "revenus": float(data_save["revenus"]), 
+                                "jours_globaux": int(data_save["jours"]), 
+                                "heures_globales": int(data_save["heures"]), 
+                                "minutes_globales": int(data_save["minutes"]),
                                 "etapes_techniques": liste_etapes_ordonnee
                             })
                             compteur_ins += 1
                         
-                        # Notification, vidage de cache et rechargement de l'interface
                         st.cache_data.clear()
-                        st.toast(f"🎯 {compteur_ins} nouveau(x) modèle(s) ordonnés et synchronisés avec succès !")
+                        st.toast(f"🎯 {compteur_ins} nouveau(x) modèle(s) synchronisé(s) en Option B !")
                         st.rerun()
             else:
                 st.info("💡 En attente de saisie textuelle dans la zone ci-dessus pour démarrer le processus.")
-
 
         # ==============================================================================
         # --- sub_tab8 : MONITEUR DE QUOTAS ET CONSOMMATION FIREBASE ---
@@ -956,11 +762,9 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
             st.markdown("### 📊 Suivi de Consommation & Quotas Journaliers (Plan Gratuit)")
             st.write("Firestore comptabilise l'usage quotidien. Voici l'état estimé de vos limites système réinitialisées toutes les 24h par Google.")
             
-            # On se calfeutre sur le fuseau horaire de Paris
             tz_paris = pytz.timezone('Europe/Paris')
             maintenant = datetime.datetime.now(tz_paris)
             
-            # La réinitialisation Firebase se fait à 09:00 heure de Paris
             cible_aujourdhui = maintenant.replace(hour=9, minute=0, second=0, microsecond=0)
             
             if maintenant < cible_aujourdhui:
@@ -972,10 +776,8 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
             heures_r, secondes_restantes = divmod(temps_restant.seconds, 3600)
             minutes_r, _ = divmod(secondes_restantes, 60)
             
-            # Affichage du compte à rebours sous forme de badge d'information
             st.warning(f"⏱️ **Prochaine réinitialisation des quotas Google Firebase dans :** `{heures_r} heure(s) et {minutes_r} minute(s)` (chaque jour à 09h00)")
 
-            # 1. Tentative de lecture du document des compteurs réels dans Firebase
             try:
                 quota_doc = db.db.collection("configuration_systeme").document("quotas_journaliers").get()
                 if quota_doc.exists:
@@ -985,17 +787,14 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
             except Exception:
                 donnees_quota = {}
 
-            # Récupération des valeurs enregistrées ou valeurs de secours par défaut si vide
             lectures_faites = int(donnees_quota.get("lectures", 1240))
             ecritures_faites = int(donnees_quota.get("ecritures", 315))
             suppressions_faites = int(donnees_quota.get("suppressions", 45))
 
-            # Constantes officielles des limites gratuites Google Firebase (Plan Spark)
             LIMITE_LECTURES = 50000
             LIMITE_ECRITURES = 20000
             LIMITE_SUPPRESSIONS = 20000
 
-            # 2. Calculs mathématiques des pourcentages et des restes
             pct_lectures = min(float(lectures_faites / LIMITE_LECTURES), 1.0)
             pct_ecritures = min(float(ecritures_faites / LIMITE_ECRITURES), 1.0)
             pct_suppressions = min(float(suppressions_faites / LIMITE_SUPPRESSIONS), 1.0)
@@ -1004,7 +803,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
             reste_ecritures = LIMITE_ECRITURES - ecritures_faites
             reste_suppressions = LIMITE_SUPPRESSIONS - suppressions_faites
 
-            # 3. Affichage visuel sous forme de cartes d'indicateurs (Metrics)
             c_q1, c_q2, c_v3 = st.columns(3)
             with c_q1:
                 st.metric("Lectures Restantes", f"{reste_lectures:,.0f}".replace(",", " "), f"-{lectures_faites} faites", delta_color="inverse")
@@ -1015,7 +813,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
 
             st.markdown("<br>", unsafe_allow_html=True)
 
-            # 4. Rendu visuel avec des barres de progression interactives
             st.markdown("**📉 Jauge d'utilisation des Lectures (Limite : 50 000 / jour) :**")
             st.progress(pct_lectures, text=f"{lectures_faites} / {LIMITE_LECTURES} ({pct_lectures*100:.1f}%)")
 
@@ -1025,9 +822,8 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
             st.markdown("**🗑️ Jauge d'utilisation des Suppressions (Limite : 20 000 / jour) :**")
             st.progress(pct_suppressions, text=f"{suppressions_faites} / {LIMITE_SUPPRESSIONS} ({pct_suppressions*100:.1f}%)")
 
-            # Bouton de rafraîchissement manuel
             st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("🔄 ACTUALISER LES COMPTEURS COMPTABLES", use_container_width=True):
+            if st.button("🔄 ACTUALISER LES COMPTEURS COMPTABLES", width="stretch"):
                 st.cache_data.clear()
                 st.rerun()
 
@@ -1038,7 +834,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
             st.markdown("### 📜 Journal d'Audit & Traçabilité NoSQL")
             st.write("Historique chronologique des modifications apportées aux configurations de l'entreprise.")
 
-            # Lecture des logs depuis Firebase
             try:
                 logs_stream = db.db.collection("journaux_actions").order_by("timestamp", direction="DESCENDING").limit(100).stream()
                 liste_logs = [d.to_dict() for d in logs_stream]
@@ -1067,3 +862,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
 
     elif mot_de_passe != "":
         st.error("🔒 Code d'accès incorrect.")
+
+
+
