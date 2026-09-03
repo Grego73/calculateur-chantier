@@ -1,873 +1,397 @@
-# Contenu complet et validé pour : onglets/direction.py
+# Contenu complet validé pour : onglets/ajouter_chantier.py
 
 import streamlit as st
 import pandas as pd
-import database as db
 import math
-import re
-import datetime
-import pytz
+import database as db
 
 # ==============================================================================
-# --- 1. POP-UP DE VALIDATION : CALCULATEUR DE RECRUTEMENT ---
+# --- 1. POPUP DE CONFIRMATION ---
 # ==============================================================================
-@st.dialog("📊 Rapport d'Analyse et de Calcul des Paliers")
-def pop_up_validation_recrutement(salaires_mensuels, metier, type_contrat, salaires_db_dict):
-    metier_clean = metier.strip().capitalize()
-    if metier_clean.endswith("s"): 
-        metier_clean = metier_clean[:-1]
+@st.dialog("🔍 Rapport de Calcul et Feuille d'Insertion NoSQL")
+def popup_confirmation_enregistrement():
+    inputs = st.session_state.get("temp_submit_data", {})
+    if not inputs:
+        st.error("Aucune donnée de simulation trouvée.")
+        return
+
+    st.write("Voici la transparence complète des calculs et formules appliqués selon les règles de l'économie du jeu :")
     
-    if "cond" in metier_clean.lower() or "direct" in metier_clean.lower(): metier_clean = "Conducteur"
-    elif "chef" in metier_clean.lower(): metier_clean = "Chef"
-    elif "ouv" in metier_clean.lower() or "macon" in metier_clean.lower(): metier_clean = "Ouvrier"
+    st.markdown("#### ⏱️ 1. Décomposition du Temps")
+    st.write(f"- **Durée réelle saisie :** `{inputs['jours_saisis']} jours, {inputs['heures_saisies']} heures, {inputs['minutes_saisies']} minutes`")
+    st.write(f"- **Forfait facturé (Location & CDD) :** `{int(inputs['jours_factures_jeu'])} jours` (Toute journée entamée est due)")
 
-    st.write(f"Voici le détail de l'analyse et la conversion pour le poste de **{metier_clean}** ({type_contrat}) :")
+    st.markdown("#### 👥 2. Formules appliquées pour la Main-d'œuvre")
+    st.code(f"Conducteurs ({inputs['type_contrat_cond']}) : {inputs['cout_cond']:,.0f} €")
+    st.code(f"Chefs ({inputs['type_contrat_chef']}) : {inputs['cout_chefs']:,.0f} €")
+    st.code(f"Ouvriers ({inputs['type_contrat_ouv']}) : {inputs['cout_ouvriers']:,.0f} €")
+
+    st.markdown("#### 🗂️ 3. Structure finale NoSQL (Firebase)")
     
-    sm_min = min(salaires_mensuels)
-    sm_max = max(salaires_mensuels)
-    sm_somme = sum(salaires_mensuels)
-    sm_nb = len(salaires_mensuels)
-    sm_moyen = sm_somme / sm_nb
-
-    if "CDI" in type_contrat:
-        sj_min = math.ceil(sm_min / 7.0)
-        sj_moyen = math.ceil(sm_moyen / 7.0)
-        sj_max = math.ceil(sm_max / 7.0)
-        prefixe_cle = f"{metier_clean}_CDI"
-        
-        txt_sm_moyen = f"{int(sm_moyen):,.0f}".replace(",", " ")
-        txt_sj_min = f"{int(sj_min):,.0f}".replace(",", " ")
-        txt_sm_min = f"{int(sm_min):,.0f}".replace(",", " ")
-        txt_sj_moyen = f"{int(sj_moyen):,.0f}".replace(",", " ")
-        txt_sj_max = f"{int(sj_max):,.0f}".replace(",", " ")
-        txt_sm_max = f"{int(sm_max):,.0f}".replace(",", " ")
-        
-        st.info(f"💡 Conversion CDI mensuelle (base 1 mois = 7j) ramenée au jour (Moyenne : {txt_sm_moyen} €/mois)")
-        st.markdown("### 🧮 Conversion ramenée à la journée de jeu :")
-        st.success(f"**- Coût Minimum :** `{txt_sj_min} € / jour` (soit {txt_sm_min} €/mois)")
-        st.success(f"**- Coût Moyen :** `{txt_sj_moyen} € / jour` (soit {txt_sm_moyen} €/mois)")
-        st.success(f"**- Coût Maximum :** `{txt_sj_max} € / jour` (soit {txt_sm_max} €/mois)")
-    else:
-        sj_min = math.ceil(sm_min)
-        sj_moyen = math.ceil(sm_moyen)
-        sj_max = math.ceil(sm_max)
-        prefixe_cle = f"{metier_clean}_CDD"
-        
-        txt_sm_moyen = f"{int(sm_moyen):,.0f}".replace(",", " ")
-        txt_sj_min = f"{int(sj_min):,.0f}".replace(",", " ")
-        txt_sj_moyen = f"{int(sj_moyen):,.0f}".replace(",", " ")
-        txt_sj_max = f"{int(sj_max):,.0f}".replace(",", " ")
-        
-        st.info(f"💡 Enregistrement CDD direct au jour (Moyenne : {txt_sm_moyen} €/jour)")
-        st.markdown("### 🧮 Tarification au jour de jeu :")
-        st.success(f"**- Tarif Minimum :** `{txt_sj_min} € / jour`")
-        st.success(f"**- Tarif Moyen :** `{txt_sj_moyen} € / jour`")
-        st.success(f"**- Tarif Maximum :** `{txt_sj_max} € / jour`")
-
-    if st.button("✅ ENREGISTRER SUR FIREBASE", type="primary", use_container_width=True, key=f"btn_save_cloud_{metier_clean}_{prefixe_cle}"):
-        grille_actuelle = dict(salaires_db_dict)
-        grille_actuelle[f"{prefixe_cle}_Min"] = int(sj_min)
-        grille_actuelle[f"{prefixe_cle}_Moyen"] = int(sj_moyen)
-        grille_actuelle[f"{prefixe_cle}_Max"] = int(sj_max)
-
-        db.db.collection("configuration_salaires").document("grille").set(grille_actuelle)
-        st.cache_data.clear()
-        st.toast(f"🚀 Tarifs de référence pour {prefixe_cle} synchronisés !")
-        st.rerun()
-
-# ==============================================================================
-# --- 2. POP-UP DE VALIDATION POUR L'EXTRACTEUR DE FICHES CHANTIERS ---
-# ==============================================================================
-@st.dialog("🔍 Rapport d'Analyse et d'Importation des Modèles")
-def pop_up_validation_fiches_chantiers(chantiers_detectes):
-    st.write("Voici la transparence des données techniques extraites de vos fiches brutes avant insertion cloud :")
+    signe_benefice = f"{inputs['benefice_net_recap']:,.0f} €".replace(",", " ")
     
-    for temporary_key, data in chantiers_detectes.items():
-        vrai_nom_propre = data["nom_affiche_propre"]
-        st.markdown(f"### 🏗️ Chantier : **{vrai_nom_propre}**")
-        
-        txt_revenus = f"{int(data['revenus']):,.0f}".replace(",", " ")
-        st.info(f"💰 **Revenus détectés :** `{txt_revenus}` €")
-        
-        st.markdown("**⏱️ Temps configuré pour l'Onglet 1 :**")
-        st.code(f"{data['jours']} jour(s), {data['heures']} heure(s), {data['minutes']} minute(s)")
-        
-        st.markdown("**⚙️ Structure des étapes détectées (Option B) :**")
-        for num, step in data["etapes_techniques"].items():
-            st.markdown(f"**Étape {num} (Durée : {step['duree_jours']} j)**")
-            st.caption(f"🕹️ Cond: {step['jh_cond']} | 🧑‍💼 Chef: {step['jh_chef']} | 👷 Ouv: {step['jh_ouvrier']}")
-            if step["materiaux"]:
-                st.write(f"🧱 Matériaux : {step['materiaux']}")
-            if step["engins"]:
-                st.write(f"🚜 Engins : {step['engins']}")
-        st.markdown("---")
-        
-    st.warning("🚨 Confirmez-vous l'injection de ces structures NoSQL par Étape dans votre catalogue de modèles ?")
+    donnees_popup = {
+        "Champ technique (Firestore)": ["nom_chantier", "revenus", "cout_materiaux", "cout_location", "cout_salaires", "depenses_totales", "benefice_net", "roi", "gain_par_jour"],
+        "Valeur brute insérée": [
+            inputs['nom_chantier'], 
+            f"{inputs['revenus']:,.0f} €".replace(",", " "), 
+            f"{inputs['txt_mats']} €", 
+            f"{inputs['txt_loc']} €", 
+            f"{inputs['txt_sal']} €", 
+            f"{inputs['txt_depenses']} €", 
+            signe_benefice, 
+            f"{inputs['roi_recap']:.2f} %", 
+            f"{inputs['txt_gain_jour']} €/j"
+        ]
+    }
+    st.table(pd.DataFrame(donnees_popup))
     
-    col_c1, col_c2 = st.columns(2)
-    with col_c1:
-        if st.button("✅ CONFIRMER L'IMPORTATION", type="primary", use_container_width=True, key="btn_confirm_cloud_import_fiches"):
-            compteur = 0
-            for temporary_key, data in chantiers_detectes.items():
-                liste_ordonnee = [t_et for k, t_et in sorted(data["etapes_techniques"].items())]
-                nom_unique_key = f"{data['nom_affiche_propre']} - {int(data['revenus'])}€"
-                
-                db.db.collection("modeles_chantiers").document(nom_unique_key).set({
-                    "nom_modele": data["nom_affiche_propre"], 
-                    "revenus": float(data["revenus"]), 
-                    "jours_globaux": int(data["jours"]), 
-                    "heures_globales": int(data["heures"]), 
-                    "minutes_globales": int(data["minutes"]),
-                    "etapes_techniques": liste_ordonnee
-                })
-                compteur += 1
-            st.cache_data.clear()
-            st.toast(f"🚀 {compteur} modèle(s) synchronisé(s) en Option B !")
-            st.rerun()
-            
-    with col_c2:
-        if st.button("❌ ANNULER", use_container_width=True, key="btn_cancel_cloud_import_fiches"):
-            st.rerun()
-
-# ==============================================================================
-# --- 3. L'ONGLET DIRECTION PRINCIPAL ---
-# ==============================================================================
-def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
-    st.subheader("🔑 Connexion Administrateur Direction")
-    mot_de_passe = st.text_input("Veuillez saisir le code d'accès :", type="password")
+    st.warning("🚨 Confirmez-vous l'envoi de cette simulation vers l'Historique cloud de l'entreprise ?")
+    col_pop1, col_pop2 = st.columns(2)
     
-    if mot_de_passe == "adminBTP2026":
-        st.success("🔓 Accès accordé au panneau de contrôle.")
-        
-        df_stats = db.charger_donnees()
-        if not df_stats.empty and "Revenus (€)" in df_stats.columns:
-            st.markdown("### 🏢 Bilan Général de l'Entreprise (Consolidé Cloud)")
-            total_chantiers = len(df_stats)
-            somme_revenus = float(df_stats["Revenus (€)"].sum())
-            somme_depenses = float(df_stats["Dépenses Totales (€)"].sum())
-            somme_benefices = float(df_stats["Bénéfice Net (€)"].sum())
-            
-            c_st1, c_st2, c_st3, c_st4 = st.columns(4)
-            with c_st1: st.metric(label="💼 Chantiers Signés", value=f"{total_chantiers}")
-            with c_st2: st.metric(label="💰 Chiffre d'Affaires Cumulé", value=f"{somme_revenus:,.0f}".replace(",", " ") + " €")
-            with c_st3: st.metric(label="📉 Dépenses Totales", value=f"{somme_depenses:,.0f}".replace(",", " ") + " €")
-            with c_st4: st.metric(label="📈 Résultat Net / Bénéfice", value=f"{somme_benefices:,.0f}".replace(",", " ") + " €")
-        else:
-            st.info("💡 Historique vierge : Aucun chantier n'est encore enregistré en base de données.")
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        with st.expander("🚨 Zone de Danger : Réinitialisation et Nettoyage des Tables"):
-            st.warning("Attention : Ces actions suppriment définitivement les données stockées sur Firebase.")
-            col_del1, col_del2, col_del3 = st.columns(3)
-            with col_del1:
-                if st.button("🗑️ Vider l'Historique des Chantiers", type="secondary", use_container_width=True):
-                    docs = db.db.collection("chantiers").stream()
-                    for d in docs: d.reference.delete()
-                    st.cache_data.clear()
-                    st.toast("Historique des chantiers supprimé !")
-                    st.rerun()
-            with col_del2:
-                if st.button("🗑️ Vider les Modèles Préfabriqués", type="secondary", use_container_width=True):
-                    docs = db.db.collection("modeles_chantiers").stream()
-                    for d in docs: d.reference.delete()
-                    st.cache_data.clear()
-                    st.toast("Catalogue des modèles vidé !")
-                    st.rerun()
-            with col_del3:
-                if st.button("💥 TOUT RÉINITIALISER", type="primary", use_container_width=True):
-                    db.reinitialiser_db()
-                    st.rerun()
-                    
-        st.markdown("---")
-
-        sub_tab1, sub_tab2, sub_tab3, sub_tab4, sub_tab5, sub_tab6, sub_tab7, sub_tab8, sub_tab9 = st.tabs([
-            "🏗️ Saisie Multi-Chantiers en Bloc", "👥 Éditer Grille Salariale", 
-            "🧱 Éditer Prix Matériaux", "🚜 Éditer Catalogue Engins", "🗂️ Consulter les Bases Données",
-            "🔎 Comparateur de Fiches", "🔍 Vérificateur de Doublons", "📊 Quotas Firebase", "📜 Historique des Actions"
-        ])
-
-        # ==============================================================================
-        # --- sub_tab1 : IMPORTATION EN BLOC ET DECODAGE PAR ÉTAPE (OPTION B) ---
-        # ==============================================================================
-        with sub_tab1:
-            dict_modeles_cloud = db.charger_catalogue_chantiers()
-            res_modeles_base = [dict_modeles_cloud[k] for k in dict_modeles_cloud if k != "Choisir un chantier pré-configuré..."]
-            total_modeles_base = len(res_modeles_base)
-
-            st.markdown(f"### 📥 Extracteur de Fiches Multi-Étapes Segmentées ({total_modeles_base} modèles en base)")
-            texte_fiches_brutes = st.text_area("Zone de saisie des fiches (Option B - Par Étape) :", value="", height=350, key="zone_texte_import_unique_fusionne")
-            
-            if st.button("🏗️ ANALYSER, NETTOYER ET IMPORTER LES MODÈLES", type="primary"):
-                if not texte_fiches_brutes.strip():
-                    st.error("❌ La zone de texte est vide.")
-                else:
-                    modeles_deja_presents = set()
-                    for doc_id, data_m in dict_modeles_cloud.items():
-                        if doc_id == "Choisir un chantier pré-configuré...": 
-                            continue
-                        nom_base = str(data_m.get("nom_modele", doc_id)).strip().lower()
-                        prix_base = float(data_m.get("revenus", 0.0))
-                        modeles_deja_presents.add((nom_base, prix_base))
-
-                    lignes = texte_fiches_brutes.split("\n")
-                    chantiers_detectes = {}
-                    nom_courant = None
-                    etape_courante_num = None
-                    compteur_doublons_bloques = 0
-                    
-                    for ligne in lignes:
-                        l_clean = ligne.strip()
-                        if not l_clean: continue
-                        
-                        if "euros" in l_clean.lower() and not l_clean.lower().startswith("revenus"):
-                            match_debut = re.search(r"^(.*?)\s+(\d[\d\s]+)\s+euros", l_clean, re.IGNORECASE)
-                            if match_debut:
-                                nom_ch = match_debut.group(1).strip()
-                                prix_txt = "".join(c for c in match_debut.group(2) if c.isdigit())
-                                prix_ch = float(prix_txt) if prix_txt else 0.0
-                            else:
-                                prix_ch = 0.0
-                                nom_ch = l_clean.replace("euros", "").replace("Euros", "").strip()
-                                
-                            if (nom_ch.lower(), prix_ch) in modeles_deja_presents:
-                                nom_courant = None
-                                compteur_doublons_bloques += 1
-                                continue
-                                
-                            nom_courant = f"{nom_ch} - {int(prix_ch)}€"
-                            etape_courante_num = None
-                            
-                            if nom_courant not in chantiers_detectes:
-                                chantiers_detectes[nom_courant] = {
-                                    "nom_affiche_propre": nom_ch,
-                                    "revenus": prix_ch, 
-                                    "jours": 0, "heures": 0, "minutes": 0,
-                                    "etapes_techniques": {}
-                                }
-                            continue
-
-                        if not nom_courant: continue
-                        
-                        if l_clean.lower().startswith("revenus :"):
-                            prix_txt = "".join(c for c in l_clean if c.isdigit())
-                            if prix_txt: 
-                                chantiers_detectes[nom_courant]["revenus"] = float(prix_txt)
-                            continue
-
-                        if "durée du chantier :" in l_clean.lower():
-                            partie_duree = l_clean.split(":")[-1].lower()
-                            m_j = re.search(r"(\d+)\s*jour", partie_duree)
-                            m_h = re.search(r"(\d+)\s*heure", partie_duree)
-                            m_m = re.search(r"(\d+)\s*minute", partie_duree)
-                            if m_j: chantiers_detectes[nom_courant]["jours"] = int(m_j.group(1))
-                            if m_h: chantiers_detectes[nom_courant]["heures"] = int(m_h.group(1))
-                            if m_m: chantiers_detectes[nom_courant]["minutes"] = int(m_m.group(1))
-                            continue
-
-                        if l_clean.lower().startswith("etape") and ":" in l_clean:
-                            match_e = re.search(r"etape\s*(\d+)", l_clean, re.IGNORECASE)
-                            if match_e: 
-                                etape_courante_num = int(match_e.group(1))
-                                if etape_courante_num not in chantiers_detectes[nom_courant]["etapes_techniques"]:
-                                    chantiers_detectes[nom_courant]["etapes_techniques"][etape_courante_num] = {
-                                        "num_etape": etape_courante_num,
-                                        "duree_jours": 1,
-                                        "jh_cond": 0.0, "jh_chef": 0.0, "jh_ouvrier": 0.0,
-                                        "materiaux": {},
-                                        "engins": []
-                                    }
-                            continue
-
-                        if etape_courante_num is not None:
-                            target_etape = chantiers_detectes[nom_courant]["etapes_techniques"][etape_courante_num]
-                            
-                            if "durée de l'étape :" in l_clean.lower() or "duree de l'etape :" in l_clean.lower():
-                                num_txt = "".join(c for c in l_clean.split(",") if c.isdigit())
-                                if num_txt: target_etape["duree_jours"] = int(num_txt)
-                                continue
-                            
-                            if ":" in l_clean and any(k in l_clean.lower() for k in ["chef", "ouvrier", "conducteur"]):
-                                gauche, droite = l_clean.split(":", 1)
-                                match_nb = re.search(r"(\d+)", droite)
-                                if match_nb:
-                                    val_nb = float(match_nb.group(1))
-                                    if "conducteur" in gauche.lower() or "engin" in gauche.lower(): target_etape["jh_cond"] = val_nb
-                                    elif "chef" in gauche.lower(): target_etape["jh_chef"] = val_nb
-                                    elif "ouvrier" in gauche.lower(): target_etape["jh_ouvrier"] = val_nb
-                                continue
-
-                            if "matériaux requis :" in l_clean.lower() or "materiaux requis :" in l_clean.lower():
-                                partie_mats = l_clean.split(":")[-1].lower()
-                                if "aucun" not in partie_mats:
-                                    sous_elements = partie_mats.split("&")
-                                    for sub in sous_elements:
-                                        qte_txt = "".join(c for c in sub if c.isdigit())
-                                        if qte_txt:
-                                            qte_val = float(qte_txt)
-                                            mat_nom = None
-                                            if "canalisation" in sub: mat_nom = "canalisations"
-                                            elif "armature" in sub: mat_nom = "armature"
-                                            elif "enrob" in sub: mat_nom = "enrobe"
-                                            elif "sable" in sub: mat_nom = "sable"
-                                            elif "terre" in sub: mat_nom = "terre"
-                                            elif "tôle" in sub or "tole" in sub: mat_nom = "tole"
-                                            elif "béton" in sub or "beton" in sub: mat_nom = "beton"
-                                            elif "panneau" in sub: mat_nom = "panneaux"
-                                            elif "tuyau" in sub: mat_nom = "tuyaux"
-                                            elif "poutre" in sub: mat_nom = "poutres"
-                                            if mat_nom: target_etape["materiaux"][mat_nom] = qte_val
-                                continue
-
-                            ligne_brute_clean = l_clean.lower().replace("é", "e").replace("è", "e").replace("à", "a")
-                            cat_engin = None
-                            if "camion benne" in ligne_brute_clean: cat_engin = "Camions Benne"
-                            elif "niveleuse" in ligne_brute_clean: cat_engin = "Niveleuse"
-                            elif "finisseur" in ligne_brute_clean: cat_engin = "Finisseur"
-                            elif "compacteur" in ligne_brute_clean: cat_engin = "Compacteur pour enrobé"
-                            elif "fraiseuse" in ligne_brute_clean: cat_engin = "Fraiseuse"
-                            elif "chargeuse" in ligne_brute_clean: cat_engin = "Chargeuse Compacte"
-                            elif "pelleteuse" in ligne_brute_clean: cat_engin = "Pelleteuses"
-                            elif "malaxeur" in ligne_brute_clean or "camion beton" in ligne_brute_clean: cat_engin = "Camion Béton Malaxeur"
-
-                            if cat_engin:
-                                niv = f"N{re.search(r'niveau\s*(\d+)', ligne_brute_clean).group(1)}" if re.search(r'niveau\s*(\d+)', ligne_brute_clean) else "N1"
-                                target_etape["engins"].append({"type": cat_engin, "niveau": niv})
-
-                    if chantiers_detectes:
-                        compteur_importation = 0
-                        for key_doc, data_ouvrage in chantiers_detectes.items():
-                            liste_ordonnee = [t_et for k, t_et in sorted(data_ouvrage["etapes_techniques"].items())]
-                            
-                            db.db.collection("modeles_chantiers").document(key_doc).set({
-                                "nom_modele": data_ouvrage["nom_affiche_propre"],
-                                "revenus": float(data_ouvrage["revenus"]),
-                                "jours_globaux": int(data_ouvrage["jours"]),
-                                "heures_globales": int(data_ouvrage["heures"]),
-                                "minutes_globales": int(data_ouvrage["minutes"]),
-                                "etapes_techniques": liste_ordonnee
-                            })
-                            compteur_importation += 1
-                        
-                        if compteur_doublons_bloques > 0:
-                            st.toast(f"ℹ️ {compteur_doublons_bloques} doublon(s) détecté(s) ont été ignoré(s).")
-                        
-                        st.cache_data.clear()
-                        st.success(f"🚀 {compteur_importation} fiche(s) de chantier importée(s) en Option B !")
-                        st.rerun()
-                    else:
-                        if compteur_doublons_bloques > 0:
-                            st.error(f"❌ Aucun nouveau modèle : Les {compteur_doublons_bloques} chantiers soumis existent déjà.")
-                        else:
-                            st.error("❌ L'algorithme n'a pas réussi à extraire de fiches valides.")
-
-        # ==============================================================================
-        # --- sub_tab2 : CONFIGURATION GRILLE SALARIALE ---
-        # ==============================================================================
-        with sub_tab2:
-            st.markdown("### 👥 Extracteur et Calculateur de Salaires par Métier & Contrat")
-            c_admin_poste, c_admin_contrat = st.columns(2)
-            with c_admin_poste: metier_cible = st.selectbox("Poste à analyser :", ["Conducteur", "Chef", "Ouvrier"])
-            with c_admin_contrat: type_contrat_cible = st.selectbox("Type de contrat collé :", ["CDI (Salaire mensuel)", "CDD (Salaire par jour)"])
-            texte_recrutement_brut = st.text_area(f"Collez le tableau des recrues pour [{metier_cible}] ici :", value="", height=150, key="zone_texte_recrutement_brut")
-            
-            if st.button("📊 ANALYSER LES SALAIRES SOUMIS", key="btn_declencher_analyse_unique"):
-                if not texte_recrutement_brut.strip(): 
-                    st.error("❌ La zone de texte est vide.")
-                else:
-                    lignes_recrues = texte_recrutement_brut.split("\n")
-                    liste_salaires_extraits = []
-                    for ligne in lignes_recrues:
-                        l_clean = ligne.strip()
-                        if not l_clean or "salaire" in l_clean.lower() or l_clean.lower() == "engager": continue 
-                        if "jour" in l_clean.lower() and "€" not in l_clean: continue
-                        elements = l_clean.split("\t") if "\t" in l_clean else l_clean.split()
-                        
-                        salaire_trouve = None
-                        for el in elements:
-                            if "€" in el:
-                                chiffre_net = "".join(c for c in el if c.isdigit())
-                                if chiffre_net: salaire_trouve = float(chiffre_net); break
-                        
-                        if salaire_trouve is not None: 
-                            liste_salaires_extraits.append(salaire_trouve)
-
-                    if liste_salaires_extraits:
-                        pop_up_validation_recrutement(liste_salaires_extraits, metier_cible, type_contrat_cible, SALAIRES_DB)
-                    else:
-                        st.error("❌ Impossible d'extraire des montants de salaires valides.")
-
-            st.markdown("#### 📄 Grille Salariale Active dans le Cloud :")
-            if not SALAIRES_DB:
-                st.info("La grille salariale cloud est actuellement vide.")
-            else:
-                lignes_grille = [{"Clé technique NoSQL": k, "Tarif (€/j)": v, "Supprimer l'entrée 🗑️": False} for k, v in SALAIRES_DB.items()]
-                df_sal_visuel = pd.DataFrame(lignes_grille)
-                
-                grille_editee = st.data_editor(
-                    df_sal_visuel, use_container_width=True, hide_index=True, key="editeur_suppression_salaires",
-                    column_config={
-                        "Clé technique NoSQL": st.column_config.TextColumn("Poste / Contrat / Palier", disabled=True),
-                        "Tarif (€/j)": st.column_config.NumberColumn("Tarif Journalier", format="%d €", disabled=True),
-                        "Supprimer l'entrée 🗑️": st.column_config.CheckboxColumn("Supprimer ?", default=False)
-                    }
-                )
-                
-                if grille_editee is not None:
-                    lignes_a_supprimer = grille_editee[grille_editee["Supprimer l'entrée 🗑️"] == True]
-                    if not lignes_a_supprimer.empty:
-                        if st.button("💥 CONFIRMER LA SUPPRESSION DES ENTRÉES SÉLECTIONNÉES", type="primary", use_container_width=True):
-                            nouvelle_grille = dict(SALAIRES_DB)
-                            for cle_technique in lignes_a_supprimer["Clé technique NoSQL"]:
-                                if cle_technique in nouvelle_grille:
-                                    del nouvelle_grille[cle_technique]
-                            
-                            db.db.collection("configuration_salaires").document("grille").set(nouvelle_grille)
-                            
-                            try:
-                                timestamp_paris = datetime.datetime.now(pytz.timezone('Europe/Paris')).strftime("%Y-%m-%d %H:%M:%S")
-                                db.db.collection("journaux_actions").add({
-                                    "timestamp": timestamp_paris,
-                                    "type_action": "SALAIRES",
-                                    "details": f"Suppression de {len(lignes_a_supprimer)} entrée(s) salariale(s)."
-                                })
-                            except Exception:
-                                pass
-                            
-                            st.cache_data.clear()
-                            st.toast("🔥 Entrées salariales supprimées avec succès !")
-                            st.rerun()
-
-        # ==============================================================================
-        # --- sub_tab3 : PRIX DES MATÉRIAUX ---
-        # ==============================================================================
-        with sub_tab3:
-            st.markdown("### 🧱 Édition du Coût de l'Approvisionnement (Prix Unitaires)")
-            form_mats = dict(MATERIAUX_DB)
-            col_m1, col_m2 = st.columns(2)
-            
-            liste_cles_mats = list(form_mats.keys())
-            milieu = math.ceil(len(liste_cles_mats) / 2)
-            
-            with col_m1:
-                for m_k in liste_cles_mats[:milieu]:
-                    form_mats[m_k] = st.number_input(f"Prix {m_k} (€/t ou €/u) :", value=float(form_mats[m_k]), min_value=0.0, step=1.0, format="%.2f")
-            with col_m2:
-                for m_k in liste_cles_mats[milieu:]:
-                    form_mats[m_k] = st.number_input(f"Prix {m_k} (€/t ou €/u) :", value=float(form_mats[m_k]), min_value=0.0, step=1.0, format="%.2f")
-                    
-            if st.button("✅ METTRE À JOUR LES TARIFS MATÉRIAUX", type="primary", use_container_width=True):
-                db.db.collection("configuration_materiaux").document("catalogue").set(form_mats)
-                st.cache_data.clear()
-                st.toast("🧱 Catalogue des prix matériaux synchronisé avec succès !")
-                st.rerun()
-
-        # ==============================================================================
-        # --- sub_tab4 : CATALOGUE DE LA FLOTTE D'ENGINS ---
-        # ==============================================================================
-        with sub_tab4:
-            st.markdown("### 🚜 Administration et Tarification de la Flotte")
-            catalogue_engins_brut = db.charger_catalogue_engins()
-            
-            with st.form("form_ajout_engin_direction", clear_on_submit=True):
-                c_en1, c_en2, c_en3 = st.columns(3)
-                with c_en1: nom_nouveau_engin = st.text_input("Nom unique & Niveau (ex: Pelleteuse N1) :").strip()
-                with c_en2: type_brut_choisi = st.text_input("Famille d'engin (ex: Pelleteuses) :").strip()
-                with c_en3: prix_jour_choisi = st.number_input("Prix de location journalier (€) :", min_value=0.0, step=10.0, value=380.0)
-                
-                submit_engin = st.form_submit_button("🚜 INSÉRER L'ENGIN DANS LE CATALOGUE GLOBAL", type="primary", use_container_width=True)
-                
-                if submit_engin:
-                    if not nom_nouveau_engin or not type_brut_choisi:
-                        st.error("❌ Veuillez compléter l'intégralité des champs textuels.")
-                    else:
-                        db.db.collection("catalogue_engins").document(nom_nouveau_engin).set({
-                            "type_brut": type_brut_choisi, "prix_jour": float(prix_jour_choisi)
-                        })
-                        st.cache_data.clear()
-                        st.toast(f"🚀 Engin '{nom_nouveau_engin}' ajouté au catalogue !")
-                        st.rerun()
-
-            st.markdown("#### Matériels actuellement référencés (Vue Cloud) :")
-            if not catalogue_engins_brut:
-                st.info("Le catalogue d'engins est vu comme vide.")
-            else:
-                df_liste_engins = pd.DataFrame([{"Nom de l'engin": k, "Prix / Jour (€)": v} for k, v in catalogue_engins_brut.items()])
-                df_liste_engins_style = df_liste_engins.style.format({"Prix / Jour (€)": lambda x: f"{x:,.0f}".replace(",", " ") + " €" if pd.notnull(x) else "-"})
-                st.dataframe(df_liste_engins_style, use_container_width=True, hide_index=True)
-
-        # ==============================================================================
-        # --- sub_tab5 : CONSULTATION BRUTE DES TABLES ---
-        # ==============================================================================
-        with sub_tab5:
-            dict_modeles = db.charger_catalogue_chantiers()
-            res_modeles = [dict_modeles[k] for k in dict_modeles if k != "Choisir un chantier pré-configuré..."]
-            total_modeles = len(res_modeles)
-
-            st.markdown(f"### 🗂️ Consultation brute complète ({total_modeles} chantiers en base)")
-            choix_table = st.selectbox(
-                "Choisir la table :", ["Modèles de Chantiers Pré-configurés", "Grille Salariale Actuelle", "Prix des Matériaux de base", "Catalogue de Location des Engins"]
+    with col_pop1:
+        if st.button("✅ ACCEPTER & ENREGISTRER", type="primary", use_container_width=True):
+            db.inserer_chantier(
+                inputs['nom_chantier'], inputs['revenus'], inputs['total_mats_recap'], 
+                inputs['total_location_recap'], inputs['total_salaires_recap'], 
+                inputs['total_depenses_recap'], inputs['benefice_net_recap'], 
+                round(inputs['roi_recap'], 2), float(inputs['jours_totaux']), 
+                round(inputs['gain_par_jour_recap'], 2), round(inputs['roi_par_jour_recap'], 2)
             )
-            if choix_table == "Modèles de Chantiers Pré-configurés":
-                if res_modeles:
-                    df_apercu = pd.DataFrame(res_modeles)
-                    if "engins_requis" in df_apercu.columns: df_apercu = df_apercu.drop(columns=["engins_requis"])
-                    colonnes_numeriques = df_apercu.select_dtypes(include=['number']).columns
-                    df_stylise = df_apercu.style.format({col: lambda x: f"{x:,.0f}".replace(",", " ") if pd.notnull(x) else "-" for col in colonnes_numeriques})
-                    st.dataframe(df_stylise, use_container_width=True, hide_index=True)
-                else: 
-                    st.info("Aucun modèle configuré sur votre base Firebase.")
-            elif choix_table == "Grille Salariale Actuelle": 
-                salaires_formates = {k: f"{v:,.0f}".replace(",", " ") + " €" for k, v in SALAIRES_DB.items()}
-                st.json(salaires_formates)
-            elif choix_table == "Prix des Matériaux de base": 
-                materiaux_formates = {k: f"{v:,.0f}".replace(",", " ") + " €" for k, v in MATERIAUX_DB.items()}
-                st.json(materiaux_formates)
-            elif choix_table == "Catalogue de Location des Engins":
-                catalogue_engins_brut = db.charger_catalogue_engins()
-                if catalogue_engins_brut: 
-                    res = [{"Engin Modèle": k, "Prix/j (€)": v} for k, v in catalogue_engins_brut.items()]
-                    df_engins_apercu = pd.DataFrame(res)
-                    df_engins_stylise = df_engins_apercu.style.format({"Prix/j (€)": lambda x: f"{x:,.0f}".replace(",", " ") + " €" if pd.notnull(x) else "-"})
-                    st.dataframe(df_engins_stylise, use_container_width=True, hide_index=True)
-                else: 
-                    st.info("Catalogue vide.")
-
-        # ==============================================================================
-        # --- sub_tab6 : COMPARATEUR DE FICHES CHANTIERS ---
-        # ==============================================================================
-        with sub_tab6:
-            st.markdown("### 🔎 Outil de Comparaison de Modèles Préfabriqués")
-            dict_modeles_comp = db.charger_catalogue_chantiers()
-            liste_selection_comp = [k for k in dict_modeles_comp.keys() if k != "Choisir un chantier pré-configuré..."]
+            st.toast("🚀 Simulation enregistrée avec succès sur le Cloud Firestore !")
+            if "temp_submit_data" in st.session_state:
+                del st.session_state["temp_submit_data"]
+            st.rerun()
             
-            if len(liste_selection_comp) < 2:
-                st.info("💡 Deux modèles minimum requis pour exécuter une comparaison.")
-            else:
-                c_cmp1, c_cmp2 = st.columns(2)
-                with c_cmp1: ch_A = st.selectbox("Sélectionner le Chantier A :", liste_selection_comp, key="comp_select_A")
-                with c_cmp2: ch_B = st.selectbox("Sélectionner le Chantier B (Comparatif) :", liste_selection_comp, key="comp_select_B")
-                
-                if ch_A == ch_B:
-                    st.warning("Veuillez cibler deux chantiers distincts.")
-                else:
-                    data_A = dict_modeles_comp[ch_A]
-                    data_B = dict_modeles_comp[ch_B]
-                    
-                    st.markdown("#### 📊 Métriques d'Ouvrages et Écarts Techniques")
-                    metrics_comparatives = {
-                        "Indicateur structurel": ["Revenus Fixes du Modèle", "Durée Théorique (jours)"],
-                        f"Chantier A : {data_A.get('nom_modele', ch_A)}": [f"{data_A.get('revenus', 0):,.0f}".replace(",", " ") + " €", f"{data_A.get('jours_globaux', 0)} jours"],
-                        f"Chantier B : {data_B.get('nom_modele', ch_B)}": [f"{data_B.get('revenus', 0):,.0f}".replace(",", " ") + " €", f"{data_B.get('jours_globaux', 0)} jours"]
-                    }
-                    st.table(pd.DataFrame(metrics_comparatives))
+    with col_pop2:
+        if st.button("❌ ANNULER & MODIFIER", use_container_width=True): 
+            if "temp_submit_data" in st.session_state:
+                del st.session_state["temp_submit_data"]
+            st.rerun()
 
-        # ==============================================================================
-        # --- sub_tab7 : VÉRIFICATEUR ET INJECTEUR DE NOUVEAUX CHANTIERS (OPTION B) ---
-        # ==============================================================================
-        with sub_tab7:
-            st.markdown(f"### 🔍 Vérificateur & Injecteur de Fiches en Bloc ({total_modeles} modèles en base)")
-            st.write("Collez vos fiches brutes complètes ci-dessous pour filtrer les doublons et configurer les nouveaux chantiers.")
+# ==============================================================================
+# --- 2. FONCTION PRINCIPALE APPELÉE PAR LE FICHIER APP.PY ---
+# ==============================================================================
+def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_ENGINS_BRUTS, CATALOGUE_CHANTIERS):
+    st.subheader("Formulaire de saisie")
+    
+    liste_triee = ["Choisir un chantier pré-configuré..."] + sorted([k for k in CATALOGUE_CHANTIERS.keys() if k != "Choisir un chantier pré-configuré..."])
+    
+    if "val_revenus" not in st.session_state:
+        st.session_state["val_revenus"] = 0.0
+        st.session_state["val_jours"] = 0
+        for k in ["sable","terre","enrobe","armature","tole","beton","panneaux","tuyaux","canalisations","poutres"]:
+            st.session_state[f"val_{k}"] = 0.0
+        st.session_state["val_jh_cond"] = 0.0
+        st.session_state["val_jh_chef"] = 0.0
+        st.session_state["val_jh_ouvrier"] = 0.0
 
-            texte_verification_brut = st.text_area("Zone de dépôt des fiches brutes :", value="", height=250, key="zone_texte_verif_bloc_doublons")
+    # --- ACTION DE RECEPTION DYNAMIQUE PAR ÉTAPES (OPTION B) ---
+    def mise_a_jour_cache_modele():
+        selection = st.session_state["select_modele_chantier_dynamique"]
+        if selection == "Choisir un chantier pré-configuré...":
+            return
             
-            if texte_verification_brut.strip():
-                dict_modeles_verif = db.charger_catalogue_chantiers()
-                chantiers_existants = set()
-                for doc_id, data_m in dict_modeles_verif.items():
-                    if doc_id == "Choisir un chantier pré-configuré...": continue
-                    nom_base = str(data_m.get("nom_modele", doc_id)).strip().lower()
-                    prix_base = float(data_m.get("revenus", 0.0))
-                    chantiers_existants.add((nom_base, prix_base))
-
-                lignes_verif = texte_verification_brut.split("\n")
-                blocs_chantiers_bruts = {}
-                nom_courant_verif = None
-                
-                for ligne in lignes_verif:
-                    l_clean = ligne.strip()
-                    if not l_clean: continue
-                    
-                    if "euros" in l_clean.lower() and not l_clean.lower().startswith("revenus"):
-                        match_verif = re.search(r"^(.*?)\s+(\d[\d\s]+)\s+euros", l_clean, re.IGNORECASE)
-                        if match_verif:
-                            nom_ch = match_verif.group(1).strip()
-                            prix_txt = "".join(c for c in match_verif.group(2) if c.isdigit())
-                            prix_ch = float(prix_txt) if prix_txt else 0.0
-                        else:
-                            prix_ch = 0.0
-                            nom_ch = l_clean.replace("euros", "").replace("Euros", "").strip()
-                            
-                        nom_courant_verif = f"{nom_ch} _VERIF_ {int(prix_ch)}"
-                        blocs_chantiers_bruts[nom_courant_verif] = {
-                            "nom_propre": nom_ch, "prix": prix_ch, "lignes": []
-                        }
-                        continue
-                    
-                    if nom_courant_verif and nom_courant_verif in blocs_chantiers_bruts:
-                        blocs_chantiers_bruts[nom_courant_verif]["lignes"].append(ligne)
-
-                liste_doublons = []
-                liste_nouveaux_blocs = []
-                
-                for k_id, info_b in blocs_chantiers_bruts.items():
-                    couple_cle = (info_b["nom_propre"].lower(), info_b["prix"])
-                    if couple_cle in chantiers_existants:
-                        liste_doublons.append(info_b)
-                    else:
-                        liste_nouveaux_blocs.append(info_b)
-                
-                c_v1, c_v2, c_v3 = st.columns(3)
-                with c_v1: st.metric("Total détecté", f"{len(blocs_chantiers_bruts)}")
-                with c_v2: st.metric("Doublons bloqués", f"{len(liste_doublons)}", delta="Déjà en base", delta_color="inverse")
-                with c_v3: st.metric("Nouveaux chantiers", f"{len(liste_nouveaux_blocs)}", delta="À configurer", delta_color="normal")
-                
-                if liste_doublons:
-                    with st.expander("🟢 Liste des doublons détectés (Ignorés automatiquement)"):
-                        for d_ch in liste_doublons:
-                            st.write(f"- **{d_ch['nom_propre']}** ({int(d_ch['prix']):,} €)".replace(",", " "))
-
-                if liste_nouveaux_blocs:
-                    st.markdown("---")
-                    st.markdown("### 🛠️ Configuration et Décodage des Nouveaux Chantiers")
-                    st.info("Modifiez ou complétez le texte des fiches ci-dessous.")
-                    
-                    chantiers_prets_a_injecter = {}
-                    
-                    for idx, n_ch in enumerate(liste_nouveaux_blocs):
-                        st.markdown(f"#### 🧱 Fiche : **{n_ch['nom_propre']}** — `{int(n_ch['prix']):,} €`".replace(",", " "))
-                        
-                        texte_initial_bloc = "\n".join(n_ch["lignes"])
-                        texte_ajuste = st.text_area(
-                            f"Ajuster la structure technique de l'ouvrage (Étapes, Ressources, Matériaux) :",
-                            value=texte_initial_bloc,
-                            height=250,
-                            key=f"area_verif_modif_{idx}_{n_ch['nom_propre']}"
-                        )
-                        
-                        # --- EXÉCUTION DU PARSER TECHNIQUE SUR LE TEXTE AJUSTÉ (OPTION B) ---
-                        chantiers_detectes_local = {
-                            "nom_affiche_propre": n_ch["nom_propre"], 
-                            "revenus": n_ch["prix"],
-                            "jours": 0, "heures": 0, "minutes": 0,
-                            "etapes_techniques": {}
-                        }
-                        
-                        lignes_locales = texte_ajuste.split("\n")
-                        etape_courante_num = None
-                        
-                        for ligne_l in lignes_locales:
-                            l_l_clean = ligne_l.strip()
-                            if not l_l_clean: continue
-                            
-                            # Détection de la durée globale
-                            if "durée du chantier :" in l_l_clean.lower():
-                                partie_duree = l_l_clean.split(":")[-1].lower()
-                                m_j = re.search(r"(\d+)\s*jour", partie_duree)
-                                m_h = re.search(r"(\d+)\s*heure", partie_duree)
-                                m_m = re.search(r"(\d+)\s*minute", partie_duree)
-                                if m_j: chantiers_detectes_local["jours"] = int(m_j.group(1))
-                                if m_h: chantiers_detectes_local["heures"] = int(m_h.group(1))
-                                if m_m: chantiers_detectes_local["minutes"] = int(m_m.group(1))
-                                continue
-
-                            # Repérage de l'étape active
-                            if l_l_clean.lower().startswith("etape") and ":" in l_l_clean:
-                                match_e = re.search(r"etape\s*(\d+)", l_l_clean, re.IGNORECASE)
-                                if match_e: 
-                                    etape_courante_num = int(match_e.group(1))
-                                    if etape_courante_num not in chantiers_detectes_local["etapes_techniques"]:
-                                        chantiers_detectes_local["etapes_techniques"][etape_courante_num] = {
-                                            "num_etape": etape_courante_num,
-                                            "duree_jours": 1,
-                                            "jh_cond": 0.0, "jh_chef": 0.0, "jh_ouvrier": 0.0,
-                                            "materiaux": {},
-                                            "engins": []
-                                        }
-                                continue
-
-                            if etape_courante_num is not None:
-                                target_etape = chantiers_detectes_local["etapes_techniques"][etape_courante_num]
-                                
-                                # Durée spécifique de l'étape
-                                if "durée de l'étape :" in l_l_clean.lower() or "duree de l'etape :" in l_l_clean.lower():
-                                    num_txt = "".join(c for c in l_l_clean.split(",") if c.isdigit())
-                                    if num_txt: target_etape["duree_jours"] = int(num_txt)
-                                    continue
-                                
-                                # Extraction du personnel requis à l'étape
-                                if ":" in l_l_clean and any(k in l_l_clean.lower() for k in ["chef", "ouvrier", "conducteur"]):
-                                    gauche, droite = l_l_clean.split(":", 1)
-                                    match_nb = re.search(r"(\d+)", droite)
-                                    if match_nb:
-                                        val_nb = float(match_nb.group(1))
-                                        if "conducteur" in gauche.lower() or "engin" in gauche.lower(): target_etape["jh_cond"] = val_nb
-                                        elif "chef" in gauche.lower(): target_etape["jh_chef"] = val_nb
-                                        elif "ouvrier" in gauche.lower(): target_etape["jh_ouvrier"] = val_nb
-                                    continue
-
-                                # EXTRACTION DES MATÉRIAUX REQUIS PAR ÉTAPE
-                                if "matériaux requis :" in l_l_clean.lower() or "materiaux requis :" in l_l_clean.lower():
-                                    partie_mats = l_l_clean.split(":")[-1].lower()
-                                    if "aucun" not in partie_mats:
-                                        sous_elements = partie_mats.split("&")
-                                        for sub in sous_elements:
-                                            qte_txt = "".join(c for c in sub if c.isdigit())
-                                            if qte_txt:
-                                                qte_val = float(qte_txt)
-                                                mat_nom = None
-                                                if "canalisation" in sub: mat_nom = "canalisations"
-                                                elif "armature" in sub: mat_nom = "armature"
-                                                elif "enrob" in sub: mat_nom = "enrobe"
-                                                elif "sable" in sub: mat_nom = "sable"
-                                                elif "terre" in sub: mat_nom = "terre"
-                                                elif "tôle" in sub or "tole" in sub: mat_nom = "tole"
-                                                elif "béton" in sub or "beton" in sub: mat_nom = "beton"
-                                                elif "panneau" in sub: mat_nom = "panneaux"
-                                                elif "tuyau" in sub: mat_nom = "tuyaux"
-                                                elif "poutre" in sub: mat_nom = "poutres"
-                                                
-                                                if mat_nom: 
-                                                    target_etape["materiaux"][mat_nom] = qte_val
-                                    continue
-
-                                # EXTRACTION ET RECONNAISSANCE DE LA FLOTTE D'ENGINS PAR ÉTAPE
-                                ligne_brute_clean = l_l_clean.lower().replace("é", "e").replace("è", "e").replace("à", "a")
-                                cat_engin = None
-                                if "camion benne" in ligne_brute_clean: cat_engin = "Camions Benne"
-                                elif "niveleuse" in ligne_brute_clean: cat_engin = "Niveleuse"
-                                elif "finisseur" in ligne_brute_clean: cat_engin = "Finisseur"
-                                elif "compacteur" in ligne_brute_clean: cat_engin = "Compacteur pour enrobé"
-                                elif "fraiseuse" in ligne_brute_clean: cat_engin = "Fraiseuse"
-                                elif "chargeuse" in ligne_brute_clean: cat_engin = "Chargeuse Compacte"
-                                elif "pelleteuse" in ligne_brute_clean: cat_engin = "Pelleteuses"
-                                elif "malaxeur" in ligne_brute_clean or "camion beton" in ligne_brute_clean: cat_engin = "Camion Béton Malaxeur"
-
-                                if cat_engin:
-                                    niv = f"N{re.search(r'niveau\s*(\d+)', ligne_brute_clean).group(1)}" if re.search(r'niveau\s*(\d+)', ligne_brute_clean) else "N1"
-                                    target_etape["engins"].append({"type": cat_engin, "niveau": niv})
-                        
-                        # Association de la structure finale parsée à la clé du modèle
-                        cle_unique_injection = f"{n_ch['nom_propre']} - {int(n_ch['prix'])}€"
-                        chantiers_prets_a_injecter[cle_unique_injection] = chantiers_detectes_local
-                        st.markdown("---")
-                    
-                    # BOUTON GLOBAL D'INJECTION POUR TOUS LES NOUVEAUX MODÈLES VALIDES
-                    if st.button("🚀 INJECTER LES NOUVEAUX MODÈLES DANS FIREBASE", type="primary", use_container_width=True, key="btn_save_verif_bloc_to_nosql"):
-                        compteur_ins = 0
-                        for unique_id, data_save in chantiers_prets_a_injecter.items():
-                            liste_etapes_ordonnee = [t_et for k, t_et in sorted(data_save["etapes_techniques"].items())]
-                            
-                            # Injection de la structure NoSQL Option B complète dans Firestore
-                            db.db.collection("modeles_chantiers").document(unique_id).set({
-                                "nom_modele": data_save["nom_affiche_propre"], 
-                                "revenus": float(data_save["revenus"]), 
-                                "jours_globaux": int(data_save["jours"]), 
-                                "heures_globales": int(data_save["heures"]), 
-                                "minutes_globales": int(data_save["minutes"]),
-                                "etapes_techniques": liste_etapes_ordonnee
-                            })
-                            compteur_ins += 1
-                        
-                        st.cache_data.clear()
-                        st.toast(f"🎯 {compteur_ins} nouveau(x) modèle(s) synchronisé(s) avec succès en Option B !")
-                        st.rerun()
-            else:
-                st.info("💡 En attente de saisie textuelle dans la zone ci-dessus pour démarrer le processus.")
-
-        # ==============================================================================
-        # --- sub_tab8 : MONITEUR DE QUOTAS ET CONSOMMATION FIREBASE ---
-        # ==============================================================================
-        with sub_tab8:
-            st.markdown("### 📊 Suivi de Consommation & Quotas Journaliers (Plan Gratuit)")
-            st.write("Firestore comptabilise l'usage quotidien. Voici l'état estimé de vos limites système réinitialisées toutes les 24h par Google.")
+        modele = CATALOGUE_CHANTIERS[selection]
+        etapes_cloud = modele.get("etapes_techniques", [])
+        
+        # Nettoyage forcé des anciens états de session pour éviter les mélanges
+        for k in ["table_engins_necessaires", "table_engins_a_louer", "table_employes_planification_etapes"]:
+            if k in st.session_state: 
+                del st.session_state[k]
             
-            tz_paris = pytz.timezone('Europe/Paris')
-            maintenant = datetime.datetime.now(tz_paris)
-            cible_aujourdhui = maintenant.replace(hour=9, minute=0, second=0, microsecond=0)
+        # Paramètres globaux temporels et financiers
+        st.session_state["val_revenus"] = float(modele.get("revenus", 0.0))
+        st.session_state["val_jours"] = int(modele.get("jours_globaux", 0))
+        
+        # Initialisation des compteurs de matériaux globaux pour l'approvisionnement
+        liste_mats_cles = ["sable","terre","enrobe","armature","tole","beton","panneaux","tuyaux","canalisations","poutres"]
+        for mat in liste_mats_cles:
+            st.session_state[f"val_{mat}"] = 0.0
             
-            if maintenant < cible_aujourdhui:
-                echeance_reinit = cible_aujourdhui
-            else:
-                echeance_reinit = cible_aujourdhui + datetime.timedelta(days=1)
-                
-            temps_restant = echeance_reinit - maintenant
-            heures_r, secondes_restantes = divmod(temps_restant.seconds, 3600)
-            minutes_r, _ = divmod(secondes_restantes, 60)
+        lignes_rh = []
+        lignes_engins = []
+        
+        # Extraction et dispatching des données de chaque étape
+        for etape in etapes_cloud:
+            num_e = etape.get("num_etape", 1)
+            duree_j = etape.get("duree_jours", 1)
             
-            st.warning(f"⏱️ **Prochaine réinitialisation des quotas Google Firebase dans :** `{heures_r} heure(s) et {minutes_r} minute(s)` (chaque jour à 09h00)")
-
-            try:
-                quota_doc = db.db.collection("configuration_systeme").document("quotas_journaliers").get()
-                donnees_quota = quota_doc.to_dict() if quota_doc.exists else {}
-            except Exception:
-                donnees_quota = {}
-
-            lectures_faites = int(donnees_quota.get("lectures", 1240))
-            ecritures_faites = int(donnees_quota.get("ecritures", 315))
-            suppressions_faites = int(donnees_quota.get("suppressions", 45))
-
-            LIMITE_LECTURES = 50000
-            LIMITE_ECRITURES = 20000
-            LIMITE_SUPPRESSIONS = 20000
-
-            pct_lectures = min(float(lectures_faites / LIMITE_LECTURES), 1.0)
-            pct_ecritures = min(float(ecritures_faites / LIMITE_ECRITURES), 1.0)
-            pct_suppressions = min(float(suppressions_faites / LIMITE_SUPPRESSIONS), 1.0)
-
-            reste_lectures = LIMITE_LECTURES - lectures_faites
-            reste_ecritures = LIMITE_ECRITURES - ecritures_faites
-            reste_suppressions = LIMITE_SUPPRESSIONS - suppressions_faites
-
-            c_q1, c_q2, c_v3 = st.columns(3)
-            with c_q1: st.metric("Lectures Restantes", f"{reste_lectures:,.0f}".replace(",", " "), f"-{lectures_faites} faites", delta_color="inverse")
-            with c_q2: st.metric("Écritures Restantes", f"{reste_ecritures:,.0f}".replace(",", " "), f"-{ecritures_faites} faites", delta_color="inverse")
-            with c_v3: st.metric("Suppressions Restantes", f"{reste_suppressions:,.0f}".replace(",", " "), f"-{suppressions_faites} faites", delta_color="inverse")
-
-            st.markdown("<br>", unsafe_allow_html=True)
-            st.markdown("**📉 Jauge d'utilisation des Lectures (Limite : 50 000 / jour) :**")
-            st.progress(pct_lectures, text=f"{lectures_faites} / {LIMITE_LECTURES} ({pct_lectures*100:.1f}%)")
-            st.markdown("**✍️ Jauge d'utilisation des Écritures (Limite : 20 000 / jour) :**")
-            st.progress(pct_ecritures, text=f"{ecritures_faites} / {LIMITE_ECRITURES} ({pct_ecritures*100:.1f}%)")
-            st.markdown("**🗑️ Jauge d'utilisation des Suppressions (Limite : 20 000 / jour) :**")
-            st.progress(pct_suppressions, text=f"{suppressions_faites} / {LIMITE_SUPPRESSIONS} ({pct_suppressions*100:.1f}%)")
-
-            st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("🔄 ACTUALISER LES COMPTEURS COMPTABLES", use_container_width=True):
-                st.cache_data.clear()
-                st.rerun()
-
-        # ==============================================================================
-        # --- sub_tab9 : TRAÇABILITÉ ET JOURNAL DES ACTIONS (LOGS) ---
-        # ==============================================================================
-        with sub_tab9:
-            st.markdown("### 📜 Journal d'Audit & Traçabilité NoSQL")
-            st.write("Historique chronologique des modifications apportées aux configurations de l'entreprise.")
-
-            try:
-                logs_stream = db.db.collection("journaux_actions").order_by("timestamp", direction="DESCENDING").limit(100).stream()
-                liste_logs = [d.to_dict() for d in logs_stream]
-            except Exception:
-                try:
-                    logs_stream = db.db.collection("journaux_actions").limit(100).stream()
-                    liste_logs = [d.to_dict() for d in logs_stream]
-                except Exception:
-                    liste_logs = []
-
-            if liste_logs:
-                df_logs = pd.DataFrame(liste_logs)
-                for col in ["timestamp", "type_action", "details"]:
-                    if col not in df_logs.columns: df_logs[col] = ""
+            # Cumul des volumes de matériaux de l'étape vers le total du chantier
+            mats_etape = etape.get("materiaux", {})
+            for mat_nom, qte in mats_etape.items():
+                if mat_nom in liste_mats_cles:
+                    st.session_state[f"val_{mat_nom}"] += float(qte)
                     
-                st.dataframe(
-                    df_logs, use_container_width=True, hide_index=True,
-                    column_config={
-                        "timestamp": st.column_config.TextColumn("⏱️ Date & Heure (Paris)", width="medium"),
-                        "type_action": st.column_config.TextColumn("🏷️ Catégorie", width="small"),
-                        "details": st.column_config.TextColumn("📝 Détails de l'opération", width="large")
-                    }
-                )
-            else:
-                st.info("💡 Aucun événement n'est encore enregistré dans le journal d'audit.")
+            # Reconstitution des lignes pour le tableau des Employés (RH)
+            lignes_rh.append({
+                "N° Étape": int(num_e),
+                "Durée Étape (jours)": int(duree_j),
+                "🕹️ Conducteurs": int(etape.get("jh_cond", 0)),
+                "🧑‍💼 Chefs": int(etape.get("jh_chef", 0)),
+                "👷 Ouvriers": int(etape.get("jh_ouvrier", 0))
+            })
+            
+            # Reconstitution des lignes pour le tableau des Engins requis
+            engins_etape = etape.get("engins", [])
+            for engin in engins_etape:
+                lignes_engins.append({
+                    "N° Étape": int(num_e),
+                    "Durée Étape (jours)": int(duree_j),
+                    "Type d'engin requis": engin.get("type", "Autre"),
+                    "Niveau requis": engin.get("niveau", "N1"),
+                    "À louer ?": False
+                })
+                
+        # Injection des structures reconstruites dans les DataEditors de l'interface
+        st.session_state["table_employes_planification_etapes"] = pd.DataFrame(lignes_rh)
+        st.session_state["table_engins_necessaires"] = pd.DataFrame(lignes_engins)
 
-    elif mot_de_passe != "":
-        st.error("🔒 Code d'accès incorrect.")
+    chantier_selectionne = st.selectbox(
+        "🚀 Sélectionner un modèle de chantier dynamique :", 
+        liste_triee, key="select_modele_chantier_dynamique", on_change=mise_a_jour_cache_modele
+    )
+    
+    valeur_nom_defaut = "" if chantier_selectionne == "Choisir un chantier pré-configuré..." else chantier_selectionne
+    nom_chantier = st.text_input("Nom ou Numéro du chantier :", value=valeur_nom_defaut).strip()
+    
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("### --- PARAMÈTRES GÉNÉRAUX ---")
+        revenus = st.number_input("Revenus prévus du chantier (€) :", value=st.session_state["val_revenus"], step=100.0, format="%.0f")
+        
+        st.write("⏱️ **Durée totale du chantier :**")
+        c_j, c_h, c_m = st.columns(3)
+        with c_j: jours_saisis = st.number_input("Jours", min_value=0, value=st.session_state["val_jours"], step=1)
+        with c_h: heures_saisies = st.number_input("Heures", min_value=0, max_value=23, value=0, step=1)
+        with c_m: minutes_saisies = st.number_input("Minutes", min_value=0, max_value=59, value=0, step=1)
+
+        heures_en_jours = heures_saisies / 24.0
+        minutes_en_jours = minutes_saisies / 1440.0
+        jours_totaux = float(jours_saisis + heures_en_jours + minutes_en_jours)
+
+        st.markdown("### --- MATÉRIAUX ---")
+        c_qte, c_px = st.columns(2)
+        with c_qte:
+            qte_sable = st.number_input("Tonnes de Sable :", value=st.session_state["val_sable"], format="%.0f")
+            qte_terre = st.number_input("Tonnes de Terre :", value=st.session_state["val_terre"], format="%.0f")
+            qte_enrobe = st.number_input("Tonnes d'Enrobé :", value=st.session_state["val_enrobe"], format="%.0f")
+            qte_armature = st.number_input("Unités d'Armature métallique :", value=st.session_state["val_armature"], format="%.0f")
+            qte_tole = st.number_input("Unités de Plaque de tôle ondulée :", value=st.session_state["val_tole"], format="%.0f")
+            qte_beton = st.number_input("Tonnes de Béton :", value=st.session_state["val_beton"], format="%.0f")
+            qte_panneaux = st.number_input("Unités de Panneaux signalisation :", value=st.session_state["val_panneaux"], format="%.0f")
+            qte_tuyaux = st.number_input("Unités de Tuyaux d'eau standards :", value=st.session_state["val_tuyaux"], format="%.0f")
+            qte_canalisations = st.number_input("Unités de Canalisations eaux usées :", value=st.session_state["val_canalisations"], format="%.0f")
+            qte_poutres = st.number_input("Unités de Poutres en acier :", value=st.session_state["val_poutres"], format="%.0f")
+        with c_px:
+            prix_sable = st.number_input("Prix Sable (€/t) :", value=float(MATERIAUX_DB.get("Sable", 12)), format="%.0f")
+            prix_terre = st.number_input("Prix Terre (€/t) :", value=float(MATERIAUX_DB.get("Terre", 16)), format="%.0f")
+            prix_enrobe = st.number_input("Prix Enrobé (€/t) :", value=float(MATERIAUX_DB.get("Enrobé", 42)), format="%.0f")
+            prix_armature = st.number_input("Prix Armature (€/u) :", value=float(MATERIAUX_DB.get("Armature", 70)), format="%.0f")
+            prix_tole = st.number_input("Prix Tôle (€/u) :", value=float(MATERIAUX_DB.get("Tôle", 55)), format="%.0f")
+            prix_beton = st.number_input("Prix Béton (€/t) :", value=float(MATERIAUX_DB.get("Béton", 45)), format="%.0f")
+            prix_panneaux = st.number_input("Prix Panneaux (€/u) :", value=float(MATERIAUX_DB.get("Panneaux", 90)), format="%.0f")
+            prix_tuyaux = st.number_input("Prix Tuyaux d'eau (€/u) :", value=float(MATERIAUX_DB.get("Tuyaux", 32)), format="%.0f")
+            prix_canalisations = st.number_input("Prix Canalisations (€/u) :", value=float(MATERIAUX_DB.get("Canalisations", 35)), format="%.0f")
+            prix_poutres = st.number_input("Prix Poutres acier (€/u) :", value=float(MATERIAUX_DB.get("Poutres", 70)), format="%.0f")
+
+        total_mats_direct = float((qte_sable*prix_sable) + (qte_terre*prix_terre) + (qte_enrobe*prix_enrobe) + (qte_armature*prix_armature) + (qte_tole*prix_tole) + (qte_beton*prix_beton) + (qte_panneaux*prix_panneaux) + (qte_tuyaux*prix_tuyaux) + (qte_canalisations*prix_canalisations) + (qte_poutres*prix_poutres))
+        st.info(f"🧱 **Total est. matériaux :** {total_mats_direct:,.0f}".replace(",", " ") + " €")
+
+    with col2:
+        st.markdown("### --- CONFIGURATION DE LA MAIN-D'ŒUVRE PAR ÉTAPE ---")
+        st.caption("💡 CDI : au prorata réel. CDD : à la journée complète entamée (due).")
+        
+        c_rh_co, c_rh_ch, c_rh_ou = st.columns(3)
+        with c_rh_co: type_contrat_cond = st.selectbox("Contrat Conducteurs :", ["CDI", "CDD"], key="type_contrat_cond")
+        with c_rh_ch: type_contrat_chef = st.selectbox("Contrat Chefs :", ["CDI", "CDD"], key="type_contrat_chef")
+        with c_rh_ou: type_contrat_ouv = st.selectbox("Contrat Ouvriers :", ["CDI", "CDD"], key="type_contrat_ouv")
+        
+        px_cond = float(SALAIRES_DB.get(f"Conducteur_{type_contrat_cond}_Moyen") or SALAIRES_DB.get(f"Conducteur_{type_contrat_cond}") or SALAIRES_DB.get("Conducteur") or 230.0)
+        px_chef = float(SALAIRES_DB.get(f"Chef_{type_contrat_chef}_Moyen") or SALAIRES_DB.get(f"Chef_{type_contrat_chef}") or SALAIRES_DB.get("Chef") or 230.0)
+        px_ouvrier = float(SALAIRES_DB.get(f"Ouvrier_{type_contrat_ouv}_Moyen") or SALAIRES_DB.get(f"Ouvrier_{type_contrat_ouv}") or SALAIRES_DB.get("Ouvrier") or 230.0)
+
+        st.info(f"💰 Tarifs Cloud : 🕹️ Cond : {px_cond:.0f}€/j | 🧑‍💼 Chef : {px_chef:.0f}€/j | 👷 Ouv : {px_ouvrier:.0f}€/j")
+
+        st.markdown("**👥 Planification des Effectifs requis à l'Étape :**")
+        df_rh_init = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "🕹️ Conducteurs", "🧑‍💼 Chefs", "👷 Ouvriers"])
+
+        tableau_employes_etapes = st.data_editor(
+            st.session_state.get("table_employes_planification_etapes", df_rh_init), num_rows="dynamic", use_container_width=True, key="table_employes_planification_etapes",
+            column_config={
+                "N° Étape": st.column_config.NumberColumn("N°", min_value=1, step=1, required=True, width="small"),
+                "Durée Étape (jours)": st.column_config.NumberColumn("Jours", min_value=1, step=1, required=True, width="small"),
+                "🕹️ Conducteurs": st.column_config.NumberColumn(f"Cond ({px_cond:.0f}€)", min_value=0, step=1, default=1, width="small"),
+                "🧑‍💼 Chefs": st.column_config.NumberColumn(f"Chef ({px_chef:.0f}€)", min_value=0, step=1, default=0, width="small"),
+                "👷 Ouvriers": st.column_config.NumberColumn(f"Ouv ({px_ouvrier:.0f}€)", min_value=0, step=1, default=0, width="small")
+            }
+        )
+
+        st.markdown("### 🚜 --- TABLE DES ENGINS NÉCESSAIRES ---")
+        df_besoins_init = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "Type d'engin requis", "Niveau requis", "À louer ?"])
+        
+        engins_necessaires = st.data_editor(
+            st.session_state.get("table_engins_necessaires", df_besoins_init), num_rows="dynamic", use_container_width=True, key="table_engins_necessaires",
+            column_config={
+                "N° Étape": st.column_config.NumberColumn("N°", min_value=1, step=1, required=True, width="small"),
+                "Durée Étape (jours)": st.column_config.NumberColumn("Durée (jours)", min_value=1, step=1, required=True),
+                "Type d'engin requis": st.column_config.TextColumn("Type d'engin requis", disabled=True),
+                "Niveau requis": st.column_config.SelectboxColumn("Niveau requis", options=["N1", "N2", "N3", "N4"], required=True),
+                "À louer ?": st.column_config.CheckboxColumn("À louer ?", default=False)
+            }
+        )
+
+        engins_transferes_list = []
+        if engins_necessaires is not None and not engins_necessaires.empty and "À louer ?" in engins_necessaires.columns:
+            df_coches = engins_necessaires[engins_necessaires["À louer ?"] == True].dropna(subset=["Type d'engin requis"])
+            for _, row in df_coches.iterrows():
+                type_demande = str(row["Type d'engin requis"]).strip()
+                niveau_demande = str(row["Niveau requis"]).strip().lower()
+                duree_etape = int(row["Durée Étape (jours)"])
+                
+                def nettoyer_mots(texte):
+                    texte = texte.lower().replace("é", "e").replace("è", "e").replace("ê", "e").replace("à", "a")
+                    for char in ["'", "-", "/", "’"]: texte = texte.replace(char, " ")
+                    return [m for m in texte.split() if m not in ["pour", "de", "d", "un", "une", "le", "la", "les", "sur"]]
+
+                mots_cles_recherche = nettoyer_mots(type_demande)
+                modele_trouve, prix_trouve = None, 380.0
+                for engin_nom, prix in CATALOGUE_ENGINS.items():
+                    if niveau_demande in engin_nom.lower() and all(mot in nettoyer_mots(engin_nom) for mot in mots_cles_recherche):
+                        modele_trouve, prix_trouve = engin_nom, prix
+                        break
+                if not modele_trouve:
+                    for engin_nom, prix in CATALOGUE_ENGINS.items():
+                        if all(mot in nettoyer_mots(engin_nom) for mot in mots_cles_recherche):
+                            modele_trouve, prix_trouve = engin_nom, prix
+                            break
+                if not modele_trouve:
+                    modele_trouve = f"{type_demande} ({niveau_demande.upper()})"
+                    prix_trouve = 380.0
+                    
+                engins_transferes_list.append({
+                    "engin_modele": modele_trouve, "Quantité": 1, "Prix Location (€/jour)": prix_trouve, "Jours de Location": duree_etape
+                })
+
+        st.markdown("### 🚜 --- TABLE DES ENGINS À LOUER ---")
+        df_engins_init = pd.DataFrame(columns=["engin_modele", "Quantité", "Prix Location (€/jour)", "Jours de Location"])
+        if len(engins_transferes_list) > 0: df_engins_init = pd.DataFrame(engins_transferes_list)
+        
+        engins_edites = st.data_editor(
+            df_engins_init, num_rows="dynamic", use_container_width=True, key="table_engins_a_louer",
+            column_config={
+                "engin_modele": st.column_config.TextColumn("Engin & Modèle", disabled=True),
+                "Quantité": st.column_config.NumberColumn("Quantité", min_value=1, default=1, step=1),
+                "Prix Location (€/jour)": st.column_config.NumberColumn("Prix Location (€/jour)", min_value=0, step=10),
+                "Jours de Location": st.column_config.NumberColumn("Jours de Location", min_value=1, max_value=365, step=1)
+            }
+        )
+
+    # ==============================================================================
+    # --- CONSOLIDATION COMPTABLE ET CALCULS GLOBAUX ---
+    # ==============================================================================
+    jours_factures_jeu = math.ceil(jours_totaux)
+    total_mats_recap = float(total_mats_direct)
+
+    total_location_recap = 0.0
+    if engins_edites is not None and not engins_edites.empty:
+        df_propres_direct = engins_edites.dropna(subset=["engin_modele"])
+        total_location_recap = float((df_propres_direct["Quantité"] * df_propres_direct["Prix Location (€/jour)"] * df_propres_direct["Jours de Location"]).sum())
+
+    cout_cond, cout_chefs, cout_ouvriers = 0.0, 0.0, 0.0
+    total_jours_etapes = 0.0
+
+    if tableau_employes_etapes is not None and not tableau_employes_etapes.empty:
+        df_rh_propre = tableau_employes_etapes.dropna(subset=["N° Étape"])
+        total_jours_etapes = float(df_rh_propre["Durée Étape (jours)"].sum())
+        
+        for _, r_rh in df_rh_propre.iterrows():
+            duree_etape_reelle = float(r_rh.get("Durée Étape (jours)", 1.0))
+            c_count = float(r_rh.get("🕹️ Conducteurs", 0))
+            ch_count = float(r_rh.get("🧑‍💼 Chefs", 0))
+            o_count = float(r_rh.get("👷 Ouvriers", 0))
+            
+            d_cond = duree_etape_reelle if type_contrat_cond == "CDI" else float(math.ceil(duree_etape_reelle))
+            d_chef = duree_etape_reelle if type_contrat_chef == "CDI" else float(math.ceil(duree_etape_reelle))
+            d_ouv  = duree_etape_reelle if type_contrat_ouv  == "CDI" else float(math.ceil(duree_etape_reelle))
+            
+            cout_cond += c_count * d_cond * px_cond
+            cout_chefs += ch_count * d_chef * px_chef
+            cout_ouvriers += o_count * d_ouv * px_ouvrier
+
+    total_salaires_recap = float(cout_chefs + cout_ouvriers + cout_cond)
+    total_depenses_recap = float(total_mats_recap + total_location_recap + total_salaires_recap)
+    benefice_net_recap = float(revenus - total_depenses_recap)
+    roi_recap = float((benefice_net_recap / total_depenses_recap) * 100 if total_depenses_recap > 0 else 0)
+    
+    gain_par_jour_recap = float(benefice_net_recap / jours_totaux if jours_totaux > 0 else 0.0)
+    roi_par_jour_recap = float(roi_recap / jours_totaux if jours_totaux > 0 else roi_recap)
+
+    # Textes de l'interface
+    txt_mats = f"{total_mats_recap:,.0f}".replace(",", " ")
+    txt_loc = f"{total_location_recap:,.0f}".replace(",", " ")
+    txt_sal = f"{total_salaires_recap:,.0f}".replace(",", " ")
+    txt_depenses = f"{total_depenses_recap:,.0f}".replace(",", " ")
+    txt_gain_jour = f"{gain_par_jour_recap:,.0f}".replace(",", " ")
+    txt_gain_jour_abs = f"{abs(gain_par_jour_recap):,.0f}".replace(",", " ")
+    txt_benefice = f"{abs(benefice_net_recap):,.0f}".replace(",", " ")
+    txt_duree_precise = f"{jours_saisis}j {heures_saisies}h {minutes_saisies}m" if jours_totaux > 0 else "0j"
+    txt_duree_etapes = f"{total_jours_etapes:.1f} j"
+
+    # --- METRICS EN BAS ---
+    st.markdown("---")
+    st.markdown("### 📊 Récapitulatif Global Estimé (Règles du Jeu)")
+    c_rc1, c_rc2, c_rc3, c_rc4, c_rc5, c_rc6, c_rc7 = st.columns(7)
+    with c_rc1: st.metric(label="🧱 Total Matériaux", value=f"{txt_mats} €")
+    with c_rc2: st.metric(label="🚜 Total Location", value=f"{txt_loc} €")
+    with c_rc3: st.metric(label="👥 Total Salaires", value=f"{txt_sal} €")
+    with c_rc4: st.metric(label="📉 Dépenses Totales", value=f"{txt_depenses} €")
+    with c_rc5: st.metric(label="⏱️ Durée Générale", value=txt_duree_precise)
+    with c_rc6: st.metric(label="⚙️ Cumul Étapes", value=txt_duree_etapes)
+    with c_rc7: st.metric(label="📈 Gain / Jour", value=f"{txt_gain_jour} €/j")
+
+    # Vérification de la synchronisation du planning
+    planning_incoherent = abs(jours_totaux - total_jours_etapes) > 0.05
+
+    if planning_incoherent:
+        st.error(
+            f"⛔ **Enregistrement bloqué :** La durée générale du chantier (`{jours_totaux:.2f} jours`) "
+            f"ne correspond pas à la somme de vos étapes techniques (`{total_jours_etapes:.1f} jours`). "
+            f"Veuillez corriger la durée ou le tableau des étapes pour débloquer l'action."
+        )
+    else:
+        st.success("✅ **Planning Synchrone :** La durée globale concorde. L'enregistrement cloud est disponible.")
+
+    if benefice_net_recap >= 0: 
+        st.success(f"🟢 **Rentabilité positive :** Bénéfice de **{txt_benefice} €** (ROI Global : **{roi_recap:.2f} %**)")
+    else: 
+        st.error(f"🔴 **Chantier déficitaire :** Perte de **{txt_benefice} €** (ROI Global : **{roi_recap:.2f} %**)")
+
+    # Bouton de soumission sécurisé par l'état du planning
+    if st.button("LANCER LE CALCUL & ENREGISTRER", type="primary", use_container_width=True, disabled=planning_incoherent):
+        df_actuel = db.charger_donnees()
+        doublon_existe = False if df_actuel.empty else not df_actuel[(df_actuel["Nom du Chantier"] == nom_chantier) & (df_actuel["Revenus (€)"] == revenus)].empty
+        
+        if not nom_chantier: 
+            st.error("⚠️ Erreur : Saisissez un nom de chantier valide.")
+        elif doublon_existe: 
+            st.error(f"❌ Erreur NoSQL : Une fiche identique au nom de '{nom_chantier}' existe déjà.")
+        else:
+            st.session_state["temp_submit_data"] = {
+                "nom_chantier": nom_chantier, "revenus": revenus, "jours_saisis": jours_saisis,
+                "heures_saisies": heures_saisies, "minutes_saisies": minutes_saisies,
+                "jours_factures_jeu": jours_factures_jeu, "type_contrat_cond": type_contrat_cond,
+                "type_contrat_chef": type_contrat_chef, "type_contrat_ouv": type_contrat_ouv,
+                "cout_cond": cout_cond, "cout_chefs": cout_chefs, "cout_ouvriers": cout_ouvriers,
+                "txt_mats": txt_mats, "txt_loc": txt_loc, "txt_sal": txt_sal, "txt_depenses": txt_depenses,
+                "roi_recap": roi_recap, "txt_gain_jour": txt_gain_jour, "total_mats_recap": total_mats_recap,
+                "total_location_recap": total_location_recap, "total_salaires_recap": total_salaires_recap,
+                "total_depenses_recap": total_depenses_recap, "benefice_net_recap": benefice_net_recap,
+                "jours_totaux": jours_totaux, "gain_par_jour_recap": gain_par_jour_recap,
+                "roi_par_jour_recap": roi_par_jour_recap
+            }
+            st.rerun()
+
+    if "temp_submit_data" in st.session_state:
+        popup_confirmation_enregistrement()
