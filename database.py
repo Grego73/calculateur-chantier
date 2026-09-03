@@ -219,3 +219,16 @@ def charger_tous_les_achats_globaux():
             tous_achats.append(data)
             
     return tous_achats
+
+# À ajouter tout en bas de : database.py
+
+def lister_toutes_les_cooperatives():
+    """
+    Récupère la liste de tous les noms de coopératives enregistrées dans Firestore.
+    """
+    try:
+        coops_stream = db.collection("cooperatives").stream()
+        list_coops = [doc.id for doc in coops_stream]
+        return sorted(list_coops)
+    except Exception:
+        return []
