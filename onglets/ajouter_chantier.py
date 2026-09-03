@@ -50,7 +50,7 @@ def popup_confirmation_enregistrement():
     col_pop1, col_pop2 = st.columns(2)
     
     with col_pop1:
-        if st.button("✅ ACCEPTER & ENREGISTRER", type="primary", use_container_width=True):
+        if st.button("✅ ACCEPTER & ENREGISTRER", type="primary", width="stretch"):
             db.inserer_chantier(
                 inputs['nom_chantier'], inputs['revenus'], inputs['total_mats_recap'], 
                 inputs['total_location_recap'], inputs['total_salaires_recap'], 
@@ -64,7 +64,7 @@ def popup_confirmation_enregistrement():
             st.rerun()
             
     with col_pop2:
-        if st.button("❌ ANNULER & MODIFIER", use_container_width=True): 
+        if st.button("❌ ANNULER & MODIFIER", width="stretch"): 
             if "temp_submit_data" in st.session_state:
                 del st.session_state["temp_submit_data"]
             st.rerun()
@@ -143,7 +143,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                     "À louer ?": False
                 })
                 
-        # Injection des structures reconstruites dans les DataEditors de l'interface
+        # Injection des structures reconstruites sous forme de DataFrames Pandas
         st.session_state["table_employes_planification_etapes"] = pd.DataFrame(lignes_rh)
         st.session_state["table_engins_necessaires"] = pd.DataFrame(lignes_engins)
 
@@ -217,8 +217,16 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         st.markdown("**👥 Planification des Effectifs requis à l'Étape :**")
         df_rh_init = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "🕹️ Conducteurs", "🧑‍💼 Chefs", "👷 Ouvriers"])
 
+        # --- SÉCURISATION ET FORCE DU FORMAT DATAFRAME ANTI-CRASH ---
+        raw_rh_state = st.session_state.get("table_employes_planification_etapes", df_rh_init)
+        if not isinstance(raw_rh_state, pd.DataFrame):
+            try:
+                raw_rh_state = pd.DataFrame(raw_rh_state)
+            except Exception:
+                raw_rh_state = df_rh_init
+
         tableau_employes_etapes = st.data_editor(
-            st.session_state.get("table_employes_planification_etapes", df_rh_init), num_rows="dynamic", use_container_width=True, key="table_employes_planification_etapes",
+            raw_rh_state, num_rows="dynamic", use_container_width=True, key="table_employes_planification_etapes",
             column_config={
                 "N° Étape": st.column_config.NumberColumn("N°", min_value=1, step=1, required=True, width="small"),
                 "Durée Étape (jours)": st.column_config.NumberColumn("Jours", min_value=1, step=1, required=True, width="small"),
@@ -231,8 +239,15 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         st.markdown("### 🚜 --- TABLE DES ENGINS NÉCESSAIRES ---")
         df_besoins_init = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "Type d'engin requis", "Niveau requis", "À louer ?"])
         
+        raw_engins_state = st.session_state.get("table_engins_necessaires", df_besoins_init)
+        if not isinstance(raw_engins_state, pd.DataFrame):
+            try:
+                raw_engins_state = pd.DataFrame(raw_engins_state)
+            except Exception:
+                raw_engins_state = df_besoins_init
+
         engins_necessaires = st.data_editor(
-            st.session_state.get("table_engins_necessaires", df_besoins_init), num_rows="dynamic", use_container_width=True, key="table_engins_necessaires",
+            raw_engins_state, num_rows="dynamic", use_container_width=True, key="table_engins_necessaires",
             column_config={
                 "N° Étape": st.column_config.NumberColumn("N°", min_value=1, step=1, required=True, width="small"),
                 "Durée Étape (jours)": st.column_config.NumberColumn("Durée (jours)", min_value=1, step=1, required=True),
