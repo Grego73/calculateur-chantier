@@ -113,7 +113,7 @@ def afficher_onglet_historique():
 
     # 6. SECTION 5 : TABLEAU INTERACTIF DES DONNÉES CLOUD
     st.markdown(f"### 📋 Liste des chantiers filtrés ({len(df_affichage)} affiché(s))")
- st.dataframe(
+     st.dataframe(
             df_affichage, use_container_width=True, hide_index=True,
             column_config={
                 "Nom du Chantier": st.column_config.TextColumn("Nom du Chantier"), # <-- Retrait de pin_to_left=True
