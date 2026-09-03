@@ -1,4 +1,4 @@
-# Contenu complet, sécurisé et entièrement corrigé pour : onglets/suivi_interne.py
+# Contenu complet, sécurisé et mis à jour pour : onglets/suivi_interne.py
 
 import streamlit as st
 import pandas as pd
@@ -15,17 +15,14 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
 
     # Si l'utilisateur n'est pas connecté, on affiche STRICTEMENT le panneau de connexion
     if st.session_state["auth_suivi_coop"] is None:
-        # Récupération dynamique de la liste des coops enregistrées sur Firebase
         coops_enregistrees = db.lister_toutes_les_cooperatives()
         options_coop = ["-- Choisir une coopérative existante --"] + coops_enregistrees + ["➕ Créer une nouvelle coopérative..."]
 
         with st.form("form_auth_coop_joueur"):
             st.markdown("#### 🔒 Authentification Équipe & Enregistrement Joueur")
             
-            # Liste déroulante des coopératives
             coop_selection = st.selectbox("Sélectionner votre Coopérative :", options_coop)
             
-            # Champ texte secret qui s'affiche si on souhaite créer une coopérative
             nom_coop_finale = ""
             if coop_selection == "➕ Créer une nouvelle coopérative...":
                 nom_coop_finale = st.text_input("Saisissez le NOM de la nouvelle Coopérative (Ex: Delta_BTP) :").strip()
@@ -45,7 +42,6 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
                 elif not mdp_input or not pseudo_input:
                     st.error("⚠️ Le mot de passe et le pseudo sont obligatoires.")
                 else:
-                    # Traitement de validation NoSQL (avec blocage strict à 4 joueurs max)
                     succes, message = db.verifier_et_inscrire_joueur(nom_coop_finale, mdp_input, pseudo_input)
                     if succes:
                         st.session_state["auth_suivi_coop"] = nom_coop_finale
@@ -55,7 +51,7 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
                         st.rerun()
                     else:
                         st.error(message)
-        return  # Bloque le reste de la page tant que la connexion n'est pas validée
+        return
 
     # ==============================================================================
     # --- INTERFACE ACTIVE APRÈS CONNEXION RÉUSSIE ---
@@ -63,7 +59,6 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
     nom_coop_active = st.session_state["auth_suivi_coop"]
     joueur_actif = st.session_state["auth_suivi_joueur"]
 
-    # CORRECTION DU TYPEERROR ICI : Ajout de l'argument (2) pour spécifier 2 colonnes
     c_head1, c_head2 = st.columns(2)
     with c_head1:
         st.success(f"🔓 Coopérative active : **{nom_coop_active}** | Session Joueur : **{joueur_actif}**")
@@ -75,10 +70,12 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
 
     st.markdown("---")
 
-    tab_coop_interne, tab_joueurs_externes, tab_depot_flux = st.tabs([
+    # Ajout du 4ème sous-onglet pour la gestion des collaborateurs
+    tab_coop_interne, tab_joueurs_externes, tab_depot_flux, tab_gestion_membres = st.tabs([
         "🏆 1. Parts & Bénéfices de la Coop (Max 4)", 
         "🌍 2. Marché Global & Matériau Favori",
-        "📥 Déposer un Flux (Apport / Réappro / Achat)"
+        "📥 Déposer un Flux (Apport / Réappro / Achat)",
+        "⚙️ Gérer les Collaborateurs"
     ])
 
     # --- TABLEAU 1 : LES 4 MEMBRES MAXIMUM ---
@@ -185,7 +182,6 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
     # --- SOUS-ONGLET DE DÉPÔT ---
     with tab_depot_flux:
         st.markdown("#### 📥 Alimenter le Grand Livre Comptable")
-        # CORRECTION DU TYPEERROR ICI AUSSI : Spécification explicite des 2 colonnes
         c_fl1, c_fl2 = st.columns(2)
         with c_fl1:
             type_mouv_choisi = st.selectbox("Nature de votre flux :", ["APPORT_INITIAL", "REAPPROVISIONNEMENT", "ACHAT_INTERNE"])
@@ -225,3 +221,37 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
                 st.rerun()
             else:
                 st.error("❌ Analyse impossible : Saisissez des données valides.")
+
+    # ==============================================================================
+    # --- 4. SOUS-ONGLET : GESTION TECHNIQUE DES INVITATIONS / AJOUTS DE MEMBRES ---
+    # ==============================================================================
+    with tab_gestion_membres:
+        st.markdown("#### ⚙️ Panneau de Recrutement & Réservation des Places")
+        st.write("Ajoutez manuellement les pseudos de vos 4 collaborateurs pour leur bloquer l'accès à la coopérative.")
+        
+        # Affichage des membres qui occupent actuellement les slots NoSQL
+        slots_occupes = len(membres_inscrits)
+        st.info(f"📊 **Occupation de la Coopérative :** `{slots_occupes} / 4` places verrouillées.")
+        
+        st.markdown("**Collaborateurs actuellement enregistrés :**")
+        for idx_m, mb in enumerate(membres_inscrits):
+            st.write(f"{idx_m + 1}. 👤 **{mb}**")
+            
+        st.markdown("---")
+        if slots_occupes < 4:
+            st.markdown("##### ➕ Ajouter un collaborateur à la liste")
+            pseudo_manuel = st.text_input("Saisissez le pseudo exact du joueur à inviter :", value="").strip()
+            
+            if st.button("📝 VALIDER ET INSCRIRE LE COLLABORATEUR", type="primary", width="stretch"):
+                if not pseudo_manuel:
+                    st.error("⚠️ Saisissez un pseudo valide.")
+                else:
+                    # Envoi de l'inscription forcée vers Firestore via la fonction dédiée
+                    statut_ins, msg_ins = db.ajouter_membre_manuel_coop(nom_coop_active, pseudo_manuel)
+                    if statut_ins:
+                        st.success(msg_ins)
+                        st.rerun()
+                    else:
+                        st.error(msg_ins)
+        else:
+            st.warning("🚫 Votre équipe est complète (4/4). Vous ne pouvez plus ajouter de collaborateurs.")
