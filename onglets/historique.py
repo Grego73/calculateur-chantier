@@ -7,7 +7,7 @@ import database as db  # Connexion aux fonctions de lecture Firebase
 def afficher_onglet_historique():
     st.subheader("📊 Tableau de Bord & Historique Cloud des Chantiers")
     
-    # 1. Récupération des données depuis Firebase
+    # 1. Récupération sécurisée des données depuis Firebase
     df_brut = db.charger_donnees()
     
     if df_brut.empty: 
@@ -16,19 +16,35 @@ def afficher_onglet_historique():
 
     df_affichage = df_brut.copy()
 
+    # Nettoyage préventif des structures de données asynchrones
+    if "etapes_techniques" in df_affichage.columns:
+        df_affichage = df_affichage.drop(columns=["etapes_techniques"])
+    if "engins_requis" in df_affichage.columns:
+        df_affichage = df_affichage.drop(columns=["engins_requis"])
+
+    # Double vérification de la présence des colonnes indispensables
+    colonnes_essentielles = ["Nom du Chantier", "Revenus (€)", "Durée (Jours)", "Bénéfice Net (€)", "ROI / Jour (%)"]
+    for col in colonnes_essentielles:
+        if col not in df_affichage.columns:
+            df_affichage[col] = 0.0 if col != "Nom du Chantier" else "Chantier Inconnu"
+
     # 2. SECTION 1 : KPI ET STATISTIQUES GLOBALES D'ENTREPRISE
     st.markdown("### 📈 Indicateurs clés de Performance (KPI)")
     
     total_projets = len(df_affichage)
     somme_revenus = float(df_affichage["Revenus (€)"].sum())
-    somme_depenses = float(df_affichage["Dépenses Totales (€)"].sum())
+    somme_depenses = float(df_affichage["Dépenses Totales (€)"].sum()) if "Dépenses Totales (€)" in df_affichage.columns else 0.0
     somme_benefices = float(df_affichage["Bénéfice Net (€)"].sum())
     moyenne_roi_jour = float(df_affichage["ROI / Jour (%)"].mean())
     
-    # Identification du meilleur chantier
-    meilleur_chantier_row = df_affichage.loc[df_affichage["Bénéfice Net (€)"].idxmax()]
-    nom_top_chantier = meilleur_chantier_row["Nom du Chantier"]
-    val_top_chantier = meilleur_chantier_row["Bénéfice Net (€)"]
+    # Identification sécurisée du meilleur chantier
+    try:
+        meilleur_chantier_row = df_affichage.loc[df_affichage["Bénéfice Net (€)"].idxmax()]
+        nom_top_chantier = meilleur_chantier_row["Nom du Chantier"]
+        val_top_chantier = meilleur_chantier_row["Bénéfice Net (€)"]
+    except Exception:
+        nom_top_chantier = "Aucun"
+        val_top_chantier = 0.0
 
     c1, c2, c3, c4 = st.columns(4)
     with c1: 
@@ -72,13 +88,13 @@ def afficher_onglet_historique():
         df_affichage = df_affichage[df_affichage["Bénéfice Net (€)"] < 0]
 
     # Application du tri des données
-    if critere_tri == "Plus gros Bénéfice d'abord": 
+    if critere_tri == "Plus gros Bénéfice d'abord" and "Bénéfice Net (€)" in df_affichage.columns: 
         df_affichage = df_affichage.sort_values(by="Bénéfice Net (€)", ascending=False)
-    elif critere_tri == "Plus gros ROI d'abord": 
+    elif critere_tri == "Plus gros ROI d'abord" and "ROI (%)" in df_affichage.columns: 
         df_affichage = df_affichage.sort_values(by="ROI (%)", ascending=False)
-    elif critere_tri == "Plus de revenus d'abord": 
+    elif critere_tri == "Plus de revenus d'abord" and "Revenus (€)" in df_affichage.columns: 
         df_affichage = df_affichage.sort_values(by="Revenus (€)", ascending=False)
-    elif critere_tri == "Durée la plus courte":
+    elif critere_tri == "Durée la plus courte" and "Durée (Jours)" in df_affichage.columns: 
         df_affichage = df_affichage.sort_values(by="Durée (Jours)", ascending=True)
 
     # Si le filtre élimine tous les chantiers
@@ -116,7 +132,7 @@ def afficher_onglet_historique():
     st.markdown(f"### 📋 Liste des chantiers filtrés ({len(df_affichage)} affiché(s))")
     
     st.dataframe(
-        df_affichage, use_container_width=True, hide_index=True,
+        df_affichage, hide_index=True, width="stretch",
         column_config={
             "Nom du Chantier": st.column_config.TextColumn("Nom du Chantier"), 
             "Revenus (€)": st.column_config.NumberColumn("Revenus", format="%.0f €"), 
@@ -141,5 +157,5 @@ def afficher_onglet_historique():
         data=csv, 
         file_name="historique_chantiers_filtres.csv", 
         mime="text/csv",
-        use_container_width=True
+        width="stretch"
     )
