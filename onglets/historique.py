@@ -113,23 +113,23 @@ def afficher_onglet_historique():
 
     # 6. SECTION 5 : TABLEAU INTERACTIF DES DONNÉES CLOUD
     st.markdown(f"### 📋 Liste des chantiers filtrés ({len(df_affichage)} affiché(s))")
-    st.dataframe(
-        df_affichage, use_container_width=True, hide_index=True,
-        column_config={
-            "Nom du Chantier": st.column_config.TextColumn("Nom du Chantier", pin_to_left=True), 
-            "Revenus (€)": st.column_config.NumberColumn("Revenus", format="%.0f €"), 
-            "Durée (Jours)": st.column_config.NumberColumn("Durée", format="%.2f j"),
-            "Coût Matériaux (€)": st.column_config.NumberColumn("Matériaux", format="%.0f €"), 
-            "Coût Location Engins (€)": st.column_config.NumberColumn("Location Engins", format="%.0f €"), 
-            "Coût Salaires (€)": st.column_config.NumberColumn("Salaires + Intérim", format="%.0f €"),
-            "Dépenses Totales (€)": st.column_config.NumberColumn("Dépenses Totales", format="%.0f €"), 
-            "Bénéfice Net (€)": st.column_config.NumberColumn("Bénéfice Net", format="%.0f €"), 
-            "Gain / Jour (€)": st.column_config.NumberColumn("Gain / Jour", format="%.0f €/j"),
-            "ROI (%)": st.column_config.NumberColumn("ROI (%)", format="%.2f %%"), 
-            "ROI / Jour (%)": st.column_config.NumberColumn("ROI / Jour", format="%.2f %%/j"), 
-            "Comparaison Moyenne Enterprise": st.column_config.TextColumn("Performance relative")
-        }
-    )
+ st.dataframe(
+            df_affichage, use_container_width=True, hide_index=True,
+            column_config={
+                "Nom du Chantier": st.column_config.TextColumn("Nom du Chantier"), # <-- Retrait de pin_to_left=True
+                "Revenus (€)": st.column_config.NumberColumn("Revenus", format="%.0f €"), 
+                "Durée (Jours)": st.column_config.NumberColumn("Durée", format="%.2f j"),
+                "Coût Matériaux (€)": st.column_config.NumberColumn("Matériaux", format="%.0f €"), 
+                "Coût Location Engins (€)": st.column_config.NumberColumn("Location Engins", format="%.0f €"), 
+                "Coût Salaires (€)": st.column_config.NumberColumn("Salaires + Intérim", format="%.0f €"),
+                "Dépenses Totales (€)": st.column_config.NumberColumn("Dépenses Totales", format="%.0f €"), 
+                "Bénéfice Net (€)": st.column_config.NumberColumn("Bénéfice Net", format="%.0f €"), 
+                "Gain / Jour (€)": st.column_config.NumberColumn("Gain / Jour", format="%.0f €/j"),
+                "ROI (%)": st.column_config.NumberColumn("ROI (%)", format="%.2f %%"), 
+                "ROI / Jour (%)": st.column_config.NumberColumn("ROI / Jour", format="%.2f %%/j"), 
+                "Comparaison Moyenne Enterprise": st.column_config.TextColumn("Performance relative")
+            }
+        )
     
     # 7. EXPORTATION EXTRACTIBLE
     st.markdown("<br>", unsafe_allow_html=True)
