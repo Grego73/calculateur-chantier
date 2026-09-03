@@ -388,15 +388,17 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
     with c_rc7: st.metric(label="📈 Gain / Jour", value=f"{txt_gain_jour} €/j")
 
     # --- ALERTE OU VALIDATION COHÉRENCE DU PLANNING ---
-    # On tolère un micro-écart (ex: 0.01) lié aux conversions d'heures/minutes en float
-    if abs(jours_totaux - total_jours_etapes) > 0.05:
-        st.warning(
-            f"⚠️ **Attention - Écart de Planification :** La durée générale du chantier (`{jours_totaux:.2f} jours`) "
+    # On tolère un micro-écart (0.05) lié aux conversions de minutes/heures en float
+    planning_incoherent = abs(jours_totaux - total_jours_etapes) > 0.05
+
+    if planning_incoherent:
+        st.error(
+            f"⛔ **Enregistrement bloqué :** La durée générale du chantier (`{jours_totaux:.2f} jours`) "
             f"ne correspond pas à la somme de vos étapes techniques (`{total_jours_etapes:.1f} jours`). "
-            f"Veuillez réajuster vos saisies pour éviter des calculs de rentabilité faussés."
+            f"Veuillez corriger la durée en haut à gauche ou ajuster le tableau des étapes pour débloquer l'action."
         )
     else:
-        st.success("✅ **Planning Synchrone :** La durée globale concorde parfaitement avec l'enchaînement de vos étapes.")
+        st.success("✅ **Planning Synchrone :** La durée globale concorde. L'enregistrement sur le Cloud est disponible.")
 
     # --- BADGES DE RENTABILITÉ DYNAMIQUE ---
     if benefice_net_recap >= 0: 
@@ -404,8 +406,9 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
     else: 
         st.error(f"🔴 **Chantier déficitaire :** Perte de **{txt_benefice} €** soit **{txt_gain_jour_abs} € / jour** sur **{txt_duree_precise}** (ROI Global : **{roi_recap:.2f} %**)")
 
-    # --- BOUTON DE SOUMISSION PRINCIPAL AVEC SÉCURISATION DU STATE ---
-    if st.button("LANCER LE CALCUL & ENREGISTRER", type="primary", use_container_width=True):
+    # --- BOUTON DE SOUMISSION SÉCURISÉ ET CONDITIONNEL ---
+    # Le paramètre disabled=planning_incoherent gère le blocage natif du composant Streamlit
+    if st.button("LANCER LE CALCUL & ENREGISTRER", type="primary", use_container_width=True, disabled=planning_incoherent):
         df_actuel = db.charger_donnees()
         doublon_existe = False if df_actuel.empty else not df_actuel[(df_actuel["Nom du Chantier"] == nom_chantier) & (df_actuel["Revenus (€)"] == revenus)].empty
         
