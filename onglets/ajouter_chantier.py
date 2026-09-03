@@ -92,31 +92,63 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
             return
             
         modele = CATALOGUE_CHANTIERS[selection]
+        etapes_cloud = modele.get("etapes_techniques", [])
         
-        if "table_engins_necessaires" in st.session_state: del st.session_state["table_engins_necessaires"]
-        if "table_engins_a_louer" in st.session_state: del st.session_state["table_engins_a_louer"]
-        if "table_employes_planification_etapes" in st.session_state: del st.session_state["table_employes_planification_etapes"]
+        # Nettoyage forcé des anciens états de session pour éviter les mélanges
+        for k in ["table_engins_necessaires", "table_engins_a_louer", "table_employes_planification_etapes"]:
+            if k in st.session_state: 
+                del st.session_state[k]
             
+        # 1. Paramètres globaux temporels et financiers
         st.session_state["val_revenus"] = float(modele.get("revenus", 0.0))
-        st.session_state["val_jours"] = int(modele.get("jours", 0))
-        st.session_state["val_sable"] = float(modele.get("sable", 0.0))
-        st.session_state["val_terre"] = float(modele.get("terre", 0.0))
-        st.session_state["val_enrobe"] = float(modele.get("enrobe", 0.0))
-        st.session_state["val_armature"] = float(modele.get("armature", 0.0))
-        st.session_state["val_tole"] = float(modele.get("tole", 0.0))
-        st.session_state["val_beton"] = float(modele.get("beton", 0.0))
-        st.session_state["val_panneaux"] = float(modele.get("panneaux", 0.0))
-        st.session_state["val_tuyaux"] = float(modele.get("tuyaux", 0.0))
-        st.session_state["val_canalisations"] = float(modele.get("canalisations", 0.0))
-        st.session_state["val_poutres"] = float(modele.get("poutres", 0.0))
+        st.session_state["val_jours"] = int(modele.get("jours_globaux", 0))
         
-        st.session_state["val_jh_cond"] = float(modele.get("jh_cond", 0.0))
-        st.session_state["val_jh_chef"] = float(modele.get("jh_chef", 0.0))
-        st.session_state["val_jh_ouvrier"] = float(modele.get("jh_ouvrier", 0.0))
+        # 2. Initialisation des compteurs de matériaux globaux pour l'approvisionnement
+        liste_mats_cles = ["sable","terre","enrobe","armature","tole","beton","panneaux","tuyaux","canalisations","poutres"]
+        for mat in liste_mats_cles:
+            st.session_state[f"val_{mat}"] = 0.0
+            
+        lignes_rh = []
+        lignes_engins = []
+        
+        # 3. Extraction et dispatching des données de chaque étape
+        for etape in etapes_cloud:
+            num_e = etape.get("num_etape", 1)
+            duree_j = etape.get("duree_jours", 1)
+            
+            # Cumul des volumes de matériaux de l'étape vers le total du chantier
+            mats_etape = etape.get("materiaux", {})
+            for mat_nom, qte in mats_etape.items():
+                if mat_nom in liste_mats_cles:
+                    st.session_state[f"val_{mat_nom}"] += float(qte)
+                    
+            # Reconstitution des lignes pour le tableau des Employés (RH)
+            lignes_rh.append({
+                "N° Étape": int(num_e),
+                "Durée Étape (jours)": int(duree_j),
+                "🕹️ Conducteurs": int(etape.get("jh_cond", 0)),
+                "🧑‍💼 Chefs": int(etape.get("jh_chef", 0)),
+                "👷 Ouvriers": int(etape.get("jh_ouvrier", 0))
+            })
+            
+            # Reconstitution des lignes pour le tableau des Engins requis
+            engins_etape = etape.get("engins", [])
+            for engin in engins_etape:
+                lignes_engins.append({
+                    "N° Étape": int(num_e),
+                    "Durée Étape (jours)": int(duree_j),
+                    "Type d'engin requis": engin.get("type", "Autre"),
+                    "Niveau requis": engin.get("niveau", "N1"),
+                    "À louer ?": False
+                })
+                
+        # 4. Injection des structures reconstruites dans les DataEditors de l'interface
+        st.session_state["table_employes_planification_etapes"] = pd.DataFrame(lignes_rh)
+        st.session_state["table_engins_necessaires"] = pd.DataFrame(lignes_engins)
 
     chantier_selectionne = st.selectbox(
         "🚀 Sélectionner un modèle de chantier dynamique :", 
-        liste_triee, key="select_modele_chantier_dynamique", on_change=mise_a_jour_cache_modele
+        liste_triee, key="select_modele_chantier_dynamique", on_change=_cache_modele
     )
     
     valeur_nom_defaut = "" if chantier_selectionne == "Choisir un chantier pré-configuré..." else chantier_selectionne
