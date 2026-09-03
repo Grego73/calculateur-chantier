@@ -471,8 +471,9 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                     del nouvelle_grille[cle_technique]
                             
                             # Mise à jour sur Firebase Firestore
-                            db.db.collection("configuration_salaires").document("grille").set(nouvelle_grille)                            
-                            # Journalisation de l'action (Optionnel mais recommandé pour votre sub_tab9)
+                            db.db.collection("configuration_salaires").document("grille").set(nouvelle_grille)
+                            
+                            # Journalisation de l'action (Optionnel)
                             try:
                                 timestamp_paris = datetime.datetime.now(pytz.timezone('Europe/Paris')).strftime("%Y-%m-%d %H:%M:%S")
                                 db.db.collection("journaux_actions").add({
@@ -487,6 +488,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             st.cache_data.clear()
                             st.toast("🔥 Entrées salariales supprimées avec succès !")
                             st.rerun()
+
 
         # ==============================================================================
         # --- sub_tab3 : PRIX DES MATÉRIAUX ---
