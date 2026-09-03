@@ -1,4 +1,4 @@
-# Contenu complet, sécurisé et corrigé pour : onglets/suivi_interne.py
+# Contenu complet, sécurisé et entièrement corrigé pour : onglets/suivi_interne.py
 
 import streamlit as st
 import pandas as pd
@@ -63,8 +63,8 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
     nom_coop_active = st.session_state["auth_suivi_coop"]
     joueur_actif = st.session_state["auth_suivi_joueur"]
 
-    # Bandeau supérieur d'authentification
-    c_head1, c_head2 = st.columns()
+    # CORRECTION DU TYPEERROR ICI : Ajout de l'argument (2) pour spécifier 2 colonnes
+    c_head1, c_head2 = st.columns(2)
     with c_head1:
         st.success(f"🔓 Coopérative active : **{nom_coop_active}** | Session Joueur : **{joueur_actif}**")
     with c_head2:
@@ -115,7 +115,6 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
             df_coop = pd.DataFrame.from_dict(compta_membres, orient='index')
             investissement_global_coop = df_coop["Total Investi Valorisé"].sum()
             
-            # RECORRECTION DU NAMEERROR (Attribution à la bonne variable ordonnée)
             if investissement_global_coop > 0:
                 df_coop["Quote-part Bénéfice (%)"] = (df_coop["Total Investi Valorisé"] / investissement_global_coop) * 100
             else:
@@ -186,6 +185,7 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
     # --- SOUS-ONGLET DE DÉPÔT ---
     with tab_depot_flux:
         st.markdown("#### 📥 Alimenter le Grand Livre Comptable")
+        # CORRECTION DU TYPEERROR ICI AUSSI : Spécification explicite des 2 colonnes
         c_fl1, c_fl2 = st.columns(2)
         with c_fl1:
             type_mouv_choisi = st.selectbox("Nature de votre flux :", ["APPORT_INITIAL", "REAPPROVISIONNEMENT", "ACHAT_INTERNE"])
