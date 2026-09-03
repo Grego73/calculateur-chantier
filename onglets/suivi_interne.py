@@ -217,3 +217,15 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
             else:
                 st.error("❌ Analyse impossible : Saisissez un montant financier ou collez des lignes de matériaux identifiables.")
 
+# À ajouter tout en bas de : database.py
+
+def lister_toutes_les_cooperatives():
+    """
+    Récupère la liste de tous les noms de coopératives enregistrées dans Firestore.
+    """
+    try:
+        coops_stream = db.collection("cooperatives").stream()
+        list_coops = [doc.id for doc in coops_stream]
+        return sorted(list_coops)
+    except Exception:
+        return []
