@@ -425,7 +425,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             st.error(f"❌ Aucun nouveau modèle : Les {compteur_doublons_bloques} chantiers soumis existent déjà.")
                         else:
                             st.error("❌ L'algorithme n'a pas réussi à extraire de fiches de chantiers valides dans votre texte brut.")
-==========================================================
+        # ==============================================================================
         # --- sub_tab2 : CONFIGURATION GRILLE SALARIALE ---
         # ==============================================================================
         with sub_tab2:
