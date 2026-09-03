@@ -343,7 +343,9 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
             jh_chef += ch_count * duree_etape_reelle
             jh_ouvrier += o_count * duree_etape_reelle
 
-    # --- CALCULS SYNTHÉTIQUES GLOBAUX ---
+    # ==============================================================================
+    # --- CALCULS SYNTHÉTIQUES GLOBAUX & COMPARAISON TEMPS VS ÉTAPES ---
+    # ==============================================================================
     total_salaires_recap = float(cout_chefs + cout_ouvriers + cout_cond)
     total_depenses_recap = float(total_mats_recap + total_location_recap + total_salaires_recap)
     benefice_net_recap = float(revenus - total_depenses_recap)
@@ -351,6 +353,12 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
     
     gain_par_jour_recap = float(benefice_net_recap / jours_totaux if jours_totaux > 0 else 0.0)
     roi_par_jour_recap = float(roi_recap / jours_totaux if jours_totaux > 0 else roi_recap)
+
+    # --- CALCUL DE LA DURÉE CUMULÉE DES ÉTAPES TECHNIQUES ---
+    total_jours_etapes = 0.0
+    if tableau_employes_etapes is not None and not tableau_employes_etapes.empty:
+        df_rh_propre = tableau_employes_etapes.dropna(subset=["N° Étape"])
+        total_jours_etapes = float(df_rh_propre["Durée Étape (jours)"].sum())
 
     # --- FORMATTAGE DES TEXTES DE L'INTERFACE ---
     txt_mats = f"{total_mats_recap:,.0f}".replace(",", " ")
@@ -362,18 +370,33 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
     txt_gain_jour_abs = f"{abs(gain_par_jour_recap):,.0f}".replace(",", " ")
     
     txt_benefice = f"{abs(benefice_net_recap):,.0f}".replace(",", " ")
-    txt_duree_precise = f"{int(jours_totaux)} jours" if jours_totaux >= 1 else f"{heures_saisies}h {minutes_saisies}m"
+    txt_duree_precise = f"{jours_saisis}j {heures_saisies}h {minutes_saisies}m" if jours_totaux > 0 else "0j"
+    txt_duree_etapes = f"{total_jours_etapes:.1f} j"
 
     # --- PANNEAU DE RECAPITULATIF (METRICS & CARDS) ---
     st.markdown("---")
     st.markdown("### 📊 Récapitulatif Global Estimé (Règles du Jeu)")
-    c_rc1, c_rc2, c_rc3, c_rc4, c_rc5, c_rc6 = st.columns(6)
+    
+    # Passage à 7 colonnes pour intégrer le suivi des étapes
+    c_rc1, c_rc2, c_rc3, c_rc4, c_rc5, c_rc6, c_rc7 = st.columns(7)
     with c_rc1: st.metric(label="🧱 Total Matériaux", value=f"{txt_mats} €")
     with c_rc2: st.metric(label="🚜 Total Location", value=f"{txt_loc} €")
     with c_rc3: st.metric(label="👥 Total Salaires (RH)", value=f"{txt_sal} €")
     with c_rc4: st.metric(label="📉 Dépenses Totales", value=f"{txt_depenses} €")
-    with c_rc5: st.metric(label="⏱️ Durée du Projet", value=txt_duree_precise)
-    with c_rc6: st.metric(label="📈 Gain / Jour", value=f"{txt_gain_jour} €/j")
+    with c_rc5: st.metric(label="⏱️ Durée Générale", value=txt_duree_precise)
+    with c_rc6: st.metric(label="⚙️ Cumul Étapes", value=txt_duree_etapes)
+    with c_rc7: st.metric(label="📈 Gain / Jour", value=f"{txt_gain_jour} €/j")
+
+    # --- ALERTE OU VALIDATION COHÉRENCE DU PLANNING ---
+    # On tolère un micro-écart (ex: 0.01) lié aux conversions d'heures/minutes en float
+    if abs(jours_totaux - total_jours_etapes) > 0.05:
+        st.warning(
+            f"⚠️ **Attention - Écart de Planification :** La durée générale du chantier (`{jours_totaux:.2f} jours`) "
+            f"ne correspond pas à la somme de vos étapes techniques (`{total_jours_etapes:.1f} jours`). "
+            f"Veuillez réajuster vos saisies pour éviter des calculs de rentabilité faussés."
+        )
+    else:
+        st.success("✅ **Planning Synchrone :** La durée globale concorde parfaitement avec l'enchaînement de vos étapes.")
 
     # --- BADGES DE RENTABILITÉ DYNAMIQUE ---
     if benefice_net_recap >= 0: 
@@ -411,3 +434,4 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
     # --- MONITORAGE DU STATE POUR L'OUVERTURE DU POPUP ---
     if "temp_submit_data" in st.session_state:
         popup_confirmation_enregistrement()
+
