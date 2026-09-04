@@ -649,14 +649,33 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                     coops_liste = db.lister_toutes_les_cooperatives()
                                     compteur_global = 0
                                     
-                                    for _, r_del in lignes_a_effacer.iterrows():
-                                        id_cible = r_del["ID_Document_Firestore"]
+                                    for _, row_del in lignes_a_effacer.iterrows():
+                                        id_cible = row_del["ID_Document_Firestore"]
+                                        joueur_cible = row_del["joueur"]
+                                        
                                         if id_cible:
                                             for cp in coops_liste:
                                                 try:
-                                                    doc_ref = db.db.collection("cooperatives").document(cp).collection("comptabilite_interne").document(id_cible)
-                                                    if doc_ref.get().exists:
-                                                        doc_ref.delete()
+                                                    # 1. Tentative d'effacement dans le Grand Livre classique (Flux Matériaux)
+                                                    doc_ref_flux = db.db.collection("cooperatives").document(cp).collection("comptabilite_interne").document(id_cible)
+                                                    if doc_ref_flux.get().exists:
+                                                        doc_ref_flux.delete()
+                                                        compteur_global += 1
+                                                        break
+                                                    
+                                                    # 2. Tentative alternative dans le Capital de Base (Flux Cash / Cap. Initial)
+                                                    # L'ID Firestore de la table capital_initial est généralement structuré sous la forme "capital_PSEUDO"
+                                                    id_capital_secours = f"capital_{joueur_cible}"
+                                                    doc_ref_cap = db.db.collection("cooperatives").document(cp).collection("capital_initial").document(id_capital_secours)
+                                                    if doc_ref_cap.get().exists:
+                                                        doc_ref_cap.delete()
+                                                        compteur_global += 1
+                                                        break
+                                                        
+                                                    # 3. Tentative alternative si l'ID direct reinvest_... a été inséré dans capital_initial
+                                                    doc_ref_cap_alt = db.db.collection("cooperatives").document(cp).collection("capital_initial").document(id_cible)
+                                                    if doc_ref_cap_alt.get().exists:
+                                                        doc_ref_cap_alt.delete()
                                                         compteur_global += 1
                                                         break
                                                 except Exception:
@@ -665,6 +684,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                     st.success(f"🔥 Nettoyage réussi : {compteur_global} transaction(s) effacée(s).")
                                     st.cache_data.clear()
                                     st.rerun()
+
                     except Exception as e:
                         st.error(f"Erreur d'indexation ou de structure : {e}")
                 else:
