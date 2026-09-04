@@ -546,10 +546,9 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             ts = row.get("timestamp", "")
                             
                             # Si c'est un apport en argent et que les dates de jeu n'existent pas, on extrait du timestamp
-                            if (not d_txt or d_txt == "None") and ts and ("CASH" in t_mouv or "INITIAL" in t_mouv):
+                            if (not d_txt or d_txt == "None" or pd.isna(d_txt)) and ts and ("CASH" in t_mouv or "INITIAL" in t_mouv):
                                 try:
-                                    # Le timestamp est au format "AAAA-MM-JJ HH:MM:SS"
-                                    p_date, p_heure = ts.split(" ")
+                                    p_date, p_heure = str(ts).split(" ")
                                     aa, mm, jj = p_date.split("-")
                                     row["date_jeu"] = f"{jj}/{mm}/{aa}"
                                     row["heure_jeu"] = p_heure[:5]
@@ -562,17 +561,15 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             dict_mats = row.get("materiaux", {})
                             
                             try:
-                                # Pour les apports financiers purs, l'ID Firestore se base sur le timestamp ou pseudo
                                 if "CASH" in t_mouv or "INITIAL" in t_mouv:
-                                    # Format historique ou unique des apports
-                                    ts_cle = ts.replace("-","").replace(":","").replace(" ","_")
+                                    ts_cle = str(ts).replace("-","").replace(":","").replace(" ","_")
                                     return f"reinvest_{ts_cle}_{act_txt.lower().strip()}"
                                 
                                 date_cle = "".join(reversed(d_txt.split("/")))
                                 heure_cle = h_txt.replace(":", "")
                                 mat_nom = "_".join(list(dict_mats.keys())).lower().strip()
-                                acteur_cle = act_txt.lower().strip().replace(" ", "_")
-                                return f"log_{date_cle}_{heure_cle}_{acteur_cle}_{mat_nom}"
+                                actor_cle = act_txt.lower().strip().replace(" ", "_")
+                                return f"log_{date_cle}_{heure_cle}_{actor_cle}_{mat_nom}"
                             except Exception:
                                 return None
 
@@ -589,18 +586,17 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                     date_cle = "".join(reversed(d_txt.split("/")))
                                     heure_cle = h_txt.replace(":", "")
                                     return f"{date_cle}_{heure_cle}"
-                                  except Exception:
+                                except Exception:
                                     pass
                             
-                            # Repli sur le timestamp réel NoSQL si aucune date de jeu n'est disponible
-                            if ts:
+                            if ts and ts != "None":
                                 return ts.replace("-","").replace(":","").replace(" ","_")
                             return "20000101_0000"
 
                         df_total_flux["cle_tri_jeu"] = df_total_flux.apply(generer_cle_tri, axis=1)
                         df_total_flux = df_total_flux.sort_values(by="cle_tri_jeu", ascending=False)
 
-                        # Formatage visuel
+                        # 3. Formatage visuel propre
                         def formater_materiaux(dict_mats):
                             if not isinstance(dict_mats, dict) or not dict_mats: return "Aucun"
                             return ", ".join([f"{k.capitalize()} ({int(v)} u)" for k, v in dict_mats.items()])
@@ -618,10 +614,9 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             return mapping.get(t, t)
                         df_total_flux["Action"] = df_total_flux["type"].apply(mapper_type)
 
-
                         df_total_flux["Supprimer ? ❌"] = False
 
-                        # Vue Direction
+                        # Construction de la vue Direction finale
                         df_visuel_flux = df_total_flux[["date_jeu", "heure_jeu", "joueur", "Action", "Ressources", "ID_Document_Firestore", "Supprimer ? ❌"]]
 
                         flux_edite = st.data_editor(
