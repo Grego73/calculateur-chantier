@@ -1,4 +1,4 @@
-# Contenu complet, sécurisé et configuré avec réinvestissements pour : onglets/suivi_interne.py
+# Contenu complet validé pour : onglets/suivi_interne.py
 
 import streamlit as st
 import pandas as pd
@@ -86,7 +86,7 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
     membres_inscrits = coop_ref.to_dict().get("membres", []) if coop_ref.exists else [joueur_actif]
 
     # ==============================================================================
-    # --- TABLEAU 1 : AFFICHAGE AVEC COLONNES CAPITAL & REINVESTISSEMENTS ---
+    # --- TABLEAU 1 : LES 4 MEMBRES MAXIMUM ---
     # ==============================================================================
     with tab_coop_interne:
         st.markdown("#### 📊 Grand Livre des Comptes Associés (Top 4 Membres)")
@@ -97,12 +97,12 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
                 "Capital Départ (€)": float(dict_capitaux.get(m, 0.0)),
                 "Réinvestissements (€)": 0.0,
                 "Réappro Matériaux (u)": 0.0, 
-                "Consommation (u)": 0.0, 
+                "Consommation Interne (u)": 0.0, 
+                "Bénéfices Générés (€)": 0.0,
                 "Score d'Apport Total": float(dict_capitaux.get(m, 0.0))
             } for m in membres_inscrits
         }
 
-        # Parsing comptable cumulé
         for fl in liste_flux:
             user = fl.get("joueur")
             if user not in compta_membres: continue
@@ -117,8 +117,10 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
             elif t_mouv == "REAPPROVISIONNEMENT":
                 compta_membres[user]["Réappro Matériaux (u)"] += mats_qte
                 compta_membres[user]["Score d'Apport Total"] += (mats_qte * 30.0)
-            elif t_mouv == "ACHAT_INTERNE":
-                compta_membres[user]["Consommation (u)"] += mats_qte
+            elif t_mouv == "ACHAT_INTERNE" or t_mouv == "ACHAT_EXTERNE":
+                compta_membres[user]["Consommation Interne (u)"] += mats_qte
+                compta_membres[user]["Bénéfices Générés (€)"] += (mats_qte * 1.0)
+                compta_membres[user]["Score d'Apport Total"] += (mats_qte * 1.0)
 
         if compta_membres:
             df_coop = pd.DataFrame.from_dict(compta_membres, orient='index')
@@ -137,9 +139,10 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
                 column_config={
                     "Pseudo Membre": st.column_config.TextColumn("👤 Membre de la Coop"),
                     "Capital Départ (€)": st.column_config.NumberColumn("💰 Capital Initial", format="%.0f €"),
-                    "Réinvestissements (€)": st.column_config.NumberColumn("➕ Réinvestissements Cash", format="%.0f €"),
-                    "Réappro Matériaux (u)": st.column_config.NumberColumn("🧱 Matériaux Apportés (Qté)"),
-                    "Consommation (u)": st.column_config.NumberColumn("🛒 Consommation (Qté)"),
+                    "Réinvestissements (€)": st.column_config.NumberColumn("➕ Rallonges Cash", format="%.0f €"),
+                    "Réappro Matériaux (u)": st.column_config.NumberColumn("🧱 Matériaux Mis (Qté)"),
+                    "Consommation Interne (u)": st.column_config.NumberColumn("🛒 Retraits Matériaux (Qté)"),
+                    "Bénéfices Générés (€)": st.column_config.NumberColumn("💸 Bénéfice Apporté", format="%.0f €"),
                     "Score d'Apport Total": st.column_config.NumberColumn("📈 Score Global", format="%.0f pts"),
                     "Distribution Bénéfice (%)": st.column_config.NumberColumn("🏆 Distribution Bénéfice légitime", format="%.2f %%")
                 }
@@ -148,61 +151,75 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
             st.info("Aucune donnée comptable n'est encore enregistrée.")
 
     # ==============================================================================
-    # --- TABLEAU 2 : TOUS LES AUTRES JOUEURS EXTERNES ---
+    # --- TABLEAU 2 : TOUS LES ACTEURS DU MARCHÉ & GRAPHIQUE ---
     # ==============================================================================
     with tab_joueurs_externes:
-        st.markdown("#### 🌍 Registre Général des Flux du Marché (Joueurs Externes)")
-        st.caption("Analyse les volumes de l'ensemble des acteurs hors-coopérative.")
+        st.markdown("#### 🌍 Registre Général des Flux du Marché (Membres & Externes)")
+        st.caption("Analyse et compare les volumes de l'ensemble des acteurs du serveur.")
 
         flux_globaux = db.charger_tous_les_achats_globaux()
 
         if not flux_globaux:
             st.info("💡 Aucun mouvement global n'est enregistré sur le réseau.")
         else:
-            stats_externes = {}
+            stats_globales = {}
+            total_par_materiau = {}
+
             for f_g in flux_globaux:
                 j_nom = f_g.get("joueur", "Inconnu")
-                if j_nom in membres_inscrits or j_nom.lower().startswith("réappro"): continue
+                if j_nom.lower().startswith("réappro"): continue
                 
-                if j_nom not in stats_externes:
-                    stats_externes[j_nom] = {"Volume Total Acheté (u)": 0.0, "detail_mats": {}}
+                if j_nom not in stats_globales:
+                    stats_globales[j_nom] = {"Volume Total Acheté (u)": 0.0, "detail_mats": {}}
 
                 mats_dict = f_g.get("materiaux", {})
                 for m_key, m_val in mats_dict.items():
-                    stats_externes[j_nom]["Volume Total Acheté (u)"] += m_val
-                    stats_externes[j_nom]["detail_mats"][m_key] = stats_externes[j_nom]["detail_mats"].get(m_key, 0.0) + m_val
+                    m_key_cap = m_key.capitalize()
+                    stats_globales[j_nom]["Volume Total Acheté (u)"] += m_val
+                    stats_globales[j_nom]["detail_mats"][m_key_cap] = stats_globales[j_nom]["detail_mats"].get(m_key_cap, 0.0) + m_val
+                    total_par_materiau[m_key_cap] = total_par_materiau.get(m_key_cap, 0.0) + m_val
 
-            lignes_externes_affichage = []
-            for joueur_ex, data_ex in stats_externes.items():
+            lignes_affichage = []
+            for joueur, data_ex in stats_globales.items():
                 details_ressources = data_ex["detail_mats"]
                 if details_ressources:
-                    materiau_favori = max(details_ressources, key=details_ressources.get).capitalize()
-                    volume_favori = details_ressources[max(details_ressources, key=details_ressources.get)]
+                    materiau_favori = max(details_ressources, key=details_ressources.get)
+                    volume_favori = details_ressources[materiau_favori]
                     txt_recap_favori = f"{materiau_favori} ({int(volume_favori)} u)"
                 else:
                     txt_recap_favori = "Aucun"
 
-                lignes_externes_affichage.append({
-                    "Joueur": joueur_ex,
+                badge_statut = "🏆 Membre Coop" if joueur in membres_inscrits else "👤 Joueur Externe"
+
+                lignes_affichage.append({
+                    "Statut": badge_statut,
+                    "Joueur": joueur,
                     "Volume Global Acquis (u)": data_ex["Volume Total Acheté (u)"],
                     "Matériau le plus acheté": txt_recap_favori
                 })
 
-            if lignes_externes_affichage:
-                df_ext = pd.DataFrame(lignes_externes_affichage)
-                
+            if lignes_affichage:
+                df_ext = pd.DataFrame(lignes_affichage).sort_values(by="Volume Global Acquis (u)", ascending=False)
                 st.dataframe(df_ext, width="stretch", hide_index=True)
+                
+                st.markdown("---")
+                st.markdown("### 📊 Classement des Matériaux les plus Consommés sur le Serveur")
+                
+                if total_par_materiau:
+                    df_graph_mats = pd.DataFrame(list(total_par_materiau.items()), columns=["Matériau", "Quantité Totale Consommée (u)"])
+                    df_graph_mats = df_graph_mats.sort_values(by="Quantité Totale Consommée (u)", ascending=True)
+                    st.bar_chart(data=df_graph_mats, x="Matériau", y="Quantité Totale Consommée (u)", color="#ff4b4b")
             else:
-                st.info("💡 Aucun joueur externe n'a encore été extrait de vos lignes d'historiques.")
+                st.info("💡 Aucun joueur n'a encore été extrait de vos lignes d'historiques.")
 
     # ==============================================================================
-    # --- 3. PARSEUR AUTOMATIQUE DE LOGS CHRONOLOGIQUES ---
+    # --- 3. PARSEUR DE LOGS CHRONOLOGIQUES DE JEU ---
     # ==============================================================================
     with tab_depot_flux:
         st.markdown("#### 📥 Alimenter le Système via le Fil des Événements")
-        st.write("Collez l'historique brut du jeu ici. Le parseur filtre et applique automatiquement les entrées temporelles uniques.")
+        st.write("Collez l'historique brut du jeu ici. Le parseur filtre automatiquement les doublons temporels.")
 
-        zone_texte_logs = st.text_area("Collez l'historique brut du jeu ici :", height=300, key="txt_logs_flux_coop_final_v4")
+        zone_texte_logs = st.text_area("Collez l'historique brut du jeu ici :", height=300, key="txt_logs_flux_coop_final_v5")
 
         if st.button("🚀 ENREGISTRER L'HISTORIQUE ET FILTRER LES DOUBLONS", type="primary", width="stretch"):
             if not zone_texte_logs.strip():
@@ -210,7 +227,6 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
             else:
                 lignes_brutes = zone_texte_logs.split("\n")
                 
-                # Supporte "a" ET "à" pour les dates
                 regex_date = re.compile(r"Le\s*(\d{2}/\d{2}/\d{4})\s*[aà]\s*(\d{2}:\d{2})", re.IGNORECASE)
                 regex_materiau = re.compile(r"(\d[\d\s]*)\s*(tonne|unité|unite)[s]?\s*de\s*(sable|terre|enrob|armature|tôle|tole|béton|beton|panneau|tuyau|canalisation|poutre)", re.IGNORECASE)
                 
@@ -272,76 +288,7 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
                     st.cache_data.clear()
                     st.rerun()
                 else:
-                    st.error("❌ Aucun bloc chronologique ou matériel valide détecté dans le texte soumis.")
-
-    # ==============================================================================
-    # --- TABLEAU 2 ENRICHI ET INJECTION DU GRAPHIQUE DES CONSOMMATIONS ---
-    # ==============================================================================
-    with tab_joueurs_externes:
-        st.markdown("#### 🌍 Registre Général des Flux du Marché (Membres & Externes)")
-        st.caption("Analyse et compare les volumes de l'ensemble des acteurs du serveur.")
-
-        flux_globaux = db.charger_tous_les_achats_globaux()
-
-        if not flux_globaux:
-            st.info("💡 Aucun mouvement global n'est enregistré sur le réseau.")
-        else:
-            stats_globales = {}
-            total_par_materiau = {} # Dictionnaire pour compiler les scores du graphique
-
-            for f_g in flux_globaux:
-                j_nom = f_g.get("joueur", "Inconnu")
-                # On ignore uniquement les lignes techniques de réapprovisionnement général de la coop
-                if j_nom.lower().startswith("réappro"): continue
-                
-                if j_nom not in stats_globales:
-                    stats_globales[j_nom] = {"Volume Total Acheté (u)": 0.0, "detail_mats": {}}
-
-                mats_dict = f_g.get("materiaux", {})
-                for m_key, m_val in mats_dict.items():
-                    m_key_cap = m_key.capitalize()
-                    stats_globales[j_nom]["Volume Total Acheté (u)"] += m_val
-                    stats_globales[j_nom]["detail_mats"][m_key_cap] = stats_globales[j_nom]["detail_mats"].get(m_key_cap, 0.0) + m_val
-                    # Cumul pour le graphique global en dessous
-                    total_par_materiau[m_key_cap] = total_par_materiau.get(m_key_cap, 0.0) + m_val
-
-            lignes_affichage = []
-            for joueur, data_ex in stats_globales.items():
-                details_ressources = data_ex["detail_mats"]
-                if details_ressources:
-                    materiau_favori = max(details_ressources, key=details_ressources.get)
-                    volume_favori = details_ressources[materiau_favori]
-                    txt_recap_favori = f"{materiau_favori} ({int(volume_favori)} u)"
-                else:
-                    txt_recap_favori = "Aucun"
-
-                # Détermination du statut (Collaborateur membre vs Externe)
-                badge_statut = "🏆 Membre Coop" if joueur in membres_inscrits else "👤 Joueur Externe"
-
-                lignes_affichage.append({
-                    "Statut": badge_statut,
-                    "Joueur": joueur,
-                    "Volume Global Acquis (u)": data_ex["Volume Total Acheté (u)"],
-                    "Matériau le plus acheté": txt_recap_favori
-                })
-
-            if lignes_affichage:
-                df_ext = pd.DataFrame(lignes_affichage).sort_values(by="Volume Global Acquis (u)", ascending=False)
-                st.dataframe(df_ext, width="stretch", hide_index=True)
-                
-                # --- INJECTION DU GRAPHIQUE REQUIS DES CONSOMMATIONS ---
-                st.markdown("---")
-                st.markdown("### 📊 Classement des Matériaux les plus Consommés sur le Serveur")
-                st.caption("Ce graphique combine tous les achats (Coopérative + Externes) pour isoler instantanément les matières premières les plus demandées.")
-                
-                if total_par_materiau:
-                    df_graph_mats = pd.DataFrame(list(total_par_materiau.items()), columns=["Matériau", "Quantité Totale Consommée (u)"])
-                    df_graph_mats = df_graph_mats.sort_values(by="Quantité Totale Consommée (u)", ascending=True) # Ascending True pour un rendu horizontal propre
-                    
-                    # Rendu graphique Streamlit horizontal ultra-scannable
-                    st.bar_chart(data=df_graph_mats, x="Matériau", y="Quantité Totale Consommée (u)", color="#ff4b4b")
-            else:
-                st.info("💡 Aucun joueur n'a encore été extrait de vos lignes d'historiques.")
+                    st.error("❌ Aucun log de matériel valide détecté.")
 
     # ==============================================================================
     # --- 4. GESTION DES REINVESTISSEMENTS ET DES COLLABORATEURS ---
@@ -352,10 +299,7 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
         slots_occupes = len(membres_inscrits)
         st.info(f"📊 **Occupation de la Coopérative :** `{slots_occupes} / 4` places verrouillées.")
         
-        # --- BLOC N°1 : REINVESTIR DE L'ARGENT SUR LE COMPTE DE LA COOP ---
         st.markdown("##### ➕ Enregistrer un NOUVEAU Réinvestissement Cash (Rallonge)")
-        st.write("Si un collaborateur réinjecte des fonds pour financer l'entreprise, déclarez sa rallonge ici :")
-        
         with st.form("form_nouveau_reinvestissement_cash"):
             c_re1, c_fl2 = st.columns(2)
             with c_re1:
@@ -363,18 +307,16 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
             with c_fl2:
                 montant_rallonge = st.number_input("Montant de l'apport complémentaire (€) :", min_value=0.0, value=0.0, step=5000.0)
                 
-            if st.form_submit_button("💰 APPLIQUER LA RALLONGE AU SCORE GLOBAL", width="stretch"):
+            if st.form_submit_button("💰 APPLIQUER LA RALLONGE", width="stretch"):
                 if montant_rallonge <= 0:
                     st.error("❌ Veuillez saisir un montant supérieur à 0 €.")
                 else:
                     db.ajouter_reinvestissement_membre(nom_coop_active, membre_reinvestit, montant_rallonge)
-                    st.success(f"🎯 Rallonge financière de {montant_rallonge:,.0f} € validée pour [ {membre_reinvestit} ] ! Recalcul des parts instantané.".replace(",", " "))
+                    st.success(f"🎯 Rallonge financière de {montant_rallonge:,.0f} € validée pour [ {membre_reinvestit} ] !".replace(",", " "))
                     st.cache_data.clear()
                     st.rerun()
                     
         st.markdown("---")
-        
-        # --- BLOC N°2 : ÉDITION DU CAPITAL DE DÉPART (LES 50K / 100K D'ORIGINE) ---
         st.markdown("##### 💰 Éditer le Capital Initial d'Origine de vos collaborateurs")
         with st.form("form_ajustement_capitaux_coop"):
             champs_capitaux = {}
@@ -391,7 +333,7 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
             if st.form_submit_button("💾 VERROUILLER LE COMPTE DE BASE", width="stretch"):
                 for mb_nom, val_money in champs_capitaux.items():
                     db.fixer_capital_initial_membre(nom_coop_active, mb_nom, val_money)
-                st.success("🎯 Tous les investissements de base ont été verrouillés et synchronisés.")
+                st.success("🎯 Tous les investissements de base ont été verrouillés.")
                 st.cache_data.clear()
                 st.rerun()
 
