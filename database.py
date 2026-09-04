@@ -269,3 +269,23 @@ def enregistrer_ligne_historique_brute(nom_coop, date_txt, heure_txt, acteur_txt
         "heure_jeu": heure_txt,
         "timestamp_enregistrement": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
     })
+
+# À ajouter tout en bas de : database.py
+
+def ajouter_reinvestissement_membre(nom_coop, pseudo_joueur, montant_cash):
+    """
+    Enregistre une rallonge/réinvestissement financier pour un membre de la coopérative
+    et l'ajoute à l'historique NoSQL sous une catégorie spécifique.
+    """
+    try:
+        mouvement_id = f"reinvest_{int(pd.Timestamp.now().timestamp())}_{pseudo_joueur}"
+        db.collection("cooperatives").document(nom_coop).collection("comptabilite_interne").document(mouvement_id).set({
+            "joueur": pseudo_joueur,
+            "type": "REINVESTISSEMENT_CASH",
+            "apport_cash": float(montant_cash),
+            "materiaux": {},
+            "timestamp": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
+        })
+        return True
+    except Exception:
+        return False
