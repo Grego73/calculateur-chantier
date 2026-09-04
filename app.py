@@ -32,7 +32,7 @@ with onglet2:
 
 with onglet3:
     # 3. L'APPEL DE LA FONCTION POUR CONSTRUIRE LA PAGE :
-    afficher_onglet_suivi_interne(config_salaires, catalogue_engins)
+    afficher_onglet_suivi_interne(config_salaires, catalogue_engins, config_materiaux)
 
 with onglet4:
     afficher_onglet_direction(config_salaires, config_materiaux)
