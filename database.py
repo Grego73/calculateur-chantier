@@ -4,6 +4,9 @@ from google.cloud import firestore
 import json
 from google.oauth2 import service_account
 
+# ==============================================================================
+# --- 1. INITIALISATION DE LA CONNEXION UNIQUE CLOUD FIRESTORE ---
+# ==============================================================================
 if "text_key" in st.secrets:
     info_cles = json.loads(st.secrets["text_key"])
     creds = service_account.Credentials.from_service_account_info(info_cles)
@@ -11,14 +14,10 @@ if "text_key" in st.secrets:
 else:
     db = firestore.Client(project="calculateur-chantier-dc921")
 
-# Vos fonctions (charger_salaires_config, etc.) restent en dessous...
-
 
 # ==============================================================================
-# --- FONCTIONS DE LECTURE (SÉCURISÉES PAR CACHE EXTENSIBLE DE 10 MIN) ---
+# --- 2. FONCTIONS DE LECTURE (SÉCURISÉES PAR CACHE EXTENSIBLE DE 10 MIN) ---
 # ==============================================================================
-# Le reste de votre fichier database.py d'origine reste inchangé...
-
 @st.cache_data(ttl=600)
 def charger_salaires_config():
     try:
@@ -108,10 +107,10 @@ def charger_donnees():
     except Exception:
         return pd.DataFrame()
 
-# ==============================================================================
-# --- FONCTIONS D'ÉCRITURE ---
-# ==============================================================================
 
+# ==============================================================================
+# --- 3. FONCTIONS D'ÉCRITURE ---
+# ==============================================================================
 def inserer_chantier(nom, rev, mats, loc, sal, total, net, roi, jours, gpj, rpj):
     try:
         db.collection("chantiers").document(nom).set({"revenus": rev, "cout_materiaux": mats, "cout_location": loc, "cout_salaires": sal, "depenses_totales": total, "benefice_net": net, "roi": roi, "jours": jours, "gain_par_jour": gpj, "roi_par_jour": rpj})
@@ -129,6 +128,7 @@ def reinitialiser_db():
         st.cache_data.clear()
     except Exception as e:
         st.error(f"❌ Échec de la réinitialisation : {e}")
+
 def enregistrer_log(type_action, details):
     import datetime
     import pytz
@@ -137,29 +137,33 @@ def enregistrer_log(type_action, details):
         maintenant = datetime.datetime.now(tz_paris)
         timestamp_txt = maintenant.strftime("%Y-%m-%d %H:%M:%S")
         
-        # Écriture NoSQL dans la collection de traçabilité
         db.collection("journaux_actions").add({
             "timestamp": timestamp_txt,
             "type_action": type_action,
             "details": details
         })
-    except Exception as e:
+    except Exception:
         pass
-        
-# À ajouter tout en bas de : database.py
+
+
+# ==============================================================================
+# --- 4. FONCTIONS AVANCÉES POUR LE SUIVI INTERNE DES COOPÉRATIVES ---
+# ==============================================================================
+def lister_toutes_les_cooperatives():
+    try:
+        coops_stream = db.collection("cooperatives").stream()
+        list_coops = [doc.id for doc in coops_stream]
+        return sorted(list_coops)
+    except Exception:
+        return []
 
 def verifier_et_inscrire_joueur(nom_coop, mdp_saisi, pseudo_joueur):
-    """
-    Vérifie le mot de passe de la coopérative et inscrit le joueur si la limite 
-    des 4 membres inscrits n'est pas atteinte.
-    """
     if not nom_coop or not mdp_saisi or not pseudo_joueur:
         return False, "⚠️ Veuillez remplir tous les champs."
         
     coop_ref = db.collection("cooperatives").document(nom_coop)
     coop_doc = coop_ref.get()
     
-    # Si la coopérative n'existe pas encore, on la crée avec le mot de passe fourni
     if not coop_doc.exists:
         coop_ref.set({
             "mot_de_passe": mdp_saisi,
@@ -168,76 +172,21 @@ def verifier_et_inscrire_joueur(nom_coop, mdp_saisi, pseudo_joueur):
         return True, f"🟢 Coopérative créée ! Bienvenue à bord, premier membre : {pseudo_joueur}"
     
     coop_data = coop_doc.to_dict()
-    
-    # Vérification du mot de passe de la coop
     if coop_data.get("mot_de_passe") != mdp_saisi:
         return False, "🔒 Mot de passe de la coopérative incorrect."
         
     membres_actuels = coop_data.get("membres", [])
-    
-    # Si le joueur fait déjà partie des inscrits, on le laisse entrer
     if pseudo_joueur in membres_actuels:
         return True, f"👋 Content de vous revoir, {pseudo_joueur}."
         
-    # Si le joueur n'est pas inscrit, on vérifie la jauge limite de 4 joueurs max
     if len(membres_actuels) >= 4:
         return False, f"🚫 Accès refusé : La coopérative '{nom_coop}' a atteint sa limite maximale de 4 joueurs inscrits."
         
-    # Le joueur est valide et il reste de la place, on l'ajoute au tableau NoSQL
     membres_actuels.append(pseudo_joueur)
     coop_ref.update({"membres": membres_actuels})
-    return True, f"📝 Inscription réussie ! Bienvenue dans la coopérative, membre n°{len(membres_actuels)} : {pseudo_joueur}"
-
-# À coller tout en bas de : database.py
-
-def enregistrer_mouvement_coop(nom_coop, pseudo_joueur, type_mouvement, materiaux_dict, apport_financier=0.0):
-    """
-    Enregistre un flux financier ou matériel pour un membre de la coopérative.
-    type_mouvement peut être : "APPORT_INITIAL", "REAPPROVISIONNEMENT" ou "ACHAT_INTERNE"
-    """
-    mouvement_id = f"flux_{int(pd.Timestamp.now().timestamp())}_{pseudo_joueur}"
-    db.collection("cooperatives").document(nom_coop).collection("comptabilite_interne").document(mouvement_id).set({
-        "joueur": pseudo_joueur,
-        "type": type_mouvement,
-        "apport_cash": float(apport_financier),
-        "materiaux": materiaux_dict,
-        "timestamp": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
-    })
-
-def charger_tous_les_achats_globaux():
-    """
-    Parcourt toutes les structures pour offrir un récapitulatif complet de chaque joueur
-    inscrit, peu importe sa coopérative.
-    """
-    coops = db.collection("cooperatives").stream()
-    tous_achats = []
-    
-    for coop in coops:
-        flux_stream = coop.reference.collection("comptabilite_interne").stream()
-        for flux in flux_stream:
-            data = flux.to_dict()
-            tous_achats.append(data)
-            
-    return tous_achats
-
-# À ajouter tout en bas de : database.py
-
-def lister_toutes_les_cooperatives():
-    """
-    Récupère la liste de tous les noms de coopératives enregistrées dans Firestore.
-    """
-    try:
-        coops_stream = db.collection("cooperatives").stream()
-        list_coops = [doc.id for doc in coops_stream]
-        return sorted(list_coops)
-    except Exception:
-        return []
+    return True, f"📝 Inscription réussie ! Membre enregistré (Place {len(membres_actuels)}/4) : {pseudo_joueur}"
 
 def ajouter_membres_bloc_coop(nom_coop, texte_membres_brut):
-    """
-    Extrait les pseudos séparés par des espaces et pré-inscrit les membres 
-    dans la limite stricte de 4 membres au total.
-    """
     if not nom_coop or not texte_membres_brut.strip():
         return False, "⚠️ Saisissez au moins un pseudo valide."
         
@@ -264,6 +213,30 @@ def ajouter_membres_bloc_coop(nom_coop, texte_membres_brut):
 
     if compteur_ajouts > 0:
         coop_ref.update({"membres": membres_actuels})
-        return True, f"🚀 {compteur_ajouts} collaborateur(s) ajouté(s) à la liste ! Initialisez leurs investissements ci-dessous."
-    
-    return False, "ℹ️ Aucun nouveau membre unique n'a été détecté ou la limite de 4 est atteinte."eturn False, "❌ Aucun collaborateur n'a pu être ajouté :\n" + "\n".join(messages_details)
+        return True, f"🚀 {compteur_ajouts} collaborateur(s) pré-inscrit(s) ! Initialisez leurs apports de départ ci-dessous."
+    return False, "ℹ️ Aucun nouveau membre unique n'a été détecté ou la limite de 4 est atteinte."
+
+def enregistrer_mouvement_coop(nom_coop, pseudo_joueur, type_mouvement, materiaux_dict, apport_financier=0.0):
+    try:
+        mouvement_id = f"flux_{int(pd.Timestamp.now().timestamp())}_{pseudo_joueur}"
+        db.collection("cooperatives").document(nom_coop).collection("comptabilite_interne").document(mouvement_id).set({
+            "joueur": pseudo_joueur,
+            "type": type_mouvement,
+            "apport_cash": float(apport_financier),
+            "materiaux": materiaux_dict,
+            "timestamp": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
+        })
+    except Exception:
+        pass
+
+def charger_tous_les_achats_globaux():
+    try:
+        coops = db.collection("cooperatives").stream()
+        tous_achats = []
+        for coop in coops:
+            flux_stream = coop.reference.collection("comptabilite_interne").stream()
+            for flux in flux_stream:
+                tous_achats.append(flux.to_dict())
+        return tous_achats
+    except Exception:
+        return []
