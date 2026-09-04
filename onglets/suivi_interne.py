@@ -210,7 +210,8 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
             else:
                 lignes_brutes = zone_texte_logs.split("\n")
                 
-                regex_date = re.compile(r"Le\s*(\d{2}/\d{2}/\d{4})\s*à\s*(\d{2}:\d{2})", re.IGNORECASE)
+                # Correction Regex : Supporte "a" ET "à" pour les dates de manière totalement transparente
+                regex_date = re.compile(r"Le\s*(\d{2}/\d{2}/\d{4})\s*[aà]\s*(\d{2}:\d{2})", re.IGNORECASE)
                 regex_materiau = re.compile(r"(\d[\d\s]*)\s*(tonne|unité|unite)[s]?\s*de\s*(sable|terre|enrob|armature|tôle|tole|béton|beton|panneau|tuyau|canalisation|poutre)", re.IGNORECASE)
                 
                 date_courante = None
@@ -220,6 +221,9 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
                 for i, lg in enumerate(lignes_brutes):
                     l_clean = lg.strip()
                     if not l_clean: continue
+
+                    if "fil des" in l_clean.lower():
+                        continue
 
                     match_date = regex_date.search(l_clean)
                     if match_date:
@@ -250,7 +254,9 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
                                     acteur_final = "Réapprovisionnement Global"
                                     type_mouv_final = "REAPPROVISIONNEMENT"
                                 elif "a acheté" in l_clean.lower():
-                                    acteur_final = l_clean.split("a acheté")[0].strip()
+                                    # Correction anti-crash : Extraction sécurisée du pseudo du joueur
+                                    parties = l_clean.split("a acheté")
+                                    acteur_final = parties[0].strip() if len(parties) > 0 else joueur_actif
                                     type_mouv_final = "ACHAT_INTERNE" if acteur_final in membres_inscrits else "ACHAT_EXTERNE"
                                 else:
                                     acteur_final = joueur_actif
@@ -267,7 +273,7 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
                     st.cache_data.clear()
                     st.rerun()
                 else:
-                    st.error("❌ Aucun bloc chronologique ou matériel valide détecté.")
+                    st.error("❌ Aucun bloc chronologique ou matériel valide détecté dans le texte soumis. Vérifiez le format.")
 
     # ==============================================================================
     # --- 4. GESTION DES REINVESTISSEMENTS ET DES COLLABORATEURS ---
