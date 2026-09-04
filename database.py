@@ -240,3 +240,32 @@ def charger_tous_les_achats_globaux():
         return tous_achats
     except Exception:
         return []
+
+# À ajouter / remplacer tout en bas de : database.py
+
+def enregistrer_ligne_historique_brute(nom_coop, date_txt, heure_txt, acteur_txt, type_mouv, materiaux_dict):
+    """
+    Enregistre un mouvement log du jeu avec une clé technique dédupliquée 
+    pour empêcher l'insertion de doublons temporels.
+    """
+    if not materiaux_dict:
+        return
+    
+    # Normalisation de la date pour la clé NoSQL (Ex: 03/09/2026 -> 20260903)
+    date_cle = "".join(reversed(date_txt.split("/")))
+    heure_cle = heure_txt.replace(":", "")
+    mat_nom = list(materiaux_dict.keys())[0]
+    
+    # Génération de l'empreinte unique
+    acteur_cle = acteur_txt.lower().strip().replace(" ", "_")
+    document_id = f"log_{date_cle}_{heure_cle}_{acteur_cle}_{mat_nom}"
+    
+    db.collection("cooperatives").document(nom_coop).collection("comptabilite_interne").document(document_id).set({
+        "joueur": acteur_txt,
+        "type": type_mouv,
+        "apport_cash": 0.0,
+        "materiaux": materiaux_dict,
+        "date_jeu": date_txt,
+        "heure_jeu": heure_txt,
+        "timestamp_enregistrement": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
+    })
