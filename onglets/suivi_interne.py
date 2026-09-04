@@ -311,24 +311,38 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
                 else:
                     st.error("❌ Aucun log de matériel valide détecté.")
 
-        # --- AJOUT : VISUALISATION DES 5 DERNIÈRES ENTRÉES EFFECTUÉES ---
+        # --- CORRECTION DU TRI : VISUALISATION DES 5 DERNIÈRES ENTRÉES DU JEU ---
         st.markdown("---")
         st.markdown("##### ⏱️ Les 5 dernières entrées enregistrées (Flux Récent)")
         
         if liste_flux:
             try:
-                # Création d'un DataFrame propre à partir des flux de la coopérative active
+                # Création du DataFrame propre
                 df_flux_recents = pd.DataFrame(liste_flux)
                 
                 # Double vérification des colonnes indispensables
-                for c_req in ["timestamp_enregistrement", "joueur", "type", "date_jeu", "heure_jeu", "materiaux"]:
+                for c_req in ["joueur", "type", "date_jeu", "heure_jeu", "materiaux"]:
                     if c_req not in df_flux_recents.columns:
                         df_flux_recents[c_req] = ""
 
-                # Tri par date et heure système pour avoir le flux le plus récent en premier
-                df_flux_recents = df_flux_recents.sort_values(by="timestamp_enregistrement", ascending=False).head(5)
+                # --- ALGORITHME DE TRI CRITIQUE SUR LE TEMPS DU JEU ---
+                def generer_cle_chronologique(row):
+                    d_txt = str(row.get("date_jeu", "01/01/2000")).strip()
+                    h_txt = str(row.get("heure_jeu", "00:00")).strip()
+                    try:
+                        # Transforme "28/08/2026" en "20260828"
+                        date_cle = "".join(reversed(d_txt.split("/")))
+                        # Transforme "09:27" en "0927"
+                        heure_cle = h_txt.replace(":", "")
+                        return f"{date_cle}_{heure_cle}"
+                    except Exception:
+                        return "20000101_0000"
 
-                # Formatage du dictionnaire de matériaux pour un affichage lisible (ex: {"sable": 50} -> "Sable : 50")
+                # Application du tri du plus récent au plus ancien
+                df_flux_recents["cle_tri_jeu"] = df_flux_recents.apply(generer_cle_chronologique, axis=1)
+                df_flux_recents = df_flux_recents.sort_values(by="cle_tri_jeu", ascending=False).head(5)
+
+                # Formatage du dictionnaire de matériaux pour un affichage lisible
                 def formater_materiaux(dict_mats):
                     if not isinstance(dict_mats, dict) or not dict_mats:
                         return "Aucun"
@@ -342,7 +356,7 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
                     return mapping.get(t, t)
                 df_flux_recents["Type"] = df_flux_recents["type"].apply(mapper_type)
 
-                # Sélection des colonnes ordonnées à afficher
+                # Sélection et ordonnancement final des colonnes
                 df_flux_recents = df_flux_recents[["date_jeu", "heure_jeu", "joueur", "Type", "Détail Matériaux"]]
 
                 st.dataframe(
