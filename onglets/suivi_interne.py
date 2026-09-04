@@ -210,7 +210,7 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
             else:
                 lignes_brutes = zone_texte_logs.split("\n")
                 
-                # Correction Regex : Supporte "a" ET "à" pour les dates de manière totalement transparente
+                # Supporte "a" ET "à" pour les dates
                 regex_date = re.compile(r"Le\s*(\d{2}/\d{2}/\d{4})\s*[aà]\s*(\d{2}:\d{2})", re.IGNORECASE)
                 regex_materiau = re.compile(r"(\d[\d\s]*)\s*(tonne|unité|unite)[s]?\s*de\s*(sable|terre|enrob|armature|tôle|tole|béton|beton|panneau|tuyau|canalisation|poutre)", re.IGNORECASE)
                 
@@ -254,7 +254,6 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
                                     acteur_final = "Réapprovisionnement Global"
                                     type_mouv_final = "REAPPROVISIONNEMENT"
                                 elif "a acheté" in l_clean.lower():
-                                    # Correction anti-crash : Extraction sécurisée du pseudo du joueur
                                     parties = l_clean.split("a acheté")
                                     acteur_final = parties[0].strip() if len(parties) > 0 else joueur_actif
                                     type_mouv_final = "ACHAT_INTERNE" if acteur_final in membres_inscrits else "ACHAT_EXTERNE"
@@ -273,7 +272,76 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
                     st.cache_data.clear()
                     st.rerun()
                 else:
-                    st.error("❌ Aucun bloc chronologique ou matériel valide détecté dans le texte soumis. Vérifiez le format.")
+                    st.error("❌ Aucun bloc chronologique ou matériel valide détecté dans le texte soumis.")
+
+    # ==============================================================================
+    # --- TABLEAU 2 ENRICHI ET INJECTION DU GRAPHIQUE DES CONSOMMATIONS ---
+    # ==============================================================================
+    with tab_joueurs_externes:
+        st.markdown("#### 🌍 Registre Général des Flux du Marché (Membres & Externes)")
+        st.caption("Analyse et compare les volumes de l'ensemble des acteurs du serveur.")
+
+        flux_globaux = db.charger_tous_les_achats_globaux()
+
+        if not flux_globaux:
+            st.info("💡 Aucun mouvement global n'est enregistré sur le réseau.")
+        else:
+            stats_globales = {}
+            total_par_materiau = {} # Dictionnaire pour compiler les scores du graphique
+
+            for f_g in flux_globaux:
+                j_nom = f_g.get("joueur", "Inconnu")
+                # On ignore uniquement les lignes techniques de réapprovisionnement général de la coop
+                if j_nom.lower().startswith("réappro"): continue
+                
+                if j_nom not in stats_globales:
+                    stats_globales[j_nom] = {"Volume Total Acheté (u)": 0.0, "detail_mats": {}}
+
+                mats_dict = f_g.get("materiaux", {})
+                for m_key, m_val in mats_dict.items():
+                    m_key_cap = m_key.capitalize()
+                    stats_globales[j_nom]["Volume Total Acheté (u)"] += m_val
+                    stats_globales[j_nom]["detail_mats"][m_key_cap] = stats_globales[j_nom]["detail_mats"].get(m_key_cap, 0.0) + m_val
+                    # Cumul pour le graphique global en dessous
+                    total_par_materiau[m_key_cap] = total_par_materiau.get(m_key_cap, 0.0) + m_val
+
+            lignes_affichage = []
+            for joueur, data_ex in stats_globales.items():
+                details_ressources = data_ex["detail_mats"]
+                if details_ressources:
+                    materiau_favori = max(details_ressources, key=details_ressources.get)
+                    volume_favori = details_ressources[materiau_favori]
+                    txt_recap_favori = f"{materiau_favori} ({int(volume_favori)} u)"
+                else:
+                    txt_recap_favori = "Aucun"
+
+                # Détermination du statut (Collaborateur membre vs Externe)
+                badge_statut = "🏆 Membre Coop" if joueur in membres_inscrits else "👤 Joueur Externe"
+
+                lignes_affichage.append({
+                    "Statut": badge_statut,
+                    "Joueur": joueur,
+                    "Volume Global Acquis (u)": data_ex["Volume Total Acheté (u)"],
+                    "Matériau le plus acheté": txt_recap_favori
+                })
+
+            if lignes_affichage:
+                df_ext = pd.DataFrame(lignes_affichage).sort_values(by="Volume Global Acquis (u)", ascending=False)
+                st.dataframe(df_ext, width="stretch", hide_index=True)
+                
+                # --- INJECTION DU GRAPHIQUE REQUIS DES CONSOMMATIONS ---
+                st.markdown("---")
+                st.markdown("### 📊 Classement des Matériaux les plus Consommés sur le Serveur")
+                st.caption("Ce graphique combine tous les achats (Coopérative + Externes) pour isoler instantanément les matières premières les plus demandées.")
+                
+                if total_par_materiau:
+                    df_graph_mats = pd.DataFrame(list(total_par_materiau.items()), columns=["Matériau", "Quantité Totale Consommée (u)"])
+                    df_graph_mats = df_graph_mats.sort_values(by="Quantité Totale Consommée (u)", ascending=True) # Ascending True pour un rendu horizontal propre
+                    
+                    # Rendu graphique Streamlit horizontal ultra-scannable
+                    st.bar_chart(data=df_graph_mats, x="Matériau", y="Quantité Totale Consommée (u)", color="#ff4b4b")
+            else:
+                st.info("💡 Aucun joueur n'a encore été extrait de vos lignes d'historiques.")
 
     # ==============================================================================
     # --- 4. GESTION DES REINVESTISSEMENTS ET DES COLLABORATEURS ---
