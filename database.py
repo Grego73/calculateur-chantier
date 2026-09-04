@@ -250,8 +250,10 @@ def enregistrer_ligne_historique_brute(nom_coop, date_txt, heure_txt, actor_txt,
     try:
         date_cle = "".join(reversed(date_txt.split("/")))
         heure_cle = heure_txt.replace(":", "")
-        mat_nom = list(materiaux_dict.keys())
-        # CORRECTION DE LA VARIABLE ICI : acteur_txt avec un e
+        
+        # CORRECTION : On joint les matériaux en une chaîne de texte propre
+        mat_nom = "_".join(list(materiaux_dict.keys())).lower().strip()
+        
         acteur_cle = actor_txt.lower().strip().replace(" ", "_")
         document_id = f"log_{date_cle}_{heure_cle}_{acteur_cle}_{mat_nom}"
         
@@ -266,6 +268,7 @@ def enregistrer_ligne_historique_brute(nom_coop, date_txt, heure_txt, actor_txt,
         })
     except Exception:
         pass
+
 
 def charger_tous_les_achats_globaux():
     try:
