@@ -104,6 +104,8 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         # Paramètres globaux temporels et financiers
         st.session_state["val_revenus"] = float(modele.get("revenus", 0.0))
         st.session_state["val_jours"] = int(modele.get("jours_globaux", 0))
+        st.session_state["val_heures"] = int(modele.get("heures_globales", 0))
+        st.session_state["val_minutes"] = int(modele.get("minutes_globales", 0))
         
         # Initialisation des compteurs de matériaux globaux
         liste_mats_cles = ["sable","terre","enrobe","armature","tole","beton","panneaux","tuyaux","canalisations","poutres"]
@@ -179,9 +181,11 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         
         st.write("⏱️ **Durée totale du chantier :**")
         c_j, c_h, c_m = st.columns(3)
+        
         with c_j: jours_saisis = st.number_input("Jours", min_value=0, value=st.session_state["val_jours"], step=1)
-        with c_h: heures_saisies = st.number_input("Heures", min_value=0, max_value=23, value=0, step=1)
-        with c_m: minutes_saisies = st.number_input("Minutes", min_value=0, max_value=59, value=0, step=1)
+        with c_h: heures_saisies = st.number_input("Heures", min_value=0, max_value=23, value=st.session_state.get("val_heures", 0), step=1)
+        with c_m: minutes_saisies = st.number_input("Minutes", min_value=0, max_value=59, value=st.session_state.get("val_minutes", 0), step=1)
+
 
         heures_en_jours = heures_saisies / 24.0
         minutes_en_jours = minutes_saisies / 1440.0
