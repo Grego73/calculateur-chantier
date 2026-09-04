@@ -253,11 +253,15 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                 chantiers_detectes[nom_courant]["revenus"] = float(prix_txt)
                             continue
 
-                        if "durée du chantier :" in l_clean.lower():
+                        if "durée du chantier :" in l_clean.lower() or "duree du chantier :" in l_clean.lower():
                             partie_duree = l_clean.split(":")[-1].lower()
+                            
+                            # Expressions régulières améliorées pour capturer avec ou sans parenthèses/pluriels
                             m_j = re.search(r"(\d+)\s*jour", partie_duree)
                             m_h = re.search(r"(\d+)\s*heure", partie_duree)
                             m_m = re.search(r"(\d+)\s*minute", partie_duree)
+                            
+                            # Sauvegarde sécurisée dans le dictionnaire du chantier détecté
                             if m_j: chantiers_detectes[nom_courant]["jours"] = int(m_j.group(1))
                             if m_h: chantiers_detectes[nom_courant]["heures"] = int(m_h.group(1))
                             if m_m: chantiers_detectes[nom_courant]["minutes"] = int(m_m.group(1))
@@ -854,15 +858,19 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             l_l_clean = ligne_l.strip()
                             if not l_l_clean: continue
                             
-                            if "durée du chantier :" in l_l_clean.lower():
-                                partie_duree = l_l_clean.split(":")[-1].lower()
-                                m_j = re.search(r"(\d+)\s*jour", partie_duree)
-                                m_h = re.search(r"(\d+)\s*heure", partie_duree)
-                                m_m = re.search(r"(\d+)\s*minute", partie_duree)
-                                if m_j: chantiers_detectes_local["jours"] = int(m_j.group(1))
-                                if m_h: chantiers_detectes_local["heures"] = int(m_h.group(1))
-                                if m_m: chantiers_detectes_local["minutes"] = int(m_m.group(1))
-                                continue
+                        if "durée du chantier :" in l_clean.lower() or "duree du chantier :" in l_clean.lower():
+                            partie_duree = l_clean.split(":")[-1].lower()
+                            
+                            # Expressions régulières améliorées pour capturer avec ou sans parenthèses/pluriels
+                            m_j = re.search(r"(\d+)\s*jour", partie_duree)
+                            m_h = re.search(r"(\d+)\s*heure", partie_duree)
+                            m_m = re.search(r"(\d+)\s*minute", partie_duree)
+                            
+                            # Sauvegarde sécurisée dans le dictionnaire du chantier détecté
+                            if m_j: chantiers_detectes[nom_courant]["jours"] = int(m_j.group(1))
+                            if m_h: chantiers_detectes[nom_courant]["heures"] = int(m_h.group(1))
+                            if m_m: chantiers_detectes[nom_courant]["minutes"] = int(m_m.group(1))
+                            continue
 
                             if l_l_clean.lower().startswith("etape") and ":" in l_l_clean:
                                 match_e = re.search(r"etape\s*(\d+)", l_l_clean, re.IGNORECASE)
