@@ -5,7 +5,7 @@ import pandas as pd
 import database as db
 import re
 
-def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
+def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
     st.markdown("### 👥 Espace de Planification & Suivi des Coopératives")
     
     # 1. INITIALISATION ET VÉRIFICATION DE L'AUTHENTIFICATION SÉCURISÉE
