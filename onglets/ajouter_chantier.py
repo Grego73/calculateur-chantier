@@ -322,6 +322,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
             cout_cond += c_count * d_cond * px_cond
             cout_chefs += ch_count * d_chef * px_chef
             cout_ouvriers += o_count * d_ouv * px_ouvrier
+            
     total_salaires_recap = float(cout_chefs + cout_ouvriers + cout_cond)
     total_depenses_recap = float(total_mats_recap + total_location_recap + total_salaires_recap)
     benefice_net_recap = float(revenus - total_depenses_recap)
@@ -330,16 +331,21 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
     gain_par_jour_recap = float(benefice_net_recap / jours_totaux if jours_totaux > 0 else 0.0)
     roi_par_jour_recap = float(roi_recap / jours_totaux if jours_totaux > 0 else roi_recap)
 
-    # Textes de l'interface
+    # --- CORRECTION DE SYNTAXE ET UNIFORMISATION DU FORMAT DES JOURS ---
     txt_mats = f"{total_mats_recap:,.0f}".replace(",", " ")
     txt_loc = f"{total_location_recap:,.0f}".replace(",", " ")
     txt_sal = f"{total_salaires_recap:,.0f}".replace(",", " ")
     txt_depenses = f"{total_depenses_recap:,.0f}".replace(",", " ")
     txt_gain_jour = f"{gain_par_jour_recap:,.0f}".replace(",", " ")
-    txt_gain_jour_abs = f"{abs(gain_par_jour_recap):,.0f}".replace(",", " ")
     txt_benefice = f"{abs(benefice_net_recap):,.0f}".replace(",", " ")
+    
+    # Formatage de la Durée Générale
     txt_duree_precise = f"{jours_saisis}j {heures_saisies}h {minutes_saisies}m" if jours_totaux > 0 else "0j"
-    txt_duree_etapes = f"{total_jours_etapes:.1f} j"
+    
+    # Formatage identique pour le Cumul Étape (Conversion des décimales en heures si existantes)
+    jours_e_entiers = int(total_jours_etapes)
+    heures_e_restantes = int(round((total_jours_etapes - jours_e_entiers) * 24))
+    txt_duree_etapes = f"{jours_e_entiers}j {heures_e_restantes}h 0m"
 
     # --- METRICS EN BAS ---
     st.markdown("---")
@@ -350,28 +356,27 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
     with c_rc3: st.metric(label="👥 Total Salaires", value=f"{txt_sal} €")
     with c_rc4: st.metric(label="📉 Dépenses Totales", value=f"{txt_depenses} €")
     with c_rc5: st.metric(label="⏱️ Durée Générale", value=txt_duree_precise)
-    with c_rc6: st.metric(label="⚙️ Cumul Étape", value=txt_duree_etapes)
+    with c_rc6: st.metric(label="⚙️ Cumul Étape", value=txt_duree_etapes) # Affichage uniformisé
     with c_rc7: st.metric(label="📈 Gain / Jour", value=f"{txt_gain_jour} €/j")
 
-    # Vérification de la synchronisation du planning
+    # --- REMPLACEMENT DU BLOCAGE PAR UN SIMPLE ALERT DE COMPARAISON SANS MATRICULE DE BLOC ---
     planning_incoherent = abs(jours_totaux - total_jours_etapes) > 0.05
 
     if planning_incoherent:
-        st.error(
-            f"⛔ **Enregistrement bloqué :** La durée générale du chantier (`{jours_totaux:.2f} jours`) "
-            f"ne correspond pas à la somme de vos étapes techniques (`{total_jours_etapes:.1f} jours`). "
-            f"Veuillez corriger la durée ou le tableau des étapes pour débloquer l'action."
+        st.warning(
+            f"⚠️ **Écart de planification détecté :** La durée générale indiquée (`{txt_duree_precise}`) "
+            f"diffère du cumul calculé des étapes techniques (`{txt_duree_etapes}`)."
         )
     else:
-        st.success("✅ **Planning Synchrone :** La durée globale concorde. L'enregistrement cloud est disponible.")
+        st.success("✅ **Planning Synchrone :** La durée globale et le cumul des étapes concordent.")
 
     if benefice_net_recap >= 0: 
         st.success(f"🟢 **Rentabilité positive :** Bénéfice de **{txt_benefice} €** (ROI Global : **{roi_recap:.2f} %**)")
     else: 
         st.error(f"🔴 **Chantier déficitaire :** Perte de **{txt_benefice} €** (ROI Global : **{roi_recap:.2f} %**)")
 
-    # Bouton de soumission sécurisé par l'état du planning
-    if st.button("LANCER LE CALCUL & ENREGISTRER", type="primary", use_container_width=True, disabled=planning_incoherent):
+    # LE BOUTON EST DÉSORMAIS TOUJOURS ACTIF (disabled=False)
+    if st.button("LANCER LE CALCUL & ENREGISTRER", type="primary", use_container_width=True, disabled=False):
         df_actuel = db.charger_donnees()
         doublon_existe = False if df_actuel.empty else not df_actuel[(df_actuel["Nom du Chantier"] == nom_chantier) & (df_actuel["Revenus (€)"] == revenus)].empty
         
