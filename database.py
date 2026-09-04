@@ -233,31 +233,50 @@ def lister_toutes_les_cooperatives():
     except Exception:
         return []
 
-# À ajouter tout en bas de : database.py
+# À remplacer tout en bas de : database.py
 
-def ajouter_membre_manuel_coop(nom_coop, pseudo_a_ajouter):
+def ajouter_membres_bloc_coop(nom_coop, texte_membres_brut):
     """
-    Force l'inscription d'un collaborateur dans le tableau des membres d'une coopérative,
-    dans la limite stricte de 4 personnes au total.
+    Extrait les pseudos séparés par des espaces ou des virgules et les inscrit 
+    en bloc dans Firestore dans la limite stricte de 4 membres au total.
     """
-    if not nom_coop or not pseudo_a_ajouter:
-        return False, "⚠️ Pseudo invalide."
+    if not nom_coop or not texte_membres_brut.strip():
+        return False, "⚠️ Veuillez saisir au moins un pseudo valide."
         
     coop_ref = db.collection("cooperatives").document(nom_coop)
     coop_doc = coop_ref.get()
     
     if not coop_doc.exists:
-        return False, "❌ La coopérative n'existe pas."
+        return False, "❌ Erreur : La coopérative ciblée est introuvable."
         
     coop_data = coop_doc.to_dict()
     membres_actuels = coop_data.get("membres", [])
     
-    if pseudo_a_ajouter in membres_actuels:
-        return False, f"ℹ️ {pseudo_a_ajouter} fait déjà partie des membres inscrits."
-        
-    if len(membres_actuels) >= 4:
-        return False, "🚫 Limite atteinte : Impossible d'ajouter. La coopérative compte déjà 4 membres."
-        
-    membres_actuels.append(pseudo_a_ajouter)
-    coop_ref.update({"membres": membres_actuels})
-    return True, f"✅ {pseudo_a_ajouter} a été ajouté avec succès à la coopérative !"
+    # Découpage du texte par les espaces (et suppression des virgules si présentes)
+    pseudos_detectes = [p.strip() for p in texte_membres_brut.replace(",", " ").split() if p.strip()]
+    
+    if not pseudos_detectes:
+        return False, "⚠️ Aucun pseudo détecté après analyse."
+
+    compteur_ajouts = 0
+    messages_details = []
+
+    for pseudo in pseudos_detectes:
+        if pseudo in membres_actuels:
+            messages_details.append(f"ℹ️ {pseudo} est déjà membre.")
+            continue
+            
+        if len(membres_actuels) >= 4:
+            messages_details.append(f"🚫 {pseudo} bloqué (Limite de 4 atteinte).")
+            continue
+            
+        # Inscription validée dans la structure NoSQL
+        membres_actuels.append(pseudo)
+        compteur_ajouts += 1
+        messages_details.append(f"✅ {pseudo} ajouté.")
+
+    if compteur_ajouts > 0:
+        coop_ref.update({"membres": membres_actuels})
+        return True, f"🚀 {compteur_ajouts} collaborateur(s) synchronisé(s) ! Détails :\n" + "\n".join(messages_details)
+    
+    return False, "❌ Aucun collaborateur n'a pu être ajouté :\n" + "\n".join(messages_details)
