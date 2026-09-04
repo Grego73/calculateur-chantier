@@ -75,22 +75,35 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
         "⚙️ Gérer les Collaborateurs"
     ])
 
-    # --- LISEUR GLOBAL DE FLUX (FIRESTORE) ---
+    # --- LECTURE COMPTABLE COMPLÈTE (FIRESTORE) ---
     flux_stream = db.db.collection("cooperatives").document(nom_coop_active).collection("comptabilite_interne").stream()
     liste_flux = [f.to_dict() for f in flux_stream]
+
+    # Lecture des capitaux initiaux enregistrés (les 50k / 100k)
+    capital_stream = db.db.collection("cooperatives").document(nom_coop_active).collection("capital_initial").stream()
+    dict_capitaux = {doc.to_dict().get("joueur"): doc.to_dict().get("montant", 0.0) for doc in capital_stream}
 
     coop_ref = db.db.collection("cooperatives").document(nom_coop_active).get()
     membres_inscrits = coop_ref.to_dict().get("membres", []) if coop_ref.exists else [joueur_actif]
 
     # ==============================================================================
-    # --- TABLEAU 1 : LES 4 MEMBRES MAXIMUM ---
+    # --- TABLEAU 1 : LES 4 MEMBRES MAXIMUM (CORRIGÉ ET ACCUMULÉ AVEC LE CAPITAL) ---
     # ==============================================================================
     with tab_coop_interne:
         st.markdown("#### 📊 Grand Livre des Comptes Associés (Top 4 Membres)")
-        st.caption("Calcule la quote-part légitime basée sur les réapprovisionnements de votre équipe.")
+        st.caption("Calcule en temps réel la répartition exacte basée sur : Capital de départ + Tonnes de matériaux apportées.")
 
-        compta_membres = {m: {"Réapprovisionnements (u)": 0.0, "Achats Internes (u)": 0.0, "Total Investi Valorisé": 0.0} for m in membres_inscrits}
+        # Chargement des structures avec les capitaux réels issus de Firebase
+        compta_membres = {
+            m: {
+                "Capital de Départ (€)": float(dict_capitaux.get(m, 0.0)), 
+                "Réapprovisionnements (u)": 0.0, 
+                "Achats Internes (u)": 0.0, 
+                "Score d'Apport Total": float(dict_capitaux.get(m, 0.0))
+            } for m in membres_inscrits
+        }
 
+        # Injection analytique des lignes de l'historique lues
         for fl in liste_flux:
             user = fl.get("joueur")
             if user not in compta_membres: continue
@@ -100,18 +113,19 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
 
             if t_mouv == "REAPPROVISIONNEMENT":
                 compta_membres[user]["Réapprovisionnements (u)"] += mats_qte
-                compta_membres[user]["Total Investi Valorisé"] += (mats_qte * 30.0)
+                # Valorisation d'un point par unité de matériau pour s'ajouter équitablement au capital cash
+                compta_membres[user]["Score d'Apport Total"] += (mats_qte * 30.0)
             elif t_mouv == "ACHAT_INTERNE":
                 compta_membres[user]["Achats Internes (u)"] += mats_qte
 
         if compta_membres:
             df_coop = pd.DataFrame.from_dict(compta_membres, orient='index')
-            investissement_global_coop = df_coop["Total Investi Valorisé"].sum()
+            total_points_coop = df_coop["Score d'Apport Total"].sum()
             
-            if investissement_global_coop > 0:
-                df_coop["Quote-part Bénéfice (%)"] = (df_coop["Total Investi Valorisé"] / investissement_global_coop) * 100
+            if total_points_coop > 0:
+                df_coop["Distribution Bénéfice (%)"] = (df_coop["Score d'Apport Total"] / total_points_coop) * 100
             else:
-                df_coop["Quote-part Bénéfice (%)"] = 100.0 / len(df_coop) if len(df_coop) > 0 else 0.0
+                df_coop["Distribution Bénéfice (%)"] = 100.0 / len(df_coop) if len(df_coop) > 0 else 0.0
 
             df_coop.index.name = "Pseudo Membre"
             df_coop = df_coop.reset_index()
@@ -120,21 +134,22 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
                 df_coop, width="stretch", hide_index=True,
                 column_config={
                     "Pseudo Membre": st.column_config.TextColumn("👤 Membre de la Coop"),
+                    "Capital de Départ (€)": st.column_config.NumberColumn("💰 Capital Initial Injecté", format="%.0f €"),
                     "Réapprovisionnements (u)": st.column_config.NumberColumn("🧱 Réappro Matériaux (Qté)"),
                     "Achats Internes (u)": st.column_config.NumberColumn("🛒 Consommation Interne (Qté)"),
-                    "Total Investi Valorisé": st.column_config.NumberColumn("📈 Score d'Apport Total", format="%.0f pts"),
-                    "Quote-part Bénéfice (%)": st.column_config.NumberColumn("🏆 Distribution Bénéfice légitime", format="%.2f %%")
+                    "Score d'Apport Total": st.column_config.NumberColumn("📈 Score Global d'Apport", format="%.0f pts"),
+                    "Distribution Bénéfice (%)": st.column_config.NumberColumn("🏆 Part des Dividendes Légitimes", format="%.2f %%")
                 }
             )
         else:
             st.info("Aucune donnée comptable n'est encore enregistrée pour vos membres.")
 
     # ==============================================================================
-    # --- TABLEAU 2 : TOUS LES AUTRES JOUEURS EXTERNES PARSÉS DYNAMIQUEMENT ---
+    # --- TABLEAU 2 : TOUS LES AUTRES JOUEURS EXTERNES ---
     # ==============================================================================
     with tab_joueurs_externes:
         st.markdown("#### 🌍 Registre Général des Flux du Marché (Joueurs Externes)")
-        st.caption("Extrait et classe automatiquement tous les joueurs détectés dans vos historiques soumis.")
+        st.caption("Analyse les volumes de l'ensemble des acteurs hors-coopérative.")
 
         flux_globaux = db.charger_tous_les_achats_globaux()
 
@@ -144,7 +159,6 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
             stats_externes = {}
             for f_g in flux_globaux:
                 j_nom = f_g.get("joueur", "Inconnu")
-                # On filtre : On exclut le mot technique de réapprovisionnement et les membres internes
                 if j_nom in membres_inscrits or j_nom.lower().startswith("réappro"): continue
                 
                 if j_nom not in stats_externes:
@@ -182,16 +196,16 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
     # ==============================================================================
     with tab_depot_flux:
         st.markdown("#### 📥 Alimenter le Système via le Fil des Événements")
-        st.write("Collez le bloc d'événements du jeu. L'algorithme associe chaque ligne à sa date et son heure exactes pour bloquer les doublons.")
+        st.write("Collez le bloc d'événements du jeu. L'action est mémorisée avec sa date pour empêcher les doublons.")
 
-        zone_texte_logs = st.text_area("Collez l'historique brut du jeu ici :", height=300, key="txt_logs_flux_coop_final_v2")
+        zone_texte_logs = st.text_area("Collez l'historique brut du jeu ici :", height=300, key="txt_logs_flux_coop_final_v3")
+
         if st.button("🚀 ENREGISTRER L'HISTORIQUE ET FILTRER LES DOUBLONS", type="primary", width="stretch"):
             if not zone_texte_logs.strip():
                 st.error("❌ Veuillez coller du texte avant de valider.")
             else:
                 lignes_brutes = zone_texte_logs.split("\n")
                 
-                # Patterns Regex robustes pour intercepter le bloc double-ligne du jeu
                 regex_date = re.compile(r"Le\s*(\d{2}/\d{2}/\d{4})\s*à\s*(\d{2}:\d{2})", re.IGNORECASE)
                 regex_materiau = re.compile(r"(\d[\d\s]*)\s*(tonne|unité|unite)[s]?\s*de\s*(sable|terre|enrob|armature|tôle|tole|béton|beton|panneau|tuyau|canalisation|poutre)", re.IGNORECASE)
                 
@@ -203,21 +217,18 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
                     l_clean = lg.strip()
                     if not l_clean: continue
 
-                    # Étape A : Repérage de l'horodatage
                     match_date = regex_date.search(l_clean)
                     if match_date:
                         date_courante = match_date.group(1)
                         heure_courante = match_date.group(2)
                         continue
 
-                    # Étape B : Analyse de la ligne d'action juste en dessous de la date
                     if date_courante and heure_courante:
                         match_mat = regex_materiau.search(l_clean)
                         if match_mat:
                             qte_val = float(match_mat.group(1).replace(" ", ""))
                             type_mat_brut = match_mat.group(3).lower()
 
-                            # Normalisation NoSQL
                             mat_cle = None
                             if "sable" in type_mat_brut: mat_cle = "sable"
                             elif "terre" in type_mat_brut: mat_cle = "terre"
@@ -231,20 +242,16 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
                             elif "poutre" in type_mat_brut: mat_cle = "poutres"
 
                             if mat_cle:
-                                # Détermination de l'acteur (Membre Coop, Externe ou Réapprovisionnement Global)
                                 if "réapprovisionnement" in l_clean.lower():
                                     acteur_final = "Réapprovisionnement Global"
                                     type_mouv_final = "REAPPROVISIONNEMENT"
                                 elif "a acheté" in l_clean.lower():
-                                    # Extraction du nom (tout ce qui précède "a acheté")
                                     acteur_final = l_clean.split("a acheté")[0].strip()
-                                    # Si c'est un membre de notre coop, c'est de la consommation interne, sinon de la stat externe
                                     type_mouv_final = "ACHAT_INTERNE" if acteur_final in membres_inscrits else "ACHAT_EXTERNE"
                                 else:
                                     acteur_final = joueur_actif
                                     type_mouv_final = "REAPPROVISIONNEMENT"
 
-                                # Envoi Cloud sécurisé anti-doublon via l'empreinte temporelle unique
                                 db.enregistrer_ligne_historique_brute(
                                     nom_coop_active, date_courante, heure_courante, 
                                     acteur_final, type_mouv_final, {mat_cle: qte_val}
@@ -252,38 +259,56 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
                                 compteur_enregistres += 1
 
                 if compteur_enregistres > 0:
-                    st.success(f"🎯 Traitement terminé ! {compteur_enregistres} ligne(s) d'événements ont été analysées, dédupliquées et synchronisées cloud.")
+                    st.success(f"🎯 Traitement terminé ! {compteur_enregistres} ligne(s) d'événements synchronisée(s).")
                     st.cache_data.clear()
                     st.rerun()
                 else:
-                    st.error("❌ L'algorithme n'a pas détecté de bloc chronologique ou de matériaux valides au format officiel du jeu.")
+                    st.error("❌ Aucun bloc chronologique ou log de matériel valide détecté.")
 
     # ==============================================================================
-    # --- 4. SOUS-ONGLET : GESTION DES COLLABORATEURS EN BLOC ---
+    # --- 4. SOUS-ONGLET : GESTION DES COLLABORATEURS ET DES CAPITAUX ---
     # ==============================================================================
     with tab_gestion_membres:
-        st.markdown("#### ⚙️ Panneau de Recrutement & Réservation des Places")
-        st.write("Saisissez vos collaborateurs séparés par un espace pour leur bloquer l'accès à la coopérative.")
+        st.markdown("#### ⚙️ Panneau de Recrutement & Configuration des Capitaux")
         
         slots_occupes = len(membres_inscrits)
         st.info(f"📊 **Occupation de la Coopérative :** `{slots_occupes} / 4` places verrouillées.")
         
-        st.markdown("**Collaborateurs actuellement enregistrés :**")
-        for idx_m, mb in enumerate(membres_inscrits):
-            st.write(f"{idx_m + 1}. 👤 **{mb}**")
+        st.markdown("---")
+        st.markdown("##### 💰 Étape 1 : Ajuster le Capital initial de vos collaborateurs")
+        st.write("Saisissez ici les investissements d'origine (ex: 50000 ou 100000). Les parts de bénéfices du Tableau 1 s'ajusteront automatiquement.")
+        
+        with st.form("form_ajustement_capitaux_coop"):
+            champs_capitaux = {}
+            for mb in membres_inscrits:
+                capital_actuel = float(dict_capitaux.get(mb, 0.0))
+                champs_capitaux[mb] = st.number_input(
+                    f"Capital initial injecté par [ {mb} ] (€) :", 
+                    min_value=0.0, 
+                    value=capital_actuel, 
+                    step=10000.0,
+                    key=f"input_ajust_cap_{mb}"
+                )
             
+            if st.form_submit_button("💾 ENREGISTRER ET VERROUILLER LES CAPITAUX", width="stretch"):
+                for mb_nom, val_money in champs_capitaux.items():
+                    db.fixer_capital_initial_membre(nom_coop_active, mb_nom, val_money)
+                st.success("🎯 Tous les investissements initiaux ont été verrouillés sur Firebase et révisés !")
+                st.cache_data.clear()
+                st.rerun()
+
         st.markdown("---")
         if slots_occupes < 4:
-            st.markdown("##### ➕ Saisie groupée de vos collaborateurs")
+            st.markdown("##### ➕ Étape 2 : Ajouter de nouveaux collaborateurs")
             texte_bloc_membres = st.text_input(
-                "Saisissez les pseudos (séparés par un espace) :", 
+                "Saisissez les pseudos manquants (séparés par un espace) :", 
                 value="", 
                 placeholder="Ex: Grego73 Adri1 Julo Ctims"
             ).strip()
             
             if st.button("📝 ENREGISTRER L'ÉQUIPE EN BLOC", type="primary", width="stretch"):
                 if not texte_bloc_membres:
-                    st.error("⚠️ Saisissez au moins un pseudo dans le champ ci-dessus.")
+                    st.error("⚠️ Saisissez au moins un pseudo.")
                 else:
                     statut_ins, msg_ins = db.ajouter_membres_bloc_coop(nom_coop_active, texte_bloc_membres)
                     if statut_ins:
@@ -293,4 +318,3 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
                         st.error(msg_ins)
         else:
             st.warning("🚫 Votre équipe est complète (4/4). Vous ne pouvez plus rajouter de joueurs.")
-
