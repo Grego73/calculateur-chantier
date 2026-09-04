@@ -154,6 +154,11 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         else:
             st.session_state["cache_df_engins"] = df_engins_brut
 
+    # --- ACTION COMPLÉMENTAIRE CRITIQUE POUR FORCER LE RENOUVELLEMENT DE L'ÉDITEUR ---
+    if "compteur_refresh_engins" not in st.session_state:
+        st.session_state["compteur_refresh_engins"] = 0
+    st.session_state["compteur_refresh_engins"] += 1
+
     chantier_selectionne = st.selectbox(
         "🚀 Sélectionner un modèle de chantier dynamique :", 
         liste_triee, key="select_modele_chantier_dynamique", on_change=mise_a_jour_cache_modele
