@@ -244,18 +244,19 @@ def ajouter_reinvestissement_membre(nom_coop, pseudo_joueur, montant_cash):
     except Exception:
         return False
 
-def enregistrer_ligne_historique_brute(nom_coop, date_txt, heure_txt, acteur_txt, type_mouv, materiaux_dict):
+def enregistrer_ligne_historique_brute(nom_coop, date_txt, heure_txt, actor_txt, type_mouv, materiaux_dict):
     if not materiaux_dict:
         return
     try:
         date_cle = "".join(reversed(date_txt.split("/")))
         heure_cle = heure_txt.replace(":", "")
         mat_nom = list(materiaux_dict.keys())
+        # CORRECTION DE LA VARIABLE ICI : acteur_txt avec un e
         acteur_cle = actor_txt.lower().strip().replace(" ", "_")
         document_id = f"log_{date_cle}_{heure_cle}_{acteur_cle}_{mat_nom}"
         
         db.collection("cooperatives").document(nom_coop).collection("comptabilite_interne").document(document_id).set({
-            "joueur": acteur_txt,
+            "joueur": actor_txt,
             "type": type_mouv,
             "apport_cash": 0.0,
             "materiaux": materiaux_dict,
