@@ -83,6 +83,10 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         for k in ["sable","terre","enrobe","armature","tole","beton","panneaux","tuyaux","canalisations","poutres"]:
             st.session_state[f"val_{k}"] = 0.0
 
+    # SÉCURITÉ : Initialisation du compteur de rafraîchissement si absent
+    if "compteur_refresh_engins" not in st.session_state:
+        st.session_state["compteur_refresh_engins"] = 0
+    
     # --- ACTION DE RECEPTION DYNAMIQUE PAR ÉTAPES CORRIGÉE ANTI-CRASH ---
     def mise_a_jour_cache_modele():
         selection = st.session_state["select_modele_chantier_dynamique"]
@@ -249,8 +253,13 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         # Lecture depuis la variable tampon intermédiaire pour les engins requis
         raw_engins_state = st.session_state.get("cache_df_engins", df_besoins_init)
 
+        # Récupération de l'index de rafraîchissement
+        idx_refresh = st.session_state.get("compteur_refresh_engins", 0)
+
+        # L'éditeur possède maintenant une clé contenant l'index (ex: "editor_engins_data_3")
         engins_necessaires = st.data_editor(
-            raw_engins_state, num_rows="dynamic", use_container_width=True, key="editor_engins_data",
+            raw_engins_state, num_rows="dynamic", use_container_width=True, 
+            key=f"editor_engins_data_{idx_refresh}", # <-- LA CORRECTION TECHNIQUE EST ICI
             column_config={
                 "N° Étape": st.column_config.NumberColumn("N°", min_value=1, step=1, required=True, width="small"),
                 "Durée Étape (jours)": st.column_config.NumberColumn("Durée (jours)", min_value=1, step=1, required=True),
@@ -259,6 +268,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                 "À louer ?": st.column_config.CheckboxColumn("À louer ?", default=False)
             }
         )
+
 
         engins_transferes_list = []
         if engins_necessaires is not None and not engins_necessaires.empty and "À louer ?" in engins_necessaires.columns:
