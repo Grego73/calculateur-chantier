@@ -496,12 +496,11 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                 st.dataframe(df_liste_engins_style, use_container_width=True, hide_index=True)
 
         # ==============================================================================
-        # --- sub_tab5 : CONSULTATION BRUTE DES TABLES (SÉCURISÉE OPTION B) ---
+        # --- sub_tab5 : CONSULTATION BRUTE ET NETTOYAGE DES TABLES (CENTRALISÉ) ---
         # ==============================================================================
         with sub_tab5:
             dict_modeles = db.charger_catalogue_chantiers()
             
-            # Correction : Sécurisation si dict_modeles est une liste ou un dictionnaire
             if isinstance(dict_modeles, dict):
                 res_modeles = [dict_modeles[k] for k in dict_modeles if k != "Choisir un chantier pré-configuré..."]
             else:
@@ -509,35 +508,149 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                 
             total_modeles = len(res_modeles)
 
-            st.markdown(f"### 🗂️ Consultation brute complète ({total_modeles} chantiers en base)")
+            st.markdown(f"### 🗂️ Centre de Contrôle et Nettoyage des Tables")
+            st.write("Sélectionnez une table système pour inspecter les données brutes. Cochez les cases en fin de ligne pour supprimer définitivement des éléments sur Firebase.")
+
             choix_table = st.selectbox(
-                "Choisir la table :", ["Modèles de Chantiers Pré-configurés", "Grille Salariale Actuelle", "Prix des Matériaux de base", "Catalogue de Location des Engins"]
+                "Choisir la table système à auditer :", 
+                [
+                    "Comptabilité Interne (Flux des Coopératives)",
+                    "Modèles de Chantiers Pré-configurés", 
+                    "Grille Salariale Actuelle", 
+                    "Prix des Matériaux de base", 
+                    "Catalogue de Location des Engins"
+                ],
+                key="select_table_direction_centralisee"
             )
-            if choix_table == "Modèles de Chantiers Pré-configurés":
+
+            # --------------------------------------------------------------------------
+            # TABLE 1 : COMPTABILITÉ INTERNE AVEC SUPPRESSION LIGNE PAR LIGNE
+            # --------------------------------------------------------------------------
+            if choix_table == "Comptabilité Interne (Flux des Coopératives)":
+                # Récupération globale de tous les mouvements sur le serveur
+                flux_globaux = db.charger_tous_les_achats_globaux()
+                
+                if flux_globaux:
+                    try:
+                        df_total_flux = pd.DataFrame(flux_globaux)
+                        
+                        # Sécurisation des colonnes NoSQL
+                        for c_req in ["joueur", "type", "date_jeu", "heure_jeu", "materiaux"]:
+                            if c_req not in df_total_flux.columns:
+                                df_total_flux[c_req] = ""
+
+                        # Extraction du nom de la coopérative depuis le flux ou calcul de sécurité
+                        # Si tes dictionnaires ne contiennent pas explicitement "nom_coop", on recrée l'ID
+                        def generer_document_id_et_coop(row):
+                            d_txt = str(row.get("date_jeu", "")).strip()
+                            h_txt = str(row.get("heure_jeu", "")).strip()
+                            act_txt = str(row.get("joueur", "")).strip()
+                            dict_mats = row.get("materiaux", {})
+                            
+                            try:
+                                date_cle = "".join(reversed(d_txt.split("/")))
+                                heure_cle = h_txt.replace(":", "")
+                                mat_nom = "_".join(list(dict_mats.keys())).lower().strip()
+                                acteur_cle = act_txt.lower().strip().replace(" ", "_")
+                                doc_id = f"log_{date_cle}_{heure_cle}_{acteur_cle}_{mat_nom}"
+                                return doc_id
+                            except Exception:
+                                return None
+
+                        df_total_flux["ID_Document_Firestore"] = df_total_flux.apply(generer_document_id_et_coop, axis=1)
+
+                        # Algorithme de tri chronologique du jeu (Plus récent en premier)
+                        def generer_cle_tri(row):
+                            d_txt = str(row.get("date_jeu", "01/01/2000")).strip()
+                            h_txt = str(row.get("heure_jeu", "00:00")).strip()
+                            try:
+                                return f'{"".join(reversed(d_txt.split("/")))}_(h_txt.replace(":", ""))'
+                            except Exception:
+                                return "20000101_0000"
+
+                        df_total_flux["cle_tri_jeu"] = df_total_flux.apply(generer_cle_tri, axis=1)
+                        df_total_flux = df_total_flux.sort_values(by="cle_tri_jeu", ascending=False)
+
+                        # Formatage visuel propre
+                        def formater_materiaux(dict_mats):
+                            if not isinstance(dict_mats, dict) or not dict_mats: return "Aucun"
+                            return ", ".join([f"{k.capitalize()} ({int(v)} u)" for k, v in dict_mats.items()])
+                        
+                        df_total_flux["Ressources"] = df_total_flux["materiaux"].apply(formater_materiaux)
+                        
+                        def mapper_type(t):
+                            mapping = {"REAPPROVISIONNEMENT": "🧱 Réappro", "ACHAT_INTERNE": "🛒 Achat Int.", "ACHAT_EXTERNE": "🌍 Achat Ext.", "REINVESTISSEMENT_CASH": "💰 Cash"}
+                            return mapping.get(t, t)
+                        df_total_flux["Action"] = df_total_flux["type"].apply(mapper_type)
+
+                        df_total_flux["Supprimer ? ❌"] = False
+
+                        # Construction de la vue Direction
+                        df_visuel_flux = df_total_flux[["date_jeu", "heure_jeu", "joueur", "Action", "Ressources", "ID_Document_Firestore", "Supprimer ? ❌"]]
+
+                        flux_edite = st.data_editor(
+                            df_visuel_flux, width="stretch", height=450, hide_index=True, key="editor_dir_compta_flux",
+                            column_config={
+                                "date_jeu": st.column_config.TextColumn("📅 Date Jeu", disabled=True),
+                                "heure_jeu": st.column_config.TextColumn("⏱️ Heure Jeu", disabled=True),
+                                "joueur": st.column_config.TextColumn("👤 Joueur / Acteur", disabled=True),
+                                "Action": st.column_config.TextColumn("🏷️ Action", disabled=True),
+                                "Ressources": st.column_config.TextColumn("🧱 Détails", disabled=True),
+                                "ID_Document_Firestore": st.column_config.TextColumn("ID Firestore", disabled=True, width="small"),
+                                "Supprimer ? ❌": st.column_config.CheckboxColumn("Supprimer ?", default=False)
+                            }
+                        )
+
+                        # Execution de la suppression de masse par lot
+                        if flux_edite is not None:
+                            lignes_a_effacer = flux_edite[flux_edite["Supprimer ? ❌"] == True]
+                            if not lignes_a_effacer.empty:
+                                nb_effacements = len(lignes_a_effacer)
+                                if st.button(f"💥 SUPPRIMER DÉFINITIVEMENT ({nb_effacements}) FLUX DE COMPTABILITÉ", type="primary", width="stretch"):
+                                    
+                                    # Pour effacer sans l'information de la coop dans l'objet, on scanne les collections racines des coopératives
+                                    coops_liste = db.lister_toutes_les_cooperatives()
+                                    compteur_global = 0
+                                    
+                                    for _, r_del in lignes_a_effacer.iterrows():
+                                        id_cible = r_del["ID_Document_Firestore"]
+                                        if id_cible:
+                                            for cp in coops_liste:
+                                                try:
+                                                    doc_ref = db.db.collection("cooperatives").document(cp).collection("comptabilite_interne").document(id_cible)
+                                                    if doc_ref.get().exists:
+                                                        doc_ref.delete()
+                                                        compteur_global += 1
+                                                        break
+                                                except Exception:
+                                                    pass
+                                                    
+                                    st.success(f"🔥 Nettoyage réussi : {compteur_global} transaction(s) effacée(s).")
+                                    st.cache_data.clear()
+                                    st.rerun()
+                    except Exception as e:
+                        st.error(f"Erreur d'indexation ou de structure : {e}")
+                else:
+                    st.info("💡 Aucun flux comptable répertorié sur le serveur.")
+
+            # --------------------------------------------------------------------------
+            # TABLE 2 : MODÈLES DE CHANTIERS AVEC COCHE DE SUPPRESSION
+            # --------------------------------------------------------------------------
+            elif choix_table == "Modèles de Chantiers Pré-configurés":
                 if res_modeles:
-                    df_apercu = pd.DataFrame(res_modeles)
-                    if "engins_requis" in df_apercu.columns: df_apercu = df_apercu.drop(columns=["engins_requis"])
-                    if "etapes_techniques" in df_apercu.columns: df_apercu = df_apercu.drop(columns=["etapes_techniques"])
-                    colonnes_numeriques = df_apercu.select_dtypes(include=['number']).columns
-                    df_stylise = df_apercu.style.format({col: lambda x: f"{x:,.0f}".replace(",", " ") if pd.notnull(x) else "-" for col in colonnes_numeriques})
-                    st.dataframe(df_stylise, use_container_width=True, hide_index=True)
-                else: 
-                    st.info("Aucun modèle configuré sur votre base Firebase.")
-            elif choix_table == "Grille Salariale Actuelle": 
-                salaires_formates = {k: f"{v:,.0f}".replace(",", " ") + " €" for k, v in SALAIRES_DB.items()}
-                st.json(salaires_formates)
-            elif choix_table == "Prix des Matériaux de base": 
-                materiaux_formates = {k: f"{v:,.0f}".replace(",", " ") + " €" for k, v in MATERIAUX_DB.items()}
-                st.json(materiaux_formates)
-            elif choix_table == "Catalogue de Location des Engins":
-                catalogue_engins_brut = db.charger_catalogue_engins()
-                if catalogue_engins_brut: 
-                    res = [{"Engin Modèle": k, "Prix/j (€)": v} for k, v in catalogue_engins_brut.items()]
-                    df_engins_apercu = pd.DataFrame(res)
-                    df_engins_stylise = df_engins_apercu.style.format({"Prix/j (€)": lambda x: f"{x:,.0f}".replace(",", " ") + " €" if pd.notnull(x) else "-"})
-                    st.dataframe(df_engins_stylise, use_container_width=True, hide_index=True)
-                else: 
-                    st.info("Catalogue vide.")
+                    df_chantiers = pd.DataFrame(res_modeles)
+                    
+                    # Nettoyage visuel des structures complexes pour garder le tableau lisible
+                    for col_drop in ["engins_requis", "etapes_techniques", "jours_globaux", "heures_globales", "minutes_globales"]:
+                        if col_drop in df_chantiers.columns:
+                            df_chantiers = df_chantiers.drop(columns=[col_drop])
+                    
+                    df_chantiers["Supprimer ? ❌"] = False
+                    
+                    chantiers_edites = st.data_editor(
+                        df_chantiers, width="stretch", height=400, hide_index=True, key="editor_dir_modeles_chantiers",
+                        column_config={
+
 
         # ==============================================================================
         # --- sub_tab6 : COMPARATEUR DE FICHES CHANTIERS (SÉCURISÉ) ---
