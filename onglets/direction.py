@@ -228,11 +228,6 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                 prix_ch = 0.0
                                 nom_ch = l_clean.replace("euros", "").replace("Euros", "").strip()
                                 
-                            if (nom_ch.lower(), prix_ch) in modeles_deja_presents:
-                                nom_courant = None
-                                compteur_doublons_bloques += 1
-                                continue
-                                
                             nom_courant = f"{nom_ch} - {int(prix_ch)}€"
                             etape_courante_num = None
                             
@@ -253,17 +248,15 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                                 chantiers_detectes[nom_courant]["revenus"] = float(prix_txt)
                             continue
 
+                        # --- DECODAGE DU TEMPS CORRIGÉ ET ROBUSTE ---
                         if "durée du chantier :" in l_clean.lower() or "duree du chantier :" in l_clean.lower():
                             partie_duree = l_clean.split(":")[-1].lower()
                             
-                            # Nettoyage de la ponctuation pour éviter les blocages textuels
+                            # On nettoie tous les caractères parasites qui collent aux chiffres
                             for char in [",", "(", ")", "s", "."]:
                                 partie_duree = partie_duree.replace(char, " ")
                             
-                            # Découpage par mot pour une analyse ciblée
                             mots = partie_duree.split()
-                            
-                            # Balayage indexé pour capturer les nombres précédant les unités
                             for idx_mot, mot in enumerate(mots):
                                 if idx_mot > 0:
                                     chiffre_txt = "".join(c for c in mots[idx_mot - 1] if c.isdigit())
