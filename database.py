@@ -281,3 +281,18 @@ def charger_tous_les_achats_globaux():
         return tous_achats
     except Exception:
         return []
+
+def obtenir_date_premier_chantier():
+    try:
+        # On récupère tous les chantiers enregistrés
+        docs = db.collection("chantiers").stream()
+        df = charger_donnees() # Réutilise votre fonction existante qui crée le DataFrame
+        
+        if not df.empty and 'Nom du Chantier' in df.columns:
+            # Si vous triez vos journaux ou chantiers, vous pouvez aussi le faire via la collection des logs
+            # Mais si vous cherchez le premier log comptable d'une coopérative :
+            return "Données disponibles"
+            
+    except Exception:
+        return "Aucune entrée"
+
