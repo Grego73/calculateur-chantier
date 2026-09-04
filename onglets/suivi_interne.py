@@ -223,35 +223,64 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS):
                 st.error("❌ Analyse impossible : Saisissez des données valides.")
 
     # ==============================================================================
-    # --- 4. SOUS-ONGLET : GESTION TECHNIQUE DES INVITATIONS / AJOUTS DE MEMBRES ---
+    # --- 4. SOUS-ONGLET : GESTION DES COLLABORATEURS & INVESTISSEMENT INITIAL ---
     # ==============================================================================
     with tab_gestion_membres:
-        st.markdown("#### ⚙️ Panneau de Recrutement & Réservation des Places")
-        st.write("Ajoutez manuellement les pseudos de vos 4 collaborateurs pour leur bloquer l'accès à la coopérative.")
+        st.markdown("#### ⚙️ Panneau de Recrutement & Registre des Apports de Départ")
         
-        # Affichage des membres qui occupent actuellement les slots NoSQL
         slots_occupes = len(membres_inscrits)
         st.info(f"📊 **Occupation de la Coopérative :** `{slots_occupes} / 4` places verrouillées.")
         
-        st.markdown("**Collaborateurs actuellement enregistrés :**")
+        st.markdown("**📋 Membres inscrits et apports validés :**")
         for idx_m, mb in enumerate(membres_inscrits):
             st.write(f"{idx_m + 1}. 👤 **{mb}**")
             
         st.markdown("---")
+        
+        # Formulaire principal de saisie groupée
         if slots_occupes < 4:
-            st.markdown("##### ➕ Ajouter un collaborateur à la liste")
-            pseudo_manuel = st.text_input("Saisissez le pseudo exact du joueur à inviter :", value="").strip()
+            st.markdown("##### ➕ Étape 1 : Saisie de l'équipe")
+            texte_bloc_membres = st.text_input(
+                "Entrez les pseudos manquants (séparés par un espace) :", 
+                value="", 
+                placeholder="Ex: Grego73 Adri1 Julo Ctims"
+            ).strip()
             
-            if st.button("📝 VALIDER ET INSCRIRE LE COLLABORATEUR", type="primary", width="stretch"):
-                if not pseudo_manuel:
-                    st.error("⚠️ Saisissez un pseudo valide.")
-                else:
-                    # Envoi de l'inscription forcée vers Firestore via la fonction dédiée
-                    statut_ins, msg_ins = db.ajouter_membre_manuel_coop(nom_coop_active, pseudo_manuel)
+            if st.button("📝 ENREGISTRER LES UTILISATEURS", type="secondary", width="stretch"):
+                if texte_bloc_membres:
+                    statut_ins, msg_ins = db.ajouter_membres_bloc_coop(nom_coop_active, texte_bloc_membres)
                     if statut_ins:
                         st.success(msg_ins)
+                        st.cache_data.clear()
                         st.rerun()
                     else:
                         st.error(msg_ins)
-        else:
-            st.warning("🚫 Votre équipe est complète (4/4). Vous ne pouvez plus ajouter de collaborateurs.")
+                        
+        st.markdown("##### 💰 Étape 2 : Déclarer l'Investissement de Départ de chaque membre")
+        st.write("Saisissez la mise de départ en cash pour chaque joueur actif. Les calculs de bénéfices de la coopérative s'ajusteront instantanément.")
+        
+        with st.form("form_investissements_initiaux"):
+            dict_apports_saisis = {}
+            # Génération d'une case numérique par membre inscrit en base de données
+            for mb in membres_inscrits:
+                dict_apports_saisis[mb] = st.number_input(
+                    f"Capital initial injecté par [ {mb} ] (€) :", 
+                    min_value=0.0, 
+                    value=0.0, 
+                    step=1000.0, 
+                    key=f"init_cash_input_{mb}"
+                )
+            
+            if st.form_submit_button("💥 VERROUILLER ET APPLIQUER LES APPORTS", width="stretch"):
+                compteur_enregistrements = 0
+                for mb_nom, montant_v in dict_apports_saisis.items():
+                    if montant_v > 0:
+                        # Envoi de la transaction NoSQL d'apport initial vers Firestore
+                        db.enregistrer_mouvement_coop(nom_coop_active, mb_nom, "APPORT_INITIAL", {}, montant_v)
+                        compteur_enregistrements += 1
+                        
+                if compteur_enregistrements > 0:
+                    st.success(f"🎯 {compteur_enregistrements} apport(s) de départ enregistré(s) avec succès ! Les quotes-parts de bénéfices ont été recalculées.")
+                    st.rerun()
+                else:
+                    st.error("❌ Veuillez entrer un montant supérieur à 0 € pour au moins un membre.")
