@@ -538,14 +538,36 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             if c_req not in df_total_flux.columns:
                                 df_total_flux[c_req] = ""
 
-                        # Génération propre de l'identifiant technique du document
+                        # 1. Génération propre de l'identifiant technique du document et extraction temporelle des apports
                         def generer_document_id_et_coop(row):
+                            d_txt = row.get("date_jeu")
+                            h_txt = row.get("heure_jeu")
+                            t_mouv = row.get("type", "")
+                            ts = row.get("timestamp", "")
+                            
+                            # Si c'est un apport en argent et que les dates de jeu n'existent pas, on extrait du timestamp
+                            if (not d_txt or d_txt == "None") and ts and ("CASH" in t_mouv or "INITIAL" in t_mouv):
+                                try:
+                                    # Le timestamp est au format "AAAA-MM-JJ HH:MM:SS"
+                                    p_date, p_heure = ts.split(" ")
+                                    aa, mm, jj = p_date.split("-")
+                                    row["date_jeu"] = f"{jj}/{mm}/{aa}"
+                                    row["heure_jeu"] = p_heure[:5]
+                                except Exception:
+                                    pass
+
                             d_txt = str(row.get("date_jeu", "")).strip()
                             h_txt = str(row.get("heure_jeu", "")).strip()
                             act_txt = str(row.get("joueur", "")).strip()
                             dict_mats = row.get("materiaux", {})
                             
                             try:
+                                # Pour les apports financiers purs, l'ID Firestore se base sur le timestamp ou pseudo
+                                if "CASH" in t_mouv or "INITIAL" in t_mouv:
+                                    # Format historique ou unique des apports
+                                    ts_cle = ts.replace("-","").replace(":","").replace(" ","_")
+                                    return f"reinvest_{ts_cle}_{act_txt.lower().strip()}"
+                                
                                 date_cle = "".join(reversed(d_txt.split("/")))
                                 heure_cle = h_txt.replace(":", "")
                                 mat_nom = "_".join(list(dict_mats.keys())).lower().strip()
@@ -556,16 +578,24 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
 
                         df_total_flux["ID_Document_Firestore"] = df_total_flux.apply(generer_document_id_et_coop, axis=1)
 
-                        # LA CORRECTION EST ICI : Clé de tri générée proprement sans mauvaise f-string
+                        # 2. Clé de tri chronologique universelle (temps de jeu OU timestamp réel si manquant)
                         def generer_cle_tri(row):
-                            d_txt = str(row.get("date_jeu", "01/01/2000")).strip()
-                            h_txt = str(row.get("heure_jeu", "00:00")).strip()
-                            try:
-                                date_cle = "".join(reversed(d_txt.split("/")))
-                                heure_cle = h_txt.replace(":", "")
-                                return f"{date_cle}_{heure_cle}"
-                            except Exception:
-                                return "20000101_0000"
+                            d_txt = str(row.get("date_jeu", "")).strip()
+                            h_txt = str(row.get("heure_jeu", "")).strip()
+                            ts = str(row.get("timestamp", "")).strip()
+                            
+                            if d_txt and d_txt != "None" and h_txt and h_txt != "None":
+                                try:
+                                    date_cle = "".join(reversed(d_txt.split("/")))
+                                    heure_cle = h_txt.replace(":", "")
+                                    return f"{date_cle}_{heure_cle}"
+                                  except Exception:
+                                    pass
+                            
+                            # Repli sur le timestamp réel NoSQL si aucune date de jeu n'est disponible
+                            if ts:
+                                return ts.replace("-","").replace(":","").replace(" ","_")
+                            return "20000101_0000"
 
                         df_total_flux["cle_tri_jeu"] = df_total_flux.apply(generer_cle_tri, axis=1)
                         df_total_flux = df_total_flux.sort_values(by="cle_tri_jeu", ascending=False)
@@ -578,9 +608,16 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                         df_total_flux["Ressources"] = df_total_flux["materiaux"].apply(formater_materiaux)
                         
                         def mapper_type(t):
-                            mapping = {"REAPPROVISIONNEMENT": "🧱 Réappro", "ACHAT_INTERNE": "🛒 Achat Int.", "ACHAT_EXTERNE": "🌍 Achat Ext.", "REINVESTISSEMENT_CASH": "💰 Cash"}
+                            mapping = {
+                                "REAPPROVISIONNEMENT": "🧱 Réappro", 
+                                "ACHAT_INTERNE": "🛒 Achat Int.", 
+                                "ACHAT_EXTERNE": "🌍 Achat Ext.", 
+                                "REINVESTISSEMENT_CASH": "💰 Rallonge Cash",
+                                "APPORT_INITIAL": "💎 Cap. Initial"
+                            }
                             return mapping.get(t, t)
                         df_total_flux["Action"] = df_total_flux["type"].apply(mapper_type)
+
 
                         df_total_flux["Supprimer ? ❌"] = False
 
