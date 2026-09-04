@@ -256,16 +256,27 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                         if "durée du chantier :" in l_clean.lower() or "duree du chantier :" in l_clean.lower():
                             partie_duree = l_clean.split(":")[-1].lower()
                             
-                            # Expressions régulières améliorées pour capturer avec ou sans parenthèses/pluriels
-                            m_j = re.search(r"(\d+)\s*jour", partie_duree)
-                            m_h = re.search(r"(\d+)\s*heure", partie_duree)
-                            m_m = re.search(r"(\d+)\s*minute", partie_duree)
+                            # Nettoyage de la ponctuation pour éviter les blocages textuels
+                            for char in [",", "(", ")", "s", "."]:
+                                partie_duree = partie_duree.replace(char, " ")
                             
-                            # Sauvegarde sécurisée dans le dictionnaire du chantier détecté
-                            if m_j: chantiers_detectes[nom_courant]["jours"] = int(m_j.group(1))
-                            if m_h: chantiers_detectes[nom_courant]["heures"] = int(m_h.group(1))
-                            if m_m: chantiers_detectes[nom_courant]["minutes"] = int(m_m.group(1))
+                            # Découpage par mot pour une analyse ciblée
+                            mots = partie_duree.split()
+                            
+                            # Balayage indexé pour capturer les nombres précédant les unités
+                            for idx_mot, mot in enumerate(mots):
+                                if idx_mot > 0:
+                                    chiffre_txt = "".join(c for c in mots[idx_mot - 1] if c.isdigit())
+                                    if chiffre_txt:
+                                        valeur_numerique = int(chiffre_txt)
+                                        if mot.startswith("jour"):
+                                            chantiers_detectes[nom_courant]["jours"] = valeur_numerique
+                                        elif mot.startswith("heure"):
+                                            chantiers_detectes[nom_courant]["heures"] = valeur_numerique
+                                        elif mot.startswith("minute"):
+                                            chantiers_detectes[nom_courant]["minutes"] = valeur_numerique
                             continue
+
 
                         if l_clean.lower().startswith("etape") and ":" in l_clean:
                             match_e = re.search(r"etape\s*(\d+)", l_clean, re.IGNORECASE)
@@ -861,16 +872,27 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                         if "durée du chantier :" in l_clean.lower() or "duree du chantier :" in l_clean.lower():
                             partie_duree = l_clean.split(":")[-1].lower()
                             
-                            # Expressions régulières améliorées pour capturer avec ou sans parenthèses/pluriels
-                            m_j = re.search(r"(\d+)\s*jour", partie_duree)
-                            m_h = re.search(r"(\d+)\s*heure", partie_duree)
-                            m_m = re.search(r"(\d+)\s*minute", partie_duree)
+                            # Nettoyage de la ponctuation pour éviter les blocages textuels
+                            for char in [",", "(", ")", "s", "."]:
+                                partie_duree = partie_duree.replace(char, " ")
                             
-                            # Sauvegarde sécurisée dans le dictionnaire du chantier détecté
-                            if m_j: chantiers_detectes[nom_courant]["jours"] = int(m_j.group(1))
-                            if m_h: chantiers_detectes[nom_courant]["heures"] = int(m_h.group(1))
-                            if m_m: chantiers_detectes[nom_courant]["minutes"] = int(m_m.group(1))
+                            # Découpage par mot pour une analyse ciblée
+                            mots = partie_duree.split()
+                            
+                            # Balayage indexé pour capturer les nombres précédant les unités
+                            for idx_mot, mot in enumerate(mots):
+                                if idx_mot > 0:
+                                    chiffre_txt = "".join(c for c in mots[idx_mot - 1] if c.isdigit())
+                                    if chiffre_txt:
+                                        valeur_numerique = int(chiffre_txt)
+                                        if mot.startswith("jour"):
+                                            chantiers_detectes[nom_courant]["jours"] = valeur_numerique
+                                        elif mot.startswith("heure"):
+                                            chantiers_detectes[nom_courant]["heures"] = valeur_numerique
+                                        elif mot.startswith("minute"):
+                                            chantiers_detectes[nom_courant]["minutes"] = valeur_numerique
                             continue
+
 
                             if l_l_clean.lower().startswith("etape") and ":" in l_l_clean:
                                 match_e = re.search(r"etape\s*(\d+)", l_l_clean, re.IGNORECASE)
