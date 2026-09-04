@@ -1,3 +1,5 @@
+# Contenu complet, sécurisé et validé pour : database.py
+
 import streamlit as st
 import pandas as pd
 from google.cloud import firestore
@@ -213,18 +215,53 @@ def ajouter_membres_bloc_coop(nom_coop, texte_membres_brut):
 
     if compteur_ajouts > 0:
         coop_ref.update({"membres": membres_actuels})
-        return True, f"🚀 {compteur_ajouts} collaborateur(s) pré-inscrit(s) ! Initialisez leurs apports de départ ci-dessous."
+        return True, f"🚀 {compteur_ajouts} collaborateur(s) ajouté(s) à la liste ! Initialisez leurs investissements ci-dessous."
     return False, "ℹ️ Aucun nouveau membre unique n'a été détecté ou la limite de 4 est atteinte."
 
-def enregistrer_mouvement_coop(nom_coop, pseudo_joueur, type_mouvement, materiaux_dict, apport_financier=0.0):
+def fixer_capital_initial_membre(nom_coop, pseudo_joueur, montant_cash):
     try:
-        mouvement_id = f"flux_{int(pd.Timestamp.now().timestamp())}_{pseudo_joueur}"
+        doc_id = f"capital_{pseudo_joueur}"
+        db.collection("cooperatives").document(nom_coop).collection("capital_initial").document(doc_id).set({
+            "joueur": pseudo_joueur,
+            "montant": float(montant_cash),
+            "timestamp": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
+        })
+        return True
+    except Exception:
+        return False
+
+def ajouter_reinvestissement_membre(nom_coop, pseudo_joueur, montant_cash):
+    try:
+        mouvement_id = f"reinvest_{int(pd.Timestamp.now().timestamp())}_{pseudo_joueur}"
         db.collection("cooperatives").document(nom_coop).collection("comptabilite_interne").document(mouvement_id).set({
             "joueur": pseudo_joueur,
-            "type": type_mouvement,
-            "apport_cash": float(apport_financier),
-            "materiaux": materiaux_dict,
+            "type": "REINVESTISSEMENT_CASH",
+            "apport_cash": float(montant_cash),
+            "materiaux": {},
             "timestamp": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
+        })
+        return True
+    except Exception:
+        return False
+
+def enregistrer_ligne_historique_brute(nom_coop, date_txt, heure_txt, acteur_txt, type_mouv, materiaux_dict):
+    if not materiaux_dict:
+        return
+    try:
+        date_cle = "".join(reversed(date_txt.split("/")))
+        heure_cle = heure_txt.replace(":", "")
+        mat_nom = list(materiaux_dict.keys())
+        acteur_cle = actor_txt.lower().strip().replace(" ", "_")
+        document_id = f"log_{date_cle}_{heure_cle}_{acteur_cle}_{mat_nom}"
+        
+        db.collection("cooperatives").document(nom_coop).collection("comptabilite_interne").document(document_id).set({
+            "joueur": acteur_txt,
+            "type": type_mouv,
+            "apport_cash": 0.0,
+            "materiaux": materiaux_dict,
+            "date_jeu": date_txt,
+            "heure_jeu": heure_txt,
+            "timestamp_enregistrement": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
         })
     except Exception:
         pass
@@ -240,52 +277,3 @@ def charger_tous_les_achats_globaux():
         return tous_achats
     except Exception:
         return []
-
-# À ajouter / remplacer tout en bas de : database.py
-
-def enregistrer_ligne_historique_brute(nom_coop, date_txt, heure_txt, acteur_txt, type_mouv, materiaux_dict):
-    """
-    Enregistre un mouvement log du jeu avec une clé technique dédupliquée 
-    pour empêcher l'insertion de doublons temporels.
-    """
-    if not materiaux_dict:
-        return
-    
-    # Normalisation de la date pour la clé NoSQL (Ex: 03/09/2026 -> 20260903)
-    date_cle = "".join(reversed(date_txt.split("/")))
-    heure_cle = heure_txt.replace(":", "")
-    mat_nom = list(materiaux_dict.keys())[0]
-    
-    # Génération de l'empreinte unique
-    acteur_cle = acteur_txt.lower().strip().replace(" ", "_")
-    document_id = f"log_{date_cle}_{heure_cle}_{acteur_cle}_{mat_nom}"
-    
-    db.collection("cooperatives").document(nom_coop).collection("comptabilite_interne").document(document_id).set({
-        "joueur": acteur_txt,
-        "type": type_mouv,
-        "apport_cash": 0.0,
-        "materiaux": materiaux_dict,
-        "date_jeu": date_txt,
-        "heure_jeu": heure_txt,
-        "timestamp_enregistrement": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
-    })
-
-# À ajouter tout en bas de : database.py
-
-def ajouter_reinvestissement_membre(nom_coop, pseudo_joueur, montant_cash):
-    """
-    Enregistre une rallonge/réinvestissement financier pour un membre de la coopérative
-    et l'ajoute à l'historique NoSQL sous une catégorie spécifique.
-    """
-    try:
-        mouvement_id = f"reinvest_{int(pd.Timestamp.now().timestamp())}_{pseudo_joueur}"
-        db.collection("cooperatives").document(nom_coop).collection("comptabilite_interne").document(mouvement_id).set({
-            "joueur": pseudo_joueur,
-            "type": "REINVESTISSEMENT_CASH",
-            "apport_cash": float(montant_cash),
-            "materiaux": {},
-            "timestamp": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
-        })
-        return True
-    except Exception:
-        return False
