@@ -90,6 +90,26 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
     # ==============================================================================
     with tab_coop_interne:
         st.markdown("#### 📊 Grand Livre des Comptes Associés (Top 4 Membres)")
+        
+        # --- EXTRACTION ET AFFICHAGE DE LA PREMIÈRE ENTRÉE DE L'HISTORIQUE ---
+        date_premiere_entree = None
+        if liste_flux:
+            # On récupère toutes les dates de jeu valides du fil d'événements
+            dates_jeu = [fl.get("date_jeu") for fl in liste_flux if fl.get("date_jeu")]
+            if dates_jeu:
+                try:
+                    # Tri chronologique des dates au format JJ/MM/AAAA
+                    dates_jeu_triees = sorted(dates_jeu, key=lambda d: "".join(reversed(d.split("/"))))
+                    date_premiere_entree = dates_jeu_triees[0]
+                except Exception:
+                    date_premiere_entree = None
+
+        # Affichage du badge d'information temporel juste au-dessus du tableau
+        if date_premiere_entree:
+            st.info(f"📅 **Première activité enregistrée dans l'historique :** `{date_premiere_entree}`")
+        else:
+            st.caption("💡 Aucune date d'événement archivée pour le moment.")
+
         st.caption("Suivi précis des apports financiers de départ, des réinvestissements ultérieurs et des coefficients de dividendes.")
 
         compta_membres = {
@@ -149,6 +169,7 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
             )
         else:
             st.info("Aucune donnée comptable n'est encore enregistrée.")
+
 
     # ==============================================================================
     # --- TABLEAU 2 : TOUS LES ACTEURS DU MARCHÉ & GRAPHIQUE ---
