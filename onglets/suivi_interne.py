@@ -240,7 +240,7 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
         st.markdown("#### 📥 Alimenter le Système via le Fil des Événements")
         st.write("Collez l'historique brut du jeu ici. Le parseur filtre automatiquement les doublons temporels.")
 
-        zone_texte_logs = st.text_area("Collez l'historique brut du jeu ici :", height=300, key="txt_logs_flux_coop_final_v5")
+        zone_texte_logs = st.text_area("Collez l'historique brut du jeu ici :", height=200, key="txt_logs_flux_coop_final_v5")
 
         if st.button("🚀 ENREGISTRER L'HISTORIQUE ET FILTRER LES DOUBLONS", type="primary", width="stretch"):
             if not zone_texte_logs.strip():
@@ -310,6 +310,56 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
                     st.rerun()
                 else:
                     st.error("❌ Aucun log de matériel valide détecté.")
+
+        # --- AJOUT : VISUALISATION DES 5 DERNIÈRES ENTRÉES EFFECTUÉES ---
+        st.markdown("---")
+        st.markdown("##### ⏱️ Les 5 dernières entrées enregistrées (Flux Récent)")
+        
+        if liste_flux:
+            try:
+                # Création d'un DataFrame propre à partir des flux de la coopérative active
+                df_flux_recents = pd.DataFrame(liste_flux)
+                
+                # Double vérification des colonnes indispensables
+                for c_req in ["timestamp_enregistrement", "joueur", "type", "date_jeu", "heure_jeu", "materiaux"]:
+                    if c_req not in df_flux_recents.columns:
+                        df_flux_recents[c_req] = ""
+
+                # Tri par date et heure système pour avoir le flux le plus récent en premier
+                df_flux_recents = df_flux_recents.sort_values(by="timestamp_enregistrement", ascending=False).head(5)
+
+                # Formatage du dictionnaire de matériaux pour un affichage lisible (ex: {"sable": 50} -> "Sable : 50")
+                def formater_materiaux(dict_mats):
+                    if not isinstance(dict_mats, dict) or not dict_mats:
+                        return "Aucun"
+                    return ", ".join([f"{k.capitalize()} ({int(v)} u)" for k, v in dict_mats.items()])
+
+                df_flux_recents["Détail Matériaux"] = df_flux_recents["materiaux"].apply(formater_materiaux)
+                
+                # Remplacer les types bruts NoSQL par des badges lisibles
+                def mapper_type(t):
+                    mapping = {"REAPPROVISIONNEMENT": "🧱 Réappro", "ACHAT_INTERNE": "🛒 Achat Int.", "ACHAT_EXTERNE": "🌍 Achat Ext.", "REINVESTISSEMENT_CASH": "💰 Cash"}
+                    return mapping.get(t, t)
+                df_flux_recents["Type"] = df_flux_recents["type"].apply(mapper_type)
+
+                # Sélection des colonnes ordonnées à afficher
+                df_flux_recents = df_flux_recents[["date_jeu", "heure_jeu", "joueur", "Type", "Détail Matériaux"]]
+
+                st.dataframe(
+                    df_flux_recents, width="stretch", hide_index=True,
+                    column_config={
+                        "date_jeu": st.column_config.TextColumn("📅 Date Jeu"),
+                        "heure_jeu": st.column_config.TextColumn("⏱️ Heure Jeu"),
+                        "joueur": st.column_config.TextColumn("👤 Joueur / Acteur"),
+                        "Type": st.column_config.TextColumn("🏷️ Action"),
+                        "Détail Matériaux": st.column_config.TextColumn("🧱 Ressources transférées")
+                    }
+                )
+            except Exception as e:
+                st.caption(f"ℹ️ Impossible de mettre en forme le flux récent ({e}).")
+        else:
+            st.info("💡 L'historique de cette coopérative est vierge pour le moment.")
+
 
     # ==============================================================================
     # --- 4. GESTION DES REINVESTISSEMENTS ET DES COLLABORATEURS ---
