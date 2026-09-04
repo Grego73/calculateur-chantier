@@ -854,11 +854,17 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                 logs_stream = db.db.collection("journaux_actions").order_by("timestamp", direction="DESCENDING").limit(100).stream()
                 liste_logs = [d.to_dict() for d in logs_stream]
             except Exception:
+                # REMPLACEMENT SÉCURISÉ DANS onglets/direction.py (sub_tab9) :
                 try:
                     logs_stream = db.db.collection("journaux_actions").limit(100).stream()
                     liste_logs = [d.to_dict() for d in logs_stream]
+                    if liste_logs:
+                        df_logs = pd.DataFrame(liste_logs)
+                        if "timestamp" in df_logs.columns:
+                            df_logs = df_logs.sort_values(by="timestamp", ascending=False)
                 except Exception:
                     liste_logs = []
+
 
             if liste_logs:
                 df_logs = pd.DataFrame(liste_logs)
