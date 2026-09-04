@@ -1,4 +1,4 @@
-# Contenu complet validé pour : onglets/ajouter_chantier.py
+# Contenu complet et validé pour : onglets/ajouter_chantier.py
 
 import streamlit as st
 import pandas as pd
@@ -82,11 +82,8 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         st.session_state["val_jours"] = 0
         for k in ["sable","terre","enrobe","armature","tole","beton","panneaux","tuyaux","canalisations","poutres"]:
             st.session_state[f"val_{k}"] = 0.0
-        st.session_state["val_jh_cond"] = 0.0
-        st.session_state["val_jh_chef"] = 0.0
-        st.session_state["val_jh_ouvrier"] = 0.0
 
-    # --- ACTION DE RECEPTION DYNAMIQUE PAR ÉTAPES (OPTION B) ---
+    # --- ACTION DE RECEPTION DYNAMIQUE PAR ÉTAPES CORRIGÉE ANTI-CRASH ---
     def mise_a_jour_cache_modele():
         selection = st.session_state["select_modele_chantier_dynamique"]
         if selection == "Choisir un chantier pré-configuré...":
@@ -95,8 +92,8 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         modele = CATALOGUE_CHANTIERS[selection]
         etapes_cloud = modele.get("etapes_techniques", [])
         
-        # Nettoyage forcé des anciens états de session pour éviter les mélanges
-        for k in ["table_engins_necessaires", "table_engins_a_louer", "table_employes_planification_etapes"]:
+        # Nettoyage préventif des états d'éditeurs (sans toucher aux clés interdites rattachées directement)
+        for k in ["editor_rh_data", "editor_engins_data"]:
             if k in st.session_state: 
                 del st.session_state[k]
             
@@ -104,7 +101,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         st.session_state["val_revenus"] = float(modele.get("revenus", 0.0))
         st.session_state["val_jours"] = int(modele.get("jours_globaux", 0))
         
-        # Initialisation des compteurs de matériaux globaux pour l'approvisionnement
+        # Initialisation des compteurs de matériaux globaux
         liste_mats_cles = ["sable","terre","enrobe","armature","tole","beton","panneaux","tuyaux","canalisations","poutres"]
         for mat in liste_mats_cles:
             st.session_state[f"val_{mat}"] = 0.0
@@ -117,13 +114,13 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
             num_e = etape.get("num_etape", 1)
             duree_j = etape.get("duree_jours", 1)
             
-            # Cumul des volumes de matériaux de l'étape vers le total du chantier
+            # Cumul des volumes de matériaux
             mats_etape = etape.get("materiaux", {})
             for mat_nom, qte in mats_etape.items():
                 if mat_nom in liste_mats_cles:
                     st.session_state[f"val_{mat_nom}"] += float(qte)
                     
-            # Reconstitution des lignes pour le tableau des Employés (RH)
+            # Reconstitution pour le tableau des Employés (RH)
             lignes_rh.append({
                 "N° Étape": int(num_e),
                 "Durée Étape (jours)": int(duree_j),
@@ -132,7 +129,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                 "👷 Ouvriers": int(etape.get("jh_ouvrier", 0))
             })
             
-            # Reconstitution des lignes pour le tableau des Engins requis
+            # Reconstitution pour le tableau des Engins requis
             engins_etape = etape.get("engins", [])
             for engin in engins_etape:
                 lignes_engins.append({
@@ -143,9 +140,9 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                     "À louer ?": False
                 })
                 
-        # Injection des structures reconstruites sous forme de DataFrames Pandas
-        st.session_state["table_employes_planification_etapes"] = pd.DataFrame(lignes_rh)
-        st.session_state["table_engins_necessaires"] = pd.DataFrame(lignes_engins)
+        # Stockage dans des variables "caches" tampon (N'utilisent pas la clé directe des widgets)
+        st.session_state["cache_df_rh"] = pd.DataFrame(lignes_rh)
+        st.session_state["cache_df_engins"] = pd.DataFrame(lignes_engins)
 
     chantier_selectionne = st.selectbox(
         "🚀 Sélectionner un modèle de chantier dynamique :", 
@@ -217,16 +214,11 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         st.markdown("**👥 Planification des Effectifs requis à l'Étape :**")
         df_rh_init = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "🕹️ Conducteurs", "🧑‍💼 Chefs", "👷 Ouvriers"])
 
-        # --- SÉCURISATION ET FORCE DU FORMAT DATAFRAME ANTI-CRASH ---
-        raw_rh_state = st.session_state.get("table_employes_planification_etapes", df_rh_init)
-        if not isinstance(raw_rh_state, pd.DataFrame):
-            try:
-                raw_rh_state = pd.DataFrame(raw_rh_state)
-            except Exception:
-                raw_rh_state = df_rh_init
+        # Lecture depuis la variable tampon intermédiaire sécurisée contre la règle d'écriture directe
+        raw_rh_state = st.session_state.get("cache_df_rh", df_rh_init)
 
         tableau_employes_etapes = st.data_editor(
-            raw_rh_state, num_rows="dynamic", use_container_width=True, key="table_employes_planification_etapes",
+            raw_rh_state, num_rows="dynamic", use_container_width=True, key="editor_rh_data",
             column_config={
                 "N° Étape": st.column_config.NumberColumn("N°", min_value=1, step=1, required=True, width="small"),
                 "Durée Étape (jours)": st.column_config.NumberColumn("Jours", min_value=1, step=1, required=True, width="small"),
@@ -239,15 +231,11 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         st.markdown("### 🚜 --- TABLE DES ENGINS NÉCESSAIRES ---")
         df_besoins_init = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "Type d'engin requis", "Niveau requis", "À louer ?"])
         
-        raw_engins_state = st.session_state.get("table_engins_necessaires", df_besoins_init)
-        if not isinstance(raw_engins_state, pd.DataFrame):
-            try:
-                raw_engins_state = pd.DataFrame(raw_engins_state)
-            except Exception:
-                raw_engins_state = df_besoins_init
+        # Lecture depuis la variable tampon intermédiaire pour les engins requis
+        raw_engins_state = st.session_state.get("cache_df_engins", df_besoins_init)
 
         engins_necessaires = st.data_editor(
-            raw_engins_state, num_rows="dynamic", use_container_width=True, key="table_engins_necessaires",
+            raw_engins_state, num_rows="dynamic", use_container_width=True, key="editor_engins_data",
             column_config={
                 "N° Étape": st.column_config.NumberColumn("N°", min_value=1, step=1, required=True, width="small"),
                 "Durée Étape (jours)": st.column_config.NumberColumn("Durée (jours)", min_value=1, step=1, required=True),
@@ -334,7 +322,6 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
             cout_cond += c_count * d_cond * px_cond
             cout_chefs += ch_count * d_chef * px_chef
             cout_ouvriers += o_count * d_ouv * px_ouvrier
-
     total_salaires_recap = float(cout_chefs + cout_ouvriers + cout_cond)
     total_depenses_recap = float(total_mats_recap + total_location_recap + total_salaires_recap)
     benefice_net_recap = float(revenus - total_depenses_recap)
@@ -363,7 +350,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
     with c_rc3: st.metric(label="👥 Total Salaires", value=f"{txt_sal} €")
     with c_rc4: st.metric(label="📉 Dépenses Totales", value=f"{txt_depenses} €")
     with c_rc5: st.metric(label="⏱️ Durée Générale", value=txt_duree_precise)
-    with c_rc6: st.metric(label="⚙️ Cumul Étapes", value=txt_duree_etapes)
+    with c_rc6: st.metric(label="⚙️ Cumul Étape", value=txt_duree_etapes)
     with c_rc7: st.metric(label="📈 Gain / Jour", value=f"{txt_gain_jour} €/j")
 
     # Vérification de la synchronisation du planning
