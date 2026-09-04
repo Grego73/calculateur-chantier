@@ -233,50 +233,37 @@ def lister_toutes_les_cooperatives():
     except Exception:
         return []
 
-# À remplacer tout en bas de : database.py
-
 def ajouter_membres_bloc_coop(nom_coop, texte_membres_brut):
     """
-    Extrait les pseudos séparés par des espaces ou des virgules et les inscrit 
-    en bloc dans Firestore dans la limite stricte de 4 membres au total.
+    Extrait les pseudos séparés par des espaces et pré-inscrit les membres 
+    dans la limite stricte de 4 membres au total.
     """
     if not nom_coop or not texte_membres_brut.strip():
-        return False, "⚠️ Veuillez saisir au moins un pseudo valide."
+        return False, "⚠️ Saisissez au moins un pseudo valide."
         
     coop_ref = db.collection("cooperatives").document(nom_coop)
     coop_doc = coop_ref.get()
     
     if not coop_doc.exists:
-        return False, "❌ Erreur : La coopérative ciblée est introuvable."
+        return False, "❌ Coopérative introuvable."
         
     coop_data = coop_doc.to_dict()
     membres_actuels = coop_data.get("membres", [])
     
-    # Découpage du texte par les espaces (et suppression des virgules si présentes)
     pseudos_detectes = [p.strip() for p in texte_membres_brut.replace(",", " ").split() if p.strip()]
     
-    if not pseudos_detectes:
-        return False, "⚠️ Aucun pseudo détecté après analyse."
-
     compteur_ajouts = 0
-    messages_details = []
-
     for pseudo in pseudos_detectes:
         if pseudo in membres_actuels:
-            messages_details.append(f"ℹ️ {pseudo} est déjà membre.")
             continue
-            
         if len(membres_actuels) >= 4:
-            messages_details.append(f"🚫 {pseudo} bloqué (Limite de 4 atteinte).")
-            continue
+            break
             
-        # Inscription validée dans la structure NoSQL
         membres_actuels.append(pseudo)
         compteur_ajouts += 1
-        messages_details.append(f"✅ {pseudo} ajouté.")
 
     if compteur_ajouts > 0:
         coop_ref.update({"membres": membres_actuels})
-        return True, f"🚀 {compteur_ajouts} collaborateur(s) synchronisé(s) ! Détails :\n" + "\n".join(messages_details)
+        return True, f"🚀 {compteur_ajouts} collaborateur(s) ajouté(s) à la liste ! Initialisez leurs investissements ci-dessous."
     
-    return False, "❌ Aucun collaborateur n'a pu être ajouté :\n" + "\n".join(messages_details)
+    return False, "ℹ️ Aucun nouveau membre unique n'a été détecté ou la limite de 4 est atteinte."eturn False, "❌ Aucun collaborateur n'a pu être ajouté :\n" + "\n".join(messages_details)
