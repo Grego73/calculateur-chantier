@@ -311,13 +311,13 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
                 else:
                     st.error("❌ Aucun log de matériel valide détecté.")
 
-        # --- CORRECTION DU TRI : VISUALISATION DES 5 DERNIÈRES ENTRÉES DU JEU ---
+        # --- CORRECTION FINALE : LES 5 DERNIÈRES ENTRÉES EFFECTIVES DU JEU ---
         st.markdown("---")
-        st.markdown("##### ⏱️ Les 5 dernières entrées enregistrées (Flux Récent)")
+        st.markdown("##### ⏱️ Les 5 dernières entrées de l'historique du jeu (Flux Matériaux)")
         
         if liste_flux:
             try:
-                # Création du DataFrame propre
+                # 1. Création du DataFrame global
                 df_flux_recents = pd.DataFrame(liste_flux)
                 
                 # Double vérification des colonnes indispensables
@@ -325,55 +325,66 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
                     if c_req not in df_flux_recents.columns:
                         df_flux_recents[c_req] = ""
 
-                # --- ALGORITHME DE TRI CRITIQUE SUR LE TEMPS DU JEU ---
-                def generer_cle_chronologique(row):
-                    d_txt = str(row.get("date_jeu", "01/01/2000")).strip()
-                    h_txt = str(row.get("heure_jeu", "00:00")).strip()
-                    try:
-                        # Transforme "28/08/2026" en "20260828"
-                        date_cle = "".join(reversed(d_txt.split("/")))
-                        # Transforme "09:27" en "0927"
-                        heure_cle = h_txt.replace(":", "")
-                        return f"{date_cle}_{heure_cle}"
-                    except Exception:
-                        return "20000101_0000"
+                # 2. FILTRE STRICT : On ne garde QUE les vraies entrées issues de l'historique du jeu
+                # On élimine les apports initiaux en capital et les rallonges cash purs
+                types_jeu_valides = ["REAPPROVISIONNEMENT", "ACHAT_INTERNE", "ACHAT_EXTERNE"]
+                df_flux_recents = df_flux_recents[df_flux_recents["type"].isin(types_jeu_valides)]
 
-                # Application du tri du plus récent au plus ancien
-                df_flux_recents["cle_tri_jeu"] = df_flux_recents.apply(generer_cle_chronologique, axis=1)
-                df_flux_recents = df_flux_recents.sort_values(by="cle_tri_jeu", ascending=False).head(5)
+                if not df_flux_recents.empty:
+                    # 3. ALGORITHME DE TRI CRITIQUE CHRONOLOGIQUE DU JEU
+                    def generer_cle_tri_jeu(row):
+                        d_txt = str(row.get("date_jeu", "01/01/2000")).strip()
+                        h_txt = str(row.get("heure_jeu", "00:00")).strip()
+                        try:
+                            # Transforme "28/08/2026" en "20260828"
+                            date_cle = "".join(reversed(d_txt.split("/")))
+                            # Transforme "09:27" en "0927"
+                            heure_cle = h_txt.replace(":", "")
+                            return f"{date_cle}_{heure_cle}"
+                        except Exception:
+                            return "20000101_0000"
 
-                # Formatage du dictionnaire de matériaux pour un affichage lisible
-                def formater_materiaux(dict_mats):
-                    if not isinstance(dict_mats, dict) or not dict_mats:
-                        return "Aucun"
-                    return ", ".join([f"{k.capitalize()} ({int(v)} u)" for k, v in dict_mats.items()])
+                    df_flux_recents["cle_tri_jeu"] = df_flux_recents.apply(generer_cle_tri_jeu, axis=1)
+                    
+                    # Tri du plus récent au plus ancien et sélection des 5 premiers
+                    df_flux_recents = df_flux_recents.sort_values(by="cle_tri_jeu", ascending=False).head(5)
 
-                df_flux_recents["Détail Matériaux"] = df_flux_recents["materiaux"].apply(formater_materiaux)
-                
-                # Remplacer les types bruts NoSQL par des badges lisibles
-                def mapper_type(t):
-                    mapping = {"REAPPROVISIONNEMENT": "🧱 Réappro", "ACHAT_INTERNE": "🛒 Achat Int.", "ACHAT_EXTERNE": "🌍 Achat Ext.", "REINVESTISSEMENT_CASH": "💰 Cash"}
-                    return mapping.get(t, t)
-                df_flux_recents["Type"] = df_flux_recents["type"].apply(mapper_type)
+                    # 4. Formatage visuel des colonnes pour le tableau
+                    def formater_materiaux(dict_mats):
+                        if not isinstance(dict_mats, dict) or not dict_mats:
+                            return "Aucun"
+                        return ", ".join([f"{k.capitalize()} ({int(v)} u)" for k, v in dict_mats.items()])
 
-                # Sélection et ordonnancement final des colonnes
-                df_flux_recents = df_flux_recents[["date_jeu", "heure_jeu", "joueur", "Type", "Détail Matériaux"]]
+                    df_flux_recents["Détail Matériaux"] = df_flux_recents["materiaux"].apply(formater_materiaux)
+                    
+                    def mapper_type(t):
+                        mapping = {
+                            "REAPPROVISIONNEMENT": "🧱 Réappro", 
+                            "ACHAT_INTERNE": "🛒 Achat Int.", 
+                            "ACHAT_EXTERNE": "🌍 Achat Ext."
+                        }
+                        return mapping.get(t, t)
+                    df_flux_recents["Type"] = df_flux_recents["type"].apply(mapper_type)
 
-                st.dataframe(
-                    df_flux_recents, width="stretch", hide_index=True,
-                    column_config={
-                        "date_jeu": st.column_config.TextColumn("📅 Date Jeu"),
-                        "heure_jeu": st.column_config.TextColumn("⏱️ Heure Jeu"),
-                        "joueur": st.column_config.TextColumn("👤 Joueur / Acteur"),
-                        "Type": st.column_config.TextColumn("🏷️ Action"),
-                        "Détail Matériaux": st.column_config.TextColumn("🧱 Ressources transférées")
-                    }
-                )
+                    # Sélection finale des colonnes ordonnées
+                    df_flux_recents = df_flux_recents[["date_jeu", "heure_jeu", "joueur", "Type", "Détail Matériaux"]]
+
+                    st.dataframe(
+                        df_flux_recents, width="stretch", hide_index=True,
+                        column_config={
+                            "date_jeu": st.column_config.TextColumn("📅 Date Jeu"),
+                            "heure_jeu": st.column_config.TextColumn("⏱️ Heure Jeu"),
+                            "joueur": st.column_config.TextColumn("👤 Joueur / Acteur"),
+                            "Type": st.column_config.TextColumn("🏷️ Action"),
+                            "Détail Matériaux": st.column_config.TextColumn("🧱 Ressources transférées")
+                        }
+                    )
+                else:
+                    st.info("💡 Aucun log d'événement de matériel (jeu) n'est enregistré dans l'historique.")
             except Exception as e:
-                st.caption(f"ℹ️ Impossible de mettre en forme le flux récent ({e}).")
+                st.caption(f"ℹ️ Impossible de mettre en forme le flux récent du jeu ({e}).")
         else:
             st.info("💡 L'historique de cette coopérative est vierge pour le moment.")
-
 
     # ==============================================================================
     # --- 4. GESTION DES REINVESTISSEMENTS ET DES COLLABORATEURS ---
