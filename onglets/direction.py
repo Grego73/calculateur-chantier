@@ -640,55 +640,85 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                             }
                         )
 
-                        if flux_edite is not None:
-                            lignes_a_effacer = flux_edite[flux_edite["Supprimer ? ❌"] == True]
-                            if not lignes_a_effacer.empty:
-                                nb_effacements = len(lignes_a_effacer)
-                                if st.button(f"💥 SUPPRIMER DÉFINITIVEMENT ({nb_effacements}) FLUX DE COMPTABILITÉ", type="primary", width="stretch"):
-                                    
-                                    coops_liste = db.lister_toutes_les_cooperatives()
-                                    compteur_global = 0
-                                    
-                                    for _, row_del in lignes_a_effacer.iterrows():
-                                        id_cible = row_del["ID_Document_Firestore"]
-                                        joueur_cible = row_del["joueur"]
-                                        
-                                        if id_cible:
-                                            for cp in coops_liste:
-                                                try:
-                                                    # 1. Tentative d'effacement dans le Grand Livre classique (Flux Matériaux)
-                                                    doc_ref_flux = db.db.collection("cooperatives").document(cp).collection("comptabilite_interne").document(id_cible)
-                                                    if doc_ref_flux.get().exists:
-                                                        doc_ref_flux.delete()
-                                                        compteur_global += 1
-                                                        break
-                                                    
-                                                    # 2. Tentative alternative dans le Capital de Base (Flux Cash / Cap. Initial)
-                                                    # L'ID Firestore de la table capital_initial est généralement structuré sous la forme "capital_PSEUDO"
-                                                    id_capital_secours = f"capital_{joueur_cible}"
-                                                    doc_ref_cap = db.db.collection("cooperatives").document(cp).collection("capital_initial").document(id_capital_secours)
-                                                    if doc_ref_cap.get().exists:
-                                                        doc_ref_cap.delete()
-                                                        compteur_global += 1
-                                                        break
-                                                        
-                                                    # 3. Tentative alternative si l'ID direct reinvest_... a été inséré dans capital_initial
-                                                    doc_ref_cap_alt = db.db.collection("cooperatives").document(cp).collection("capital_initial").document(id_cible)
-                                                    if doc_ref_cap_alt.get().exists:
-                                                        doc_ref_cap_alt.delete()
-                                                        compteur_global += 1
-                                                        break
-                                                except Exception:
-                                                    pass
-                                                    
-                                    st.success(f"🔥 Nettoyage réussi : {compteur_global} transaction(s) effacée(s).")
-                                    st.cache_data.clear()
-                                    st.rerun()
+                        # 6. Affichage de l'éditeur NoSQL
+                        flux_edite = st.data_editor(
+                            df_visuel_flux, width="stretch", height=450, hide_index=True, key="editor_dir_compta_flux",
+                            column_config={
+                                "date_jeu": st.column_config.TextColumn("📅 Date Jeu", disabled=True),
+                                "heure_jeu": st.column_config.TextColumn("⏱️ Heure Jeu", disabled=True),
+                                "joueur": st.column_config.TextColumn("👤 Joueur / Acteur", disabled=True),
+                                "Action": st.column_config.TextColumn("🏷️ Action", disabled=True),
+                                "Ressources": st.column_config.TextColumn("🧱 Détails", disabled=True),
+                                "ID_Document_Firestore": st.column_config.TextColumn("ID Firestore", disabled=True, width="small"),
+                                "Supprimer ? ❌": st.column_config.CheckboxColumn("Supprimer ?", default=False)
+                            }
+                        )
 
+                        # --- CORRECTION DE SAUVEGARDE DE L'ÉTAT DU COMPOSANT ---
+                        if flux_edite is not None:
+                            # On extrait les lignes cochées en comparant l'état actuel de l'éditeur
+                            lignes_a_effacer = flux_edite[flux_edite["Supprimer ? ❌"] == True]
+                            
+                            if not lignes_a_effacer.empty:
+                                # On stocke de manière persistante les IDs à détruire dans la session Streamlit
+                                list_ids_a_detruire = []
+                                for _, r_del in lignes_a_effacer.iterrows():
+                                    list_ids_a_detruire.append({
+                                        "id_firestore": r_del["ID_Document_Firestore"],
+                                        "joueur": r_del["joueur"]
+                                    })
+                                st.session_state["flux_coop_a_supprimer_tampon"] = list_ids_a_detruire
+
+                        # Affichage sécurisé du bouton si des éléments attendent d'être supprimés en mémoire cache
+                        if "flux_coop_a_supprimer_tampon" in st.session_state and st.session_state["flux_coop_a_supprimer_tampon"]:
+                            nb_elements = len(st.session_state["flux_coop_a_supprimer_tampon"])
+                            
+                            if st.button(f"💥 CONFIRMER LA SUPPRESSION DÉFINITIVE DE ({nb_elements}) LIGNE(S)", type="primary", use_container_width=True):
+                                coops_liste = db.lister_toutes_les_cooperatives()
+                                compteur_global = 0
+                                
+                                for item in st.session_state["flux_coop_a_supprimer_tampon"]:
+                                    id_cible = item["id_firestore"]
+                                    joueur_cible = item["joueur"]
+                                    
+                                    if id_cible:
+                                        for cp in coops_liste:
+                                            try:
+                                                # 1. Nettoyage dans la table classique compta_interne (flux matériaux)
+                                                doc_ref_flux = db.db.collection("cooperatives").document(cp).collection("comptabilite_interne").document(id_cible)
+                                                if doc_ref_flux.get().exists:
+                                                    doc_ref_flux.delete()
+                                                    compteur_global += 1
+                                                    continue
+                                                
+                                                # 2. Nettoyage dans le capital initial (format direct reinvest_...)
+                                                doc_ref_cap_alt = db.db.collection("cooperatives").document(cp).collection("capital_initial").document(id_cible)
+                                                if doc_ref_cap_alt.get().exists:
+                                                    doc_ref_cap_alt.delete()
+                                                    compteur_global += 1
+                                                    continue
+                                                    
+                                                # 3. Nettoyage dans le capital de base par défaut (format capital_PSEUDO)
+                                                id_capital_secours = f"capital_{joueur_cible}"
+                                                doc_ref_cap = db.db.collection("cooperatives").document(cp).collection("capital_initial").document(id_capital_secours)
+                                                if doc_ref_cap.get().exists:
+                                                    doc_ref_cap.delete()
+                                                    compteur_global += 1
+                                                    continue
+                                            except Exception:
+                                                pass
+                                                
+                                # Remise à zéro du tampon après traitement
+                                st.session_state["flux_coop_a_supprimer_tampon"] = []
+                                st.success(f"🔥 Nettoyage Cloud Firestore réussi : {compteur_global} document(s) supprimé(s).")
+                                st.cache_data.clear()
+                                st.rerun()
+                                
                     except Exception as e:
                         st.error(f"Erreur d'indexation ou de structure : {e}")
                 else:
                     st.info("💡 Aucun flux comptable répertorié sur le serveur.")
+
 
             # --------------------------------------------------------------------------
             # TABLE 2 : MODÈLES DE CHANTIERS AVEC COCHE DE SUPPRESSION
