@@ -140,9 +140,19 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                     "À louer ?": False
                 })
                 
-        # Stockage dans des variables "caches" tampon (N'utilisent pas la clé directe des widgets)
+        # Stockage dans des variables "caches" tampon
         st.session_state["cache_df_rh"] = pd.DataFrame(lignes_rh)
-        st.session_state["cache_df_engins"] = pd.DataFrame(lignes_engins)
+        
+        # --- CORRECTION ANTY-DOUBLON ICI ---
+        df_engins_brut = pd.DataFrame(lignes_engins)
+        if not df_engins_brut.empty:
+            # On élimine les doublons stricts basés sur l'étape, le type et le niveau requis
+            st.session_state["cache_df_engins"] = df_engins_brut.drop_duplicates(
+                subset=["N° Étape", "Type d'engin requis", "Niveau requis"], 
+                keep="first"
+            ).reset_index(drop=True)
+        else:
+            st.session_state["cache_df_engins"] = df_engins_brut
 
     chantier_selectionne = st.selectbox(
         "🚀 Sélectionner un modèle de chantier dynamique :", 
