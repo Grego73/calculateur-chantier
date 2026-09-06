@@ -105,28 +105,21 @@ def generer_excel_distribution_paye(df_coop, benefice_total_caisse, id_logistici
             cell_net = worksheet.cell(row=row_idx, column=6)
             cell_net.number_format = '#,##0.00 "€"'; cell_net.fill = fill_total; cell_net.font = font_total
             
-        for c, w in zip(['A','B','C','D','E','F'], [20, 35, 22, 22, 25, 25]):
-            worksheet.column_dimensions[c].width = w
+        # CORRECTIF : Application explicite des largeurs de cellules
+        for col_name, width_val in [('A', 20), ('B', 35), ('C', 22), ('D', 22), ('E', 25), ('F', 25)]:
+            worksheet.column_dimensions[col_name].width = width_val
+            
     return buffer.getvalue()
 
 def envoyer_releve_sur_discord(nom_coop, pseudo_emetteur, df_coop, benefice_total_caisse, id_logisticien, fichier_bytes, nom_fichier):
-    """
-    Calcule la répartition en euros et le classement général de tous les acheteurs,
-    puis envoie le tout dans le corps du message Discord avec la pièce jointe.
-    """
-    import streamlit as st
-    import requests
-
+    """Pousse proprement le relevé textuel et le fichier Excel sur le canal Discord de l'équipe."""
     if "discord_webhook_url" not in st.secrets:
         return False, "⚠️ Webhook Discord non configuré dans les secrets Streamlit."
     url_webhook = st.secrets["discord_webhook_url"]
     
-    # ==============================================================================
-    # --- 1. CALCUL DE LA RÉPARTITION EN EUROS (MEMBRES) ---
-    # ==============================================================================
+    # 1. CALCULS EN EUROS POUR LES MEMBRES
     benefice_restant = benefice_total_caisse
     prime_logistique_globale = 0.0
-    
     if id_logisticien and benefice_total_caisse > 0:
         prime_logistique_globale = benefice_total_caisse * 0.05
         benefice_restant = benefice_total_caisse - prime_logistique_globale
@@ -137,46 +130,27 @@ def envoyer_releve_sur_discord(nom_coop, pseudo_emetteur, df_coop, benefice_tota
     for _, row in df_coop.iterrows():
         pseudo = row["Pseudo Membre"]
         pct_dividende = row["Distribution Bénéfice (%)"]
-        
         argent_dividendes = (pct_dividende / 100.0) * benefice_restant
         prime_lo = prime_logistique_globale if pseudo == id_logisticien else 0.0
-        total_joueur = argent_dividendes + prime_lo
         
         badge_log = " 👑 (+5% Prime)" if pseudo == id_logisticien else ""
-        texte_membres += f"👤 {pseudo:<12} ➔ {total_joueur:,.2f} €  ({pct_dividende:.1f}%{badge_log})\n"
+        texte_membres += f"👤 {pseudo:<12} ➔ {(argent_dividendes + prime_lo):,.2f} €  ({pct_dividende:.1f}%{badge_log})\n"
 
-    # ==============================================================================
-    # --- 2. CALCUL DU CLASSEMENT GÉNÉRAL DES ACHETEURS (TOUT LE SERVEUR) ---
-    # ==============================================================================
-    # On récupère tous les flux stockés dans la session de l'onglet
-    # (Streamlit conserve 'liste_flux' à travers les appels s'il est transmis ou si on lit la base)
+    # 2. EXTRACTEUR ET TRI SÉCURISÉ DES SOUVENIRS DU SERVEUR
     stats_acheteurs = {}
-    
-    # Pour reconstruire les volumes d'achat de tout le serveur de manière étanche
-    try:
-        # On extrait la table brute des flux depuis la collection pour compiler le classement général
-        from google.cloud import firestore
-        db_client = firestore.Client(project="calculateur-chantier-dc921")
-        flux_stream = db_client.collection("cooperatives").document(nom_coop).collection("comptabilite_interne").stream()
-        
-        for doc in flux_stream:
-            f = doc.to_dict()
-            j_nom = f.get("joueur", "Inconnu")
-            # Filtrage pour isoler uniquement les transactions de vente / consommation
-            if j_nom.lower().startswith("réappro") or f.get("type") == "REAPPROVISIONNEMENT": 
-                continue
-                
-            volume_ligne = sum(f.get("materiaux", {}).values())
-            if volume_ligne > 0:
-                stats_acheteurs[j_nom] = stats_acheteurs.get(j_nom, 0.0) + volume_ligne
-    except Exception:
-        pass
+    for fl in liste_flux:
+        j_nom = fl.get("joueur", "Inconnu")
+        if j_nom.lower().startswith("réappro") or fl.get("type") == "REAPPROVISIONNEMENT": 
+            continue
+        volume_ligne = sum(fl.get("materiaux", {}).values())
+        if volume_ligne > 0:
+            stats_acheteurs[j_nom] = stats_acheteurs.get(j_nom, 0.0) + volume_ligne
 
-    # Tri des acheteurs du plus grand au plus petit volume
+    # CORRECTIF DU TRI : Tri précis basé exclusivement sur l'index de la valeur [1] (Le volume)
     acheteurs_tries = sorted(stats_acheteurs.items(), key=lambda x: x[1], reverse=True)
     
     texte_classement_acheteurs = ""
-    for index, (acheteur, vol) in enumerate(acheteurs_tries[:10]): # On affiche le Top 10 maximum
+    for index, (acheteur, vol) in enumerate(acheteurs_tries[:10]):
         medaille = "🥇" if index == 0 else ("🥈" if index == 1 else ("🥉" if index == 2 else f" #{index+1:<2}"))
         badge_type = "(Coop)" if acheteur in membres_inscrits else "(Client)"
         texte_classement_acheteurs += f"{medaille} {acheteur:<12} ➔ {int(vol):,d} unités {badge_type}\n".replace(",", " ")
@@ -184,9 +158,7 @@ def envoyer_releve_sur_discord(nom_coop, pseudo_emetteur, df_coop, benefice_tota
     if not texte_classement_acheteurs:
         texte_classement_acheteurs = "Aucun achat enregistré pour le moment.\n"
 
-    # ==============================================================================
-    # --- 3. RÉDACTION DU MESSAGE STYLISÉ POUR DISCORD ---
-    # ==============================================================================
+    # 3. COMPOSITION FINALE DU TEXTE DES EMBEDS DISCORD
     texte_recap_discord = (
         f"```md\n"
         f"# 📊 RELEVÉ DE COMPTE HEBDOMADAIRE : {nom_coop.upper()}\n"
@@ -206,13 +178,12 @@ def envoyer_releve_sur_discord(nom_coop, pseudo_emetteur, df_coop, benefice_tota
     payload = {
         "username": f"Banque Centrale - {nom_coop}",
         "avatar_url": "https://flaticon.com",
-        "content": text_recap_discord
+        "content": texte_recap_discord
     }
     
     try:
         files = {"file": (nom_fichier, fichier_bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
         response = requests.post(url_webhook, data=payload, files=files, timeout=10)
-        
         if response.status_code >= 200 and response.status_code < 300:
             return True, "🟢 Rapport de paie et classement envoyés sur Discord !"
         return False, f"❌ Erreur Discord (Code {response.status_code})"
