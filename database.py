@@ -296,3 +296,40 @@ def obtenir_date_premier_chantier():
     except Exception:
         return "Aucune entrée"
 
+def envoyer_releve_sur_discord(nom_coop, pseudo_emetteur, message_texte, fichier_bytes=None, nom_fichier="paye.xlsx"):
+    """
+    Envoie un rapport textuel et le fichier Excel de la paye directement
+    sur le serveur Discord de la coopérative via son Webhook sécurisé.
+    """
+    import requests
+    import streamlit as st
+
+    # Récupération de l'URL du Webhook stockée en toute sécurité dans les Secrets de Streamlit
+    if "discord_webhook_url" not in st.secrets:
+        return False, "⚠️ Webhook Discord non configuré dans les secrets Streamlit."
+        
+    url_webhook = st.secrets["discord_webhook_url"]
+    
+    # 1. Préparation du payload textuel stylisé pour Discord (Embed)
+    payload = {
+        "username": f"Banque Centrale - {nom_coop}",
+        "avatar_url": "https://flaticon.com",
+        "content": f"📊 **Nouveau Relevé Comptable soumis par [{pseudo_emetteur}]**\n{message_texte}"
+    }
+    
+    try:
+        if fichier_bytes:
+            # Envoi combiné du texte et du fichier Excel physique
+            files = {
+                "file": (nom_fichier, fichier_bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            }
+            response = requests.post(url_webhook, data=payload, files=files, timeout=10)
+        else:
+            # Envoi du texte simple si pas de fichier
+            response = requests.post(url_webhook, json=payload, timeout=10)
+            
+        if response.status_code in:
+            return True, "🟢 Rapport envoyé avec succès sur Discord !"
+        return False, f"❌ Erreur Discord (Code {response.status_code})"
+    except Exception as e:
+        return False, f"❌ Échec de la connexion vers Discord : {e}"
