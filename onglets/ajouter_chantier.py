@@ -307,14 +307,16 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                     "engin_modele": modele_trouve, "Quantité": 1, "Prix Location (€/jour)": prix_trouve, "Jours de Location": duree_etape
                 })
 
-        st.markdown("### 🚜 --- TABLE DES ENGINS À LOUER ---")
+               st.markdown("### 🚜 --- TABLE DES ENGINS À LOUER ---")
         df_engins_init = pd.DataFrame(columns=["engin_modele", "Quantité", "Prix Location (€/jour)", "Jours de Location"])
-        if len(engins_transferes_list) > 0: df_engins_init = pd.DataFrame(engins_transferes_list)
+        if len(engins_transferes_list) > 0: 
+            df_engins_init = pd.DataFrame(engins_transferes_list)
         
+        # CORRECTION : Utilisation de idx_refresh pour stabiliser la clé d'édition
         engins_edites = st.data_editor(
-            df_engins_init, num_rows="dynamic", use_container_width=True, key="table_engins_a_louer",
+            df_engins_init, num_rows="dynamic", use_container_width=True, key=f"table_engins_a_louer_{idx_refresh}",
             column_config={
-                "engin_modele": st.column_config.TextColumn("Engin & Modèle", disabled=True),
+                "engin_modele": st.column_config.TextColumn("Engin & Modèle", disabled=False), # Rendu modifiable si besoin manuel
                 "Quantité": st.column_config.NumberColumn("Quantité", min_value=1, default=1, step=1),
                 "Prix Location (€/jour)": st.column_config.NumberColumn("Prix Location (€/jour)", min_value=0, step=10),
                 "Jours de Location": st.column_config.NumberColumn("Jours de Location", min_value=1, max_value=365, step=1)
@@ -326,6 +328,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
     # ==============================================================================
     jours_factures_jeu = math.ceil(jours_totaux)
     total_mats_recap = float(total_mats_direct)
+
     total_location_recap = 0.0
     if engins_edites is not None and not engins_edites.empty:
         df_propres_direct = engins_edites.dropna(subset=["engin_modele"])
@@ -424,6 +427,8 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
             st.rerun()
 
     if "temp_submit_data" in st.session_state:
+        popup_confirmation_enregistrement()
+
         popup_confirmation_enregistrement()
 
 
