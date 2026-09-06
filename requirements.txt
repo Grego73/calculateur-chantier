@@ -3,3 +3,5 @@ google-cloud-firestore
 pytz
 pandas
 streamlit
+openpyxl
+requests
