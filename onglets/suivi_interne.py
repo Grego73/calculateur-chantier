@@ -105,18 +105,68 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
             )
             if id_log: st.success(f"👑 **Félicitations à [{id_log}]** (Responsable Logistique de la semaine) !")
 
-    # --- TAB 2 : MARCHE GLOBAL (ACCESSIBLE TOUS NIVEAUX) ---
+    # ==============================================================================
+    # --- TABLEAU 2 : TOUS LES ACTEURS DU MARCHÉ & GRAPHIQUE DES QUANTITÉS ---
+    # ==============================================================================
     with tab_joueurs_externes:
         st.markdown("#### 🌍 Registre Général des Flux du Marché (Membres & Externes/Clients)")
-        if liste_flux:
-            stats = {}
-            for f in liste_flux:
-                j = f.get("joueur", "Inconnu")
-                if j.lower().startswith("réappro"): continue
-                if j not in stats: stats[j] = 0.0
-                stats[j] += sum(f.get("materiaux", {}).values())
-            df_m = pd.DataFrame([{"Joueur": k, "Statut": "🏆 Membre Coop" if k in membres_inscrits else "👤 Client", "Volume (u)": v} for k, v in stats.items()])
-            st.dataframe(df_m.sort_values(by="Volume (u)", ascending=False), width="stretch", hide_index=True)
+        st.caption("Analyse et compare les volumes de l'ensemble des acteurs du serveur. Les anciens membres restent visibles ici.")
+
+        if not liste_flux:
+            st.info("💡 Aucun mouvement global n'est enregistré sur le réseau.")
+        else:
+            stats_globales = {}
+            total_par_materiau = {}
+
+            # Reconstruction de la boucle d'analyse croisée des matériaux
+            for f_g in liste_flux:
+                j_nom = f_g.get("joueur", "Inconnu")
+                if j_nom.lower().startswith("réappro"): 
+                    continue
+                
+                if j_nom not in stats_globales:
+                    stats_globales[j_nom] = {"Volume Total Acheté (u)": 0.0, "detail_mats": {}}
+
+                mats_dict = f_g.get("materiaux", {})
+                for m_key, m_val in mats_dict.items():
+                    m_key_cap = m_key.capitalize()
+                    stats_globales[j_nom]["Volume Total Acheté (u)"] += m_val
+                    stats_globales[j_nom]["detail_mats"][m_key_cap] = stats_globales[j_nom]["detail_mats"].get(m_key_cap, 0.0) + m_val
+                    total_par_materiau[m_key_cap] = total_par_materiau.get(m_key_cap, 0.0) + m_val
+
+            lignes_affichage = []
+            for joueur, data_ex in stats_globales.items():
+                details_ressources = data_ex["detail_mats"]
+                if details_ressources:
+                    materiau_favori = max(details_ressources, key=details_ressources.get)
+                    volume_favori = details_ressources[materiau_favori]
+                    txt_recap_favori = f"{materiau_favori} ({int(volume_favori)} u)"
+                else:
+                    txt_recap_favori = "Aucun"
+
+                badge_statut = "🏆 Membre Coop" if joueur in membres_inscrits else "👤 Client / Ex-Membre"
+
+                lignes_affichage.append({
+                    "Statut": badge_statut,
+                    "Joueur": joueur,
+                    "Volume Global Acquis (u)": data_ex["Volume Total Acheté (u)"],
+                    "Matériau le plus acheté": txt_recap_favori
+                })
+
+            if lignes_affichage:
+                df_ext = pd.DataFrame(lignes_affichage).sort_values(by="Volume Global Acquis (u)", ascending=False)
+                st.dataframe(df_ext, width="stretch", hide_index=True)
+                
+                # --- LE RETOUR DU GRAPHIQUE DES RESSOURCES ---
+                st.markdown("---")
+                st.markdown("### 📊 Classement des Matériaux les plus Consommés sur le Serveur")
+                
+                if total_par_materiau:
+                    df_graph_mats = pd.DataFrame(list(total_par_materiau.items()), columns=["Matériau", "Quantité Totale Consommée (u)"])
+                    df_graph_mats = df_graph_mats.sort_values(by="Quantité Totale Consommée (u)", ascending=True)
+                    st.bar_chart(data=df_graph_mats, x="Matériau", y="Quantité Totale Consommée (u)", color="#ff4b4b")
+            else:
+                st.info("💡 Aucun volume d'achat n'a pu être extrait pour alimenter le graphique.")
 
     # --- TAB 3 : PARSEUR DE LOGS (ACCESSIBLE TOUS NIVEAUX) ---
     with tab_depot_flux:
