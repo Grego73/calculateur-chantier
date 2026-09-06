@@ -1,4 +1,4 @@
-# Contenu complet validé et corrigé pour : onglets/ajouter_chantier.py
+# Contenu complet validé et stabilisé pour : onglets/ajouter_chantier.py
 
 import streamlit as st
 import pandas as pd
@@ -6,7 +6,7 @@ import math
 import database as db
 
 # ==============================================================================
-# --- 1. POPUP DE CONFIRMATION ---
+# --- 1. POPUP DE CONFIRMATION AVEC EXPORT EXCEL ---
 # ==============================================================================
 @st.dialog("🔍 Rapport de Calcul et Feuille d'Insertion NoSQL")
 def popup_confirmation_enregistrement():
@@ -44,8 +44,41 @@ def popup_confirmation_enregistrement():
             f"{inputs['txt_gain_jour']} €/j"
         ]
     }
-    st.table(pd.DataFrame(donnees_popup))
+    df_popup = pd.DataFrame(donnees_popup)
+    st.table(df_popup)
     
+    # --- PRÉPARATION DU CONFIGURATEUR DE TÉLÉCHARGEMENT EXCEL ---
+    try:
+        df_excel = pd.DataFrame({
+            "Indicateur Financier": [
+                "Nom du Chantier", "Chiffre d'Affaires Prévu", "Coût Estimé Matériaux", 
+                "Coût Location Engins", "Masse Salariale Totale", "Dépenses Globales Consolidées", 
+                "Bénéfice Net Estimé", "ROI Global", "Rentabilité Quotidienne (€/j)"
+            ],
+            "Valeur": [
+                inputs['nom_chantier'], inputs['revenus'], inputs['total_mats_recap'],
+                inputs['total_location_recap'], inputs['total_salaires_recap'], inputs['total_depenses_recap'],
+                inputs['benefice_net_recap'], f"{inputs['roi_recap']:.2f} %", inputs['gain_par_jour_recap']
+            ]
+        })
+        
+        # Injection du fichier Excel en mémoire tampon
+        import io
+        buffer_excel = io.BytesIO()
+        with pd.ExcelWriter(buffer_excel, engine='openpyxl') as writer:
+            df_excel.to_excel(writer, index=False, sheet_name="Bilan Chantier")
+        data_excel_bytes = buffer_excel.getvalue()
+        
+        st.download_button(
+            label="📥 TÉLÉCHARGER LA FICHE COMPTABLE (EXCEL)",
+            data=data_excel_bytes,
+            file_name=f"fiche_rentabilite_{inputs['nom_chantier'].replace(' ', '_')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            width="stretch"
+        )
+    except Exception as e:
+        st.caption(f"ℹ️ Optionnel : Impossible de compiler la fiche Excel ({e})")
+        
     st.warning("🚨 Confirmez-vous l'envoi de cette simulation vers l'Historique cloud de l'entreprise ?")
     col_pop1, col_pop2 = st.columns(2)
     
@@ -58,13 +91,23 @@ def popup_confirmation_enregistrement():
                 round(inputs['roi_recap'], 2), float(inputs['jours_totaux']), 
                 round(inputs['gain_par_jour_recap'], 2), round(inputs['roi_par_jour_recap'], 2)
             )
-            st.toast("🚀 Simulation enregistrée avec succès sur le Cloud Firestore !")
+            
+            # Traçabilité NoSQL
+            db.enregistrer_log(
+                type_action="CHANTIER",
+                details=f"Création et insertion du chantier cloud [{inputs['nom_chantier']}] pour un CA de {inputs['revenus']} €."
+            )
+            
+            # Nettoyage et reset des états
+            st.session_state["activer_popup_confirmation"] = False
             if "temp_submit_data" in st.session_state:
                 del st.session_state["temp_submit_data"]
+            st.toast("🚀 Simulation enregistrée avec succès sur le Cloud Firestore !")
             st.rerun()
             
     with col_pop2:
         if st.button("❌ ANNULER & MODIFIER", width="stretch"): 
+            st.session_state["activer_popup_confirmation"] = False
             if "temp_submit_data" in st.session_state:
                 del st.session_state["temp_submit_data"]
             st.rerun()
@@ -77,7 +120,6 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
     
     liste_triee = ["Choisir un chantier pré-configuré..."] + sorted([k for k in CATALOGUE_CHANTIERS.keys() if k != "Choisir un chantier pré-configuré..."])
     
-    # Initialisations de session_state
     if "val_revenus" not in st.session_state:
         st.session_state["val_revenus"] = 0.0
         st.session_state["val_jours"] = 0
@@ -92,11 +134,8 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
     # --- ACTION DE RECEPTION DYNAMIQUE PAR ÉTAPES ---
     def mise_a_jour_cache_modele():
         selection = st.session_state["select_modele_chantier_dynamique"]
-        
-        # On force le changement de clé de l'éditeur SEULEMENT au changement de modèle
         st.session_state["compteur_refresh_engins"] += 1
         
-        # Nettoyage ciblé des anciens états des data_editors
         for key in list(st.session_state.keys()):
             if "editor_rh_data" in key or "editor_engins_data" in key:
                 del st.session_state[key]
@@ -115,13 +154,11 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         modele = CATALOGUE_CHANTIERS[selection]
         etapes_cloud = modele.get("etapes_techniques", [])
             
-        # Paramètres globaux temporels et financiers
         st.session_state["val_revenus"] = float(modele.get("revenus", 0.0))
         st.session_state["val_jours"] = int(modele.get("jours_globaux", 0))
         st.session_state["val_heures"] = int(modele.get("heures_globales", 0))
         st.session_state["val_minutes"] = int(modele.get("minutes_globales", 0))
         
-        # Initialisation des compteurs de matériaux globaux
         liste_mats_cles = ["sable","terre","enrobe","armature","tole","beton","panneaux","tuyaux","canalisations","poutres"]
         for mat in liste_mats_cles:
             st.session_state[f"val_{mat}"] = 0.0
@@ -129,50 +166,35 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         lignes_rh = []
         lignes_engins = []
         
-        # Extraction et dispatching des données de chaque étape
         for etape in etapes_cloud:
             num_e = etape.get("num_etape", 1)
             duree_j = etape.get("duree_jours", 1)
             
-            # Cumul des volumes de matériaux
             mats_etape = etape.get("materiaux", {})
             for mat_nom, qte in mats_etape.items():
                 if mat_nom in liste_mats_cles:
                     st.session_state[f"val_{mat_nom}"] += float(qte)
                     
-            # Reconstitution pour le tableau des Employés (RH)
             lignes_rh.append({
-                "N° Étape": int(num_e),
-                "Durée Étape (jours)": int(duree_j),
-                "🕹️ Conducteurs": int(etape.get("jh_cond", 0)),
-                "🧑‍💼 Chefs": int(etape.get("jh_chef", 0)),
-                "👷 Ouvriers": int(etape.get("jh_ouvrier", 0))
+                "N° Étape": int(num_e), "Durée Étape (jours)": int(duree_j),
+                "🕹️ Conducteurs": int(etape.get("jh_cond", 0)), "🧑‍💼 Chefs": int(etape.get("jh_chef", 0)), "👷 Ouvriers": int(etape.get("jh_ouvrier", 0))
             })
             
-            # Reconstitution pour le tableau des Engins requis
             engins_etape = etape.get("engins", [])
             for engin in engins_etape:
                 lignes_engins.append({
-                    "N° Étape": int(num_e),
-                    "Durée Étape (jours)": int(duree_j),
-                    "Type d'engin requis": engin.get("type", "Autre"),
-                    "Niveau requis": engin.get("niveau", "N1"),
-                    "À louer ?": False
+                    "N° Étape": int(num_e), "Durée Étape (jours)": int(duree_j),
+                    "Type d'engin requis": engin.get("type", "Autre"), "Niveau requis": engin.get("niveau", "N1"), "À louer ?": False
                 })
                 
-        # Stockage dans des variables "caches" tampon
         st.session_state["cache_df_rh"] = pd.DataFrame(lignes_rh)
-        
         df_engins_brut = pd.DataFrame(lignes_engins)
         if not df_engins_brut.empty:
             st.session_state["cache_df_engins"] = df_engins_brut.drop_duplicates(
-                subset=["N° Étape", "Type d'engin requis", "Niveau requis"], 
-                keep="first"
+                subset=["N° Étape", "Type d'engin requis", "Niveau requis"], keep="first"
             ).reset_index(drop=True)
         else:
             st.session_state["cache_df_engins"] = df_engins_brut
-
-    # Récupération de l'index de rafraîchissement stabilisé
     idx_refresh = st.session_state["compteur_refresh_engins"]
 
     chantier_selectionne = st.selectbox(
@@ -191,10 +213,10 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         
         st.write("⏱️ **Durée totale du chantier :**")
         c_j, c_h, c_m = st.columns(3)
-        
         with c_j: jours_saisis = st.number_input("Jours", min_value=0, value=st.session_state["val_jours"], step=1)
         with c_h: heures_saisies = st.number_input("Heures", min_value=0, max_value=23, value=st.session_state["val_heures"], step=1)
         with c_m: minutes_saisies = st.number_input("Minutes", min_value=0, max_value=59, value=st.session_state["val_minutes"], step=1)
+
         heures_en_jours = heures_saisies / 24.0
         minutes_en_jours = minutes_saisies / 1440.0
         jours_totaux = float(jours_saisis + heures_en_jours + minutes_en_jours)
@@ -244,11 +266,10 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
 
         st.markdown("**👥 Planification des Effectifs requis à l'Étape :**")
         df_rh_init = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "🕹️ Conducteurs", "🧑‍💼 Chefs", "👷 Ouvriers"])
-
         raw_rh_state = st.session_state.get("cache_df_rh", df_rh_init)
 
         tableau_employes_etapes = st.data_editor(
-            raw_rh_state, num_rows="dynamic", use_container_width=True, key=f"editor_rh_data_{idx_refresh}",
+            raw_rh_state, num_rows="dynamic", width="stretch", key=f"editor_rh_data_{idx_refresh}",
             column_config={
                 "N° Étape": st.column_config.NumberColumn("N°", min_value=1, step=1, required=True, width="small"),
                 "Durée Étape (jours)": st.column_config.NumberColumn("Jours", min_value=1, step=1, required=True, width="small"),
@@ -260,12 +281,10 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
 
         st.markdown("### 🚜 --- TABLE DES ENGINS NÉCESSAIRES ---")
         df_besoins_init = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "Type d'engin requis", "Niveau requis", "À louer ?"])
-        
         raw_engins_state = st.session_state.get("cache_df_engins", df_besoins_init)
 
         engins_necessaires = st.data_editor(
-            raw_engins_state, num_rows="dynamic", use_container_width=True, 
-            key=f"editor_engins_data_{idx_refresh}", 
+            raw_engins_state, num_rows="dynamic", width="stretch", key=f"editor_engins_data_{idx_refresh}", 
             column_config={
                 "N° Étape": st.column_config.NumberColumn("N°", min_value=1, step=1, required=True, width="small"),
                 "Durée Étape (jours)": st.column_config.NumberColumn("Durée (jours)", min_value=1, step=1, required=True),
@@ -306,17 +325,15 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                 engins_transferes_list.append({
                     "engin_modele": modele_trouve, "Quantité": 1, "Prix Location (€/jour)": prix_trouve, "Jours de Location": duree_etape
                 })
-
         st.markdown("### 🚜 --- TABLE DES ENGINS À LOUER ---")
         df_engins_init = pd.DataFrame(columns=["engin_modele", "Quantité", "Prix Location (€/jour)", "Jours de Location"])
         if len(engins_transferes_list) > 0: 
             df_engins_init = pd.DataFrame(engins_transferes_list)
         
-        # CORRECTION : Utilisation de idx_refresh pour stabiliser la clé d'édition
         engins_edites = st.data_editor(
-            df_engins_init, num_rows="dynamic", use_container_width=True, key=f"table_engins_a_louer_{idx_refresh}",
+            df_engins_init, num_rows="dynamic", width="stretch", key=f"table_engins_a_louer_{idx_refresh}",
             column_config={
-                "engin_modele": st.column_config.TextColumn("Engin & Modèle", disabled=False), # Rendu modifiable si besoin manuel
+                "engin_modele": st.column_config.TextColumn("Engin & Modèle", disabled=True),
                 "Quantité": st.column_config.NumberColumn("Quantité", min_value=1, default=1, step=1),
                 "Prix Location (€/jour)": st.column_config.NumberColumn("Prix Location (€/jour)", min_value=0, step=10),
                 "Jours de Location": st.column_config.NumberColumn("Jours de Location", min_value=1, max_value=365, step=1)
@@ -402,7 +419,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
     else: 
         st.error(f"🔴 **Chantier déficitaire :** Perte de **{txt_benefice} €** (ROI Global : **{roi_recap:.2f} %**)")
 
-    if st.button("LANCER LE CALCUL & ENREGISTRER", type="primary", use_container_width=True):
+    if st.button("LANCER LE CALCUL & ENREGISTRER", type="primary", width="stretch"):
         df_actuel = db.charger_donnees()
         doublon_existe = False if df_actuel.empty else not df_actuel[(df_actuel["Nom du Chantier"] == nom_chantier) & (df_actuel["Revenus (€)"] == revenus)].empty
         
@@ -424,10 +441,10 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                 "jours_totaux": jours_totaux, "gain_par_jour_recap": gain_par_jour_recap,
                 "roi_par_jour_recap": roi_par_jour_recap
             }
+            st.session_state["activer_popup_confirmation"] = True
             st.rerun()
 
-    if "temp_submit_data" in st.session_state:
+    if st.session_state.get("activer_popup_confirmation") and "temp_submit_data" in st.session_state:
         popup_confirmation_enregistrement()
-
 
 
