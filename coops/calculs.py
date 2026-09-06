@@ -124,8 +124,8 @@ def envoyer_releve_sur_discord(nom_coop, pseudo_emetteur, message_texte, fichier
         files = {"file": (nom_fichier, fichier_bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
         response = requests.post(url_webhook, data=payload, files=files, timeout=10)
         
-        # CORRECTIF STRICT DU COUPE-TEXTE : La ligne est désormais complète et valide !
-        if response.status_code in:
+        # MODIFICATION STRATÉGIQUE ANTI-COUPURE : Remplacement du 'in' par une comparaison mathématique directe
+        if response.status_code >= 200 and response.status_code < 300:
             return True, "🟢 Rapport envoyé avec succès sur Discord !"
         return False, f"❌ Erreur Discord (Code {response.status_code})"
     except Exception as e:
