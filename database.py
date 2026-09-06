@@ -1,4 +1,4 @@
-# Contenu complet, sécurisé et validé pour : database.py
+# Contenu complet validé et corrigé pour : database.py
 
 import streamlit as st
 import pandas as pd
@@ -173,21 +173,20 @@ def verifier_et_inscrire_joueur(nom_coop, mdp_saisi, pseudo_joueur):
     # 1. SI LA COOP N'EXISTE PAS : On la crée. Le joueur devient automatiquement le Créateur (Niveau 3)
     if not coop_doc.exists:
         coop_ref.set({
-            "mdp_niveau3": mdp_saisi,      # Le mot de passe saisi devient le pass Créateur
-            "mdp_niveau2": f"{mdp_saisi}2", # Pass Fiable par défaut (Ex: btp1232)
-            "mdp_niveau1": f"{mdp_saisi}1", # Pass Ouvrier par défaut (Ex: btp1231)
+            "mdp_niveau3": mdp_saisi,
+            "mdp_niveau2": f"{mdp_saisi}2",
+            "mdp_niveau1": f"{mdp_saisi}1",
             "membres": [pseudo_joueur]
         })
-        return True, f"🟢 Coopérative créée ! Vous êtes Niveau 3 (Créateur). Pseudos de base configurés.", 3
+        return True, f"🟢 Coopérative créée ! Vous êtes Niveau 3 (Créateur).", 3
     
     # 2. SI LA COOP EXISTE : On vérifie quel mot de passe a été saisi
     coop_data = coop_doc.to_dict()
     
-    mdp3 = coop_data.get("mdp_niveau3") or coop_data.get("mot_de_passe") # Récupère l'ancien mdp si migration
+    mdp3 = coop_data.get("mdp_niveau3") or coop_data.get("mot_de_passe")
     mdp2 = coop_data.get("mdp_niveau2", f"{mdp3}2")
     mdp1 = coop_data.get("mdp_niveau1", f"{mdp3}1")
     
-    # Vérification du grade selon le mot de passe tapé
     if mdp_saisi == mdp3:
         niveau_detecte = 3
     elif mdp_saisi == mdp2:
@@ -199,14 +198,12 @@ def verifier_et_inscrire_joueur(nom_coop, mdp_saisi, pseudo_joueur):
         
     membres_actuels = coop_data.get("membres", [])
     
-    # Si le joueur est déjà membre ou si c'est le gérant de niveau 3, on le laisse passer
     if pseudo_joueur in membres_actuels or niveau_detecte == 3:
         if pseudo_joueur not in membres_actuels:
             membres_actuels.append(pseudo_joueur)
             coop_ref.update({"membres": membres_actuels})
         return True, f"👋 Connexion réussie.", niveau_detecte
         
-    # Limite de 4 joueurs pour les niveaux 1 et 2
     if len(membres_actuels) >= 4:
         return False, f"🚫 Accès refusé : La coopérative a atteint sa limite de 4 joueurs inscrits.", 1
         
@@ -226,7 +223,6 @@ def ajouter_membres_bloc_coop(nom_coop, texte_membres_brut):
         
     coop_data = coop_doc.to_dict()
     membres_actuels = coop_data.get("membres", [])
-    
     pseudos_detectes = [p.strip() for p in texte_membres_brut.replace(",", " ").split() if p.strip()]
     
     compteur_ajouts = 0
@@ -238,10 +234,9 @@ def ajouter_membres_bloc_coop(nom_coop, texte_membres_brut):
             
         membres_actuels.append(pseudo)
         compteur_ajouts += 1
-
     if compteur_ajouts > 0:
         coop_ref.update({"membres": membres_actuels})
-        return True, f"🚀 {compteur_ajouts} collaborateur(s) ajouté(s) à la liste ! Initialisez leurs investissements ci-dessous."
+        return True, f"🚀 {compteur_ajouts} collaborateur(s) ajouté(s) à la liste !"
     return False, "ℹ️ Aucun nouveau membre unique n'a été détecté ou la limite de 4 est atteinte."
 
 def fixer_capital_initial_membre(nom_coop, pseudo_joueur, montant_cash):
@@ -276,10 +271,7 @@ def enregistrer_ligne_historique_brute(nom_coop, date_txt, heure_txt, actor_txt,
     try:
         date_cle = "".join(reversed(date_txt.split("/")))
         heure_cle = heure_txt.replace(":", "")
-        
-        # CORRECTION : On joint les matériaux en une chaîne de texte propre
         mat_nom = "_".join(list(materiaux_dict.keys())).lower().strip()
-        
         acteur_cle = actor_txt.lower().strip().replace(" ", "_")
         document_id = f"log_{date_cle}_{heure_cle}_{acteur_cle}_{mat_nom}"
         
@@ -295,7 +287,6 @@ def enregistrer_ligne_historique_brute(nom_coop, date_txt, heure_txt, actor_txt,
     except Exception:
         pass
 
-
 def charger_tous_les_achats_globaux():
     try:
         coops = db.collection("cooperatives").stream()
@@ -307,55 +298,3 @@ def charger_tous_les_achats_globaux():
         return tous_achats
     except Exception:
         return []
-
-def obtenir_date_premier_chantier():
-    try:
-        # On récupère tous les chantiers enregistrés
-        docs = db.collection("chantiers").stream()
-        df = charger_donnees() # Réutilise votre fonction existante qui crée le DataFrame
-        
-        if not df.empty and 'Nom du Chantier' in df.columns:
-            # Si vous triez vos journaux ou chantiers, vous pouvez aussi le faire via la collection des logs
-            # Mais si vous cherchez le premier log comptable d'une coopérative :
-            return "Données disponibles"
-            
-    except Exception:
-        return "Aucune entrée"
-
-def envoyer_releve_sur_discord(nom_coop, pseudo_emetteur, message_texte, fichier_bytes=None, nom_fichier="paye.xlsx"):
-    """
-    Envoie un rapport textuel et le fichier Excel de la paye directement
-    sur le serveur Discord de la coopérative via son Webhook sécurisé.
-    """
-    import requests
-    import streamlit as st
-
-    # Récupération de l'URL du Webhook stockée en toute sécurité dans les Secrets de Streamlit
-    if "discord_webhook_url" not in st.secrets:
-        return False, "⚠️ Webhook Discord non configuré dans les secrets Streamlit."
-        
-    url_webhook = st.secrets["discord_webhook_url"]
-    
-    # 1. Préparation du payload textuel stylisé pour Discord (Embed)
-    payload = {
-        "username": f"Banque Centrale - {nom_coop}",
-        "avatar_url": "https://flaticon.com",
-        "content": f"📊 **Nouveau Relevé Comptable soumis par [{pseudo_emetteur}]**\n{message_texte}"
-    }
-    
-    try:
-        if fichier_bytes:
-            # Envoi combiné du texte et du fichier Excel physique
-            files = {
-                "file": (nom_fichier, fichier_bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-            }
-            response = requests.post(url_webhook, data=payload, files=files, timeout=10)
-        else:
-            # Envoi du texte simple si pas de fichier
-            response = requests.post(url_webhook, json=payload, timeout=10)
-            
-        if response.status_code in:
-            return True, "🟢 Rapport envoyé avec succès sur Discord !"
-        return False, f"❌ Erreur Discord (Code {response.status_code})"
-    except Exception as e:
-        return False, f"❌ Échec de la connexion vers Discord : {e}"
