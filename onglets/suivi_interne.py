@@ -83,11 +83,24 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
                 data_paye_bytes = generer_excel_distribution_paye(df_coop, caisse_saisie, id_log)
                 st.download_button(label="📥 TÉLÉCHARGER LE RELEVÉ EXCEL", data=data_paye_bytes, file_name="releve_paye.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", width="stretch")
             
+            # CORRECTIF : Alignement des paramètres pour envoyer_releve_sur_discord
             if st.button("🚀 EXPÉDIER LE BILAN ET LA PAIE SUR DISCORD", type="primary", width="stretch"):
-                msg_txt = f"```md\n# RELEVÉ DE COMPTE WEEKLY : {nom_coop_active}\n- Caisse : {caisse_saisie} €\n- Logisticien : {id_log}\n```"
-                statut, msg = envoyer_releve_sur_discord(nom_coop_active, joueur_actif, msg_txt, data_paye_bytes, "releve.xlsx")
-                if statut: st.success(msg)
-                else: st.error(msg)
+                with st.spinner("Envoi du relevé de compte et du classement sur Discord..."):
+                    # On envoie exactement les variables requises pour le calcul du Top Acheteurs
+                    statut, msg = envoyer_releve_sur_discord(
+                        nom_coop=nom_coop_active,
+                        pseudo_emetteur=joueur_actif,
+                        df_coop=df_coop,
+                        benefice_total_caisse=caisse_saisie,
+                        id_logisticien=id_log,
+                        fichier_bytes=data_paye_bytes,
+                        nom_fichier=f"releve_comptable_{nom_coop_active}.xlsx"
+                    )
+                    if statut: 
+                        st.success(msg)
+                    else: 
+                        st.error(msg)
+
 
     # --- TAB 2 : MARCHE GLOBAL ---
     with tab_joueurs_externes:
