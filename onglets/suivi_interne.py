@@ -434,8 +434,53 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
                 st.rerun()
 
         st.markdown("---")
+        st.markdown("---")
+        st.markdown("##### 🚨 Zone de Gestion des Effectifs (Licenciement)")
+        
+        # Sélection du membre à retirer
+        membre_a_retirer = st.selectbox(
+            "Sélectionner un membre à retirer de la Coopérative :", 
+            ["-- Choisir un membre --"] + membres_inscrits,
+            key="selectbox_retirer_membre_coop"
+        )
+        
+        if membre_a_retirer != "-- Choisir un membre --":
+            st.warning(f"⚠️ **Attention :** Retirer {membre_a_retirer} libérera un slot (Place {slots_occupes}/4). Ses anciens achats resteront comptabilisés dans le Marché Global.")
+            
+            # Double validation obligatoire anti-missclick
+            confirmer_retrait = st.checkbox(f"Je confirme vouloir retirer {membre_a_retirer} de la coopérative.")
+            
+            if st.button(f"🗑️ RETIRER {membre_a_retirer.upper()} DE LA COOP", type="primary", width="stretch", disabled=not confirmer_retrait):
+                try:
+                    # 1. Récupération de la liste des membres actifs
+                    coop_doc_ref = db.db.collection("cooperatives").document(nom_coop_active)
+                    coop_data = coop_doc_ref.get().to_dict()
+                    membres_actuels = coop_data.get("membres", [])
+                    
+                    if membre_a_retirer in membres_actuels:
+                        membres_actuels.remove(membre_a_retirer)
+                        coop_doc_ref.update({"membres": membres_actuels})
+                        
+                        # --- INJECTION DU LOG D'AUDIT TECHNIQUE ---
+                        db.enregistrer_log(
+                            type_action="COOPERATIVE",
+                            details=f"Le joueur [{joueur_actif}] a retiré le membre [{membre_a_retirer}] de la coopérative [{nom_coop_active}]."
+                        )
+                        
+                        # Fermeture de session si le joueur se retire lui-même
+                        if membre_a_retirer == joueur_actif:
+                            st.session_state["auth_suivi_coop"] = None
+                            st.session_state["auth_suivi_joueur"] = None
+                        
+                        st.success(f"🏃 {membre_a_retirer} a été retiré de la coopérative avec succès !")
+                        st.cache_data.clear()
+                        st.rerun()
+                except Exception as e:
+                    st.error(f"❌ Erreur lors du retrait du membre : {e}")
+
+        st.markdown("---")
         if slots_occupes < 4:
-            st.markdown("##### ➕ Étape 2 : Ajouter de nouveaux collaborateurs")
+            st.markdown("##### ➕ Ajouter de nouveaux collaborateurs")
             texte_bloc_membres = st.text_input(
                 "Saisissez les pseudos manquants (séparés par un espace) :", 
                 value="", 
@@ -448,6 +493,11 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
                 else:
                     statut_ins, msg_ins = db.ajouter_membres_bloc_coop(nom_coop_active, texte_bloc_membres)
                     if statut_ins:
+                        # Log d'audit lors de l'ajout d'équipe
+                        db.enregistrer_log(
+                            type_action="COOPERATIVE",
+                            details=f"Le joueur [{joueur_actif}] a ajouté de nouveaux membres en bloc dans [{nom_coop_active}]."
+                        )
                         st.success(msg_ins)
                         st.rerun()
                     else:
