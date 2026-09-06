@@ -1,9 +1,10 @@
-# Fichier : coops/parseur.py
+# Fichier complet, nettoyé et validé pour : coops/parseur.py
 import re
 
 def analyser_historique_brut(texte_brut, membres_inscrits, joueur_actif):
     """
-    Analyse le fil des événements bruts et extrait les actions de Réappro et d'Achats nominatifs
+    Analyse le fil des événements bruts du lundi et extrait les actions 
+    de Réappro et d'Achats nominatifs avec nettoyage strict des espaces.
     """
     lignes_brutes = texte_brut.split("\n")
     regex_date = re.compile(r"Le\s*(\d{2}/\d{2}/\d{4})\s*[aà]\s*(\d{2}:\d{2})", re.IGNORECASE)
@@ -43,16 +44,18 @@ def analyser_historique_brut(texte_brut, membres_inscrits, joueur_actif):
                 elif "poutre" in type_mat_brut: mat_cle = "poutres"
 
                 if mat_cle:
+                    # --- CORRECTIF : Nettoyage strict avec .strip() pour éliminer les espaces parasites ---
                     if "réapprovisionne de" in l_clean.lower():
-                        parties = l_clean.split("réapprovisionne")
+                        parties = l_clean.split("réapprovisionne", 1)
+                        # On prend la partie gauche (le pseudo) et on retire les espaces vides autour
                         acteur_final = parties[0].strip() if parties[0].strip() else "Réapprovisionnement Global"
                         type_mouv_final = "REAPPROVISIONNEMENT"
                     elif l_clean.lower().startswith("réapprovisionnement de"):
                         acteur_final = "Réapprovisionnement Global"
                         type_mouv_final = "REAPPROVISIONNEMENT"
                     elif "a acheté" in l_clean.lower():
-                        parties = l_clean.split("a acheté")
-                        acteur_final = parties[0].strip() if len(parties) > 0 else joueur_actif
+                        parties = l_clean.split("a acheté", 1)
+                        acteur_final = parties[0].strip() if parties[0].strip() else joueur_actif
                         type_mouv_final = "ACHAT_INTERNE" if acteur_final in membres_inscrits else "ACHAT_EXTERNE"
                     else:
                         acteur_final = joueur_actif
