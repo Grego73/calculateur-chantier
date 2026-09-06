@@ -20,7 +20,7 @@ catalogue_chantiers = db.charger_catalogue_chantiers()
 onglet1, onglet2, onglet3, onglet4 = st.tabs([
     "➕ Ajouter un Chantier", 
     "📊 Historique & Classement", 
-    "👥 Suivi Interne",  # <-- DOIT ÊTRE ICI
+    "👥 Suivi Interne Coop",
     "🔒 Espace Direction"
 ])
 
