@@ -307,7 +307,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                     "engin_modele": modele_trouve, "Quantité": 1, "Prix Location (€/jour)": prix_trouve, "Jours de Location": duree_etape
                 })
 
-               st.markdown("### 🚜 --- TABLE DES ENGINS À LOUER ---")
+        st.markdown("### 🚜 --- TABLE DES ENGINS À LOUER ---")
         df_engins_init = pd.DataFrame(columns=["engin_modele", "Quantité", "Prix Location (€/jour)", "Jours de Location"])
         if len(engins_transferes_list) > 0: 
             df_engins_init = pd.DataFrame(engins_transferes_list)
@@ -427,8 +427,6 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
             st.rerun()
 
     if "temp_submit_data" in st.session_state:
-        popup_confirmation_enregistrement()
-
         popup_confirmation_enregistrement()
 
 
