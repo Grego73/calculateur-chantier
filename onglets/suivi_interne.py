@@ -101,21 +101,88 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
                     else: 
                         st.error(msg)
 
-
-    # --- TAB 2 : MARCHE GLOBAL ---
+    # ==============================================================================
+    # --- TAB 2 : MARCHE GLOBAL & CLASSEMENT GÉNÉRAL DES ACHETEURS ---
+    # ==============================================================================
     with tab_joueurs_externes:
-        st.markdown("#### 🌍 Registre Général des Flux du Marché")
-        if liste_flux:
-            stats_g, mats_g = {}, {}
-            for f in liste_flux:
-                j = f.get("joueur", "Inconnu")
-                if j.lower().startswith("réappro"): continue
-                if j not in stats_g: stats_g[j] = 0.0
-                for m_k, m_v in f.get("materiaux", {}).items():
-                    stats_g[j] += m_v
-                    mats_g[m_k.capitalize()] = mats_g.get(m_k.capitalize(), 0.0) + m_v
-            st.dataframe(pd.DataFrame([{"Joueur": k, "Statut": "🏆 Membre" if k in membres_inscrits else "👤 Client", "Volume (u)": v} for k, v in stats_g.items()]), width="stretch", hide_index=True)
-            if mats_g: st.bar_chart(pd.DataFrame(list(mats_g.items()), columns=["Matériau", "Volume"]).set_index("Matériau"), color="#ff4b4b")
+        st.markdown("#### 🌍 Classement Général des Acheteurs (Membres & Clients)")
+        st.caption("Registre centralisé et classé par volume d'achat total pour l'ensemble des acteurs du serveur.")
+
+        if not liste_flux:
+            st.info("💡 Aucun mouvement d'achat n'est enregistré sur le réseau pour le moment.")
+        else:
+            stats_globales = {}
+            total_par_materiau = {}
+
+            # Extraction et compilation des flux de tous les acheteurs du serveur
+            for f_g in liste_flux:
+                j_nom = f_g.get("joueur", "Inconnu")
+                # On filtre les lignes de réapprovisionnement logistique pour ne garder que les achats
+                if j_nom.lower().startswith("réappro") or f_g.get("type") == "REAPPROVISIONNEMENT": 
+                    continue
+                
+                if j_nom not in stats_globales:
+                    stats_globales[j_nom] = {"Volume Total Acheté (u)": 0.0, "detail_mats": {}}
+
+                mats_dict = f_g.get("materiaux", {})
+                for m_key, m_val in mats_dict.items():
+                    m_key_cap = m_key.capitalize()
+                    stats_globales[j_nom]["Volume Total Acheté (u)"] += m_val
+                    stats_globales[j_nom]["detail_mats"][m_key_cap] = stats_globales[j_nom]["detail_mats"].get(m_key_cap, 0.0) + m_val
+                    total_par_materiau[m_key_cap] = total_par_materiau.get(m_key_cap, 0.0) + m_val
+
+            lignes_affichage = []
+            for joueur, data_ex in stats_globales.items():
+                details_ressources = data_ex["detail_mats"]
+                if details_ressources:
+                    # Détection automatique de la ressource la plus consommée par le joueur
+                    materiau_favori = max(details_ressources, key=details_ressources.get)
+                    volume_favori = details_ressources[materiau_favori]
+                    txt_recap_favori = f"{materiau_favori} ({int(volume_favori)} u)"
+                else:
+                    txt_recap_favori = "Aucun"
+
+                # Affectation du badge de statut (Interne ou Client Externe)
+                badge_statut = "🏆 Membre Coop" if joueur in membres_inscrits else "👤 Client / Joueur Externe"
+
+                lignes_affichage.append({
+                    "Statut": badge_statut,
+                    "Joueur": joueur,
+                    "Volume Global Acquis (u)": data_ex["Volume Total Acheté (u)"],
+                    "Matériau le plus acheté": txt_recap_favori
+                })
+
+            if lignes_affichage:
+                # Création du DataFrame et tri automatique du plus grand au plus petit acheteur
+                df_ext = pd.DataFrame(lignes_affichage).sort_values(by="Volume Global Acquis (u)", ascending=False).reset_index(drop=True)
+                
+                # Injection d'une colonne de classement dynamique (Rang #1, #2, #3...)
+                df_ext.index = df_ext.index + 1
+                df_ext.index.name = "Rang"
+                df_ext = df_ext.reset_index()
+
+                # Affichage du tableau de bord du Marché Global
+                st.dataframe(
+                    df_ext, width="stretch", hide_index=True,
+                    column_config={
+                        "Rang": st.column_config.NumberColumn("👑 Clst", format="#%d", width="small"),
+                        "Statut": st.column_config.TextColumn("🏷️ Statut Réseau"),
+                        "Joueur": st.column_config.TextColumn("👤 Pseudo de l'Acheteur"),
+                        "Volume Global Acquis (u)": st.column_config.NumberColumn("📦 Volume Total (u)", format="%,d u"),
+                        "Matériau le plus acheté": st.column_config.TextColumn("💎 Matériau Favori")
+                    }
+                )
+                
+                # --- LE RETOUR DE VOTRE GRAPHIQUE DES RESSOURCES ---
+                st.markdown("---")
+                st.markdown("### 📊 Classement des Matériaux les plus Consommés sur le Serveur")
+                
+                if total_par_materiau:
+                    df_graph_mats = pd.DataFrame(list(total_par_materiau.items()), columns=["Matériau", "Quantité Totale Consommée (u)"])
+                    df_graph_mats = df_graph_mats.sort_values(by="Quantité Totale Consommée (u)", ascending=True)
+                    st.bar_chart(data=df_graph_mats, x="Matériau", y="Quantité Totale Consommée (u)", color="#ff4b4b")
+            else:
+                st.info("💡 Aucun volume d'achat n'a pu être extrait du fil des événements pour le moment.")
 
     # --- TAB 3 : PARSEUR LOGS ---
     with tab_depot_flux:
