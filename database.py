@@ -160,33 +160,59 @@ def lister_toutes_les_cooperatives():
         return []
 
 def verifier_et_inscrire_joueur(nom_coop, mdp_saisi, pseudo_joueur):
+    """
+    Vérifie le mot de passe saisi et attribue le niveau de privilège (1, 2 ou 3)
+    selon la configuration de la coopérative.
+    """
     if not nom_coop or not mdp_saisi or not pseudo_joueur:
-        return False, "⚠️ Veuillez remplir tous les champs."
+        return False, "⚠️ Veuillez remplir tous les champs.", 1
         
     coop_ref = db.collection("cooperatives").document(nom_coop)
     coop_doc = coop_ref.get()
     
+    # 1. SI LA COOP N'EXISTE PAS : On la crée. Le joueur devient automatiquement le Créateur (Niveau 3)
     if not coop_doc.exists:
         coop_ref.set({
-            "mot_de_passe": mdp_saisi,
+            "mdp_niveau3": mdp_saisi,      # Le mot de passe saisi devient le pass Créateur
+            "mdp_niveau2": f"{mdp_saisi}2", # Pass Fiable par défaut (Ex: btp1232)
+            "mdp_niveau1": f"{mdp_saisi}1", # Pass Ouvrier par défaut (Ex: btp1231)
             "membres": [pseudo_joueur]
         })
-        return True, f"🟢 Coopérative créée ! Bienvenue à bord, premier membre : {pseudo_joueur}"
+        return True, f"🟢 Coopérative créée ! Vous êtes Niveau 3 (Créateur). Pseudos de base configurés.", 3
     
+    # 2. SI LA COOP EXISTE : On vérifie quel mot de passe a été saisi
     coop_data = coop_doc.to_dict()
-    if coop_data.get("mot_de_passe") != mdp_saisi:
-        return False, "🔒 Mot de passe de la coopérative incorrect."
+    
+    mdp3 = coop_data.get("mdp_niveau3") or coop_data.get("mot_de_passe") # Récupère l'ancien mdp si migration
+    mdp2 = coop_data.get("mdp_niveau2", f"{mdp3}2")
+    mdp1 = coop_data.get("mdp_niveau1", f"{mdp3}1")
+    
+    # Vérification du grade selon le mot de passe tapé
+    if mdp_saisi == mdp3:
+        niveau_detecte = 3
+    elif mdp_saisi == mdp2:
+        niveau_detecte = 2
+    elif mdp_saisi == mdp1:
+        niveau_detecte = 1
+    else:
+        return False, "🔒 Mot de passe incorrect pour cette coopérative.", 1
         
     membres_actuels = coop_data.get("membres", [])
-    if pseudo_joueur in membres_actuels:
-        return True, f"👋 Content de vous revoir, {pseudo_joueur}."
+    
+    # Si le joueur est déjà membre ou si c'est le gérant de niveau 3, on le laisse passer
+    if pseudo_joueur in membres_actuels or niveau_detecte == 3:
+        if pseudo_joueur not in membres_actuels:
+            membres_actuels.append(pseudo_joueur)
+            coop_ref.update({"membres": membres_actuels})
+        return True, f"👋 Connexion réussie.", niveau_detecte
         
+    # Limite de 4 joueurs pour les niveaux 1 et 2
     if len(membres_actuels) >= 4:
-        return False, f"🚫 Accès refusé : La coopérative '{nom_coop}' a atteint sa limite maximale de 4 joueurs inscrits."
+        return False, f"🚫 Accès refusé : La coopérative a atteint sa limite de 4 joueurs inscrits.", 1
         
     membres_actuels.append(pseudo_joueur)
     coop_ref.update({"membres": membres_actuels})
-    return True, f"📝 Inscription réussie ! Membre enregistré (Place {len(membres_actuels)}/4) : {pseudo_joueur}"
+    return True, f"📝 Inscription réussie ! Membre enregistré.", niveau_detecte
 
 def ajouter_membres_bloc_coop(nom_coop, texte_membres_brut):
     if not nom_coop or not texte_membres_brut.strip():
