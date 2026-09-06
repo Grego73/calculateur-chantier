@@ -100,18 +100,108 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
             st.success(f"🎯 Synchronisation NoSQL réussie : {len(mouvements)} ligne(s) ajoutée(s) !")
             st.cache_data.clear(); st.rerun()
 
-    # --- 4. PANNEAU ADMIN GESTION DES SALARIÉS ---
+    # ==============================================================================
+    # --- 4. GESTION DES COLLABORATEURS ET LICENCIEMENT SÉCURISÉ ---
+    # ==============================================================================
     with tab_gestion_membres:
         st.markdown("#### ⚙️ Gérer les Collaborateurs")
         slots_occupes = len(membres_inscrits)
-        membre_a_retirer = st.selectbox("Sélectionner un membre à licencier :", ["-- Choisir un membre --"] + membres_inscrits)
-        if membre_a_retirer != "-- Choisir un membre --" and st.checkbox("Confirmer le licenciement définitif"):
-            if st.button(f"🗑️ VIRER {membre_a_retirer.upper()}", type="primary", width="stretch"):
-                coop_doc_ref = db.db.collection("cooperatives").document(nom_coop_active)
-                membres_actuels = coop_doc_ref.get().to_dict().get("membres", [])
-                if membre_a_retirer in membres_actuels:
-                    membres_actuels.remove(membre_a_retirer)
-                    coop_doc_ref.update({"membres": membres_actuels})
-                    db.enregistrer_log("COOPERATIVE", f"Retrait de [{membre_a_retirer}] par [{joueur_actif}]")
-                    st.cache_data.clear(); st.rerun()
+        st.info(f"📊 **Occupation de la Coopérative :** `{slots_occupes} / 4` places verrouillées.")
+        
+        st.markdown("##### 🚨 Zone de Gestion des Effectifs (Licenciement)")
+        
+        # CORRECTIF : Menu déroulant connecté à une clé stable pour la réinitialisation forcée
+        membre_a_retirer = st.selectbox(
+            "Sélectionner un membre à retirer de la Coopérative :", 
+            ["-- Choisir un membre --"] + membres_inscrits, 
+            key="selectbox_retirer_membre_coop"
+        )
+        
+        if membre_a_retirer != "-- Choisir un membre --":
+            st.warning(f"⚠️ **Attention :** Retirer {membre_a_retirer} libérera un slot. Ses transactions resteront sauvegardées sous l'étiquette 'Client / Ex-Membre' dans le Marché Global.")
+            confirmer_retrait = st.checkbox(f"Je confirme vouloir retirer {membre_a_retirer} de la coopérative.")
+            
+            if st.button(f"🗑️ RETIRER {membre_a_retirer.upper()} DE LA COOP", type="primary", width="stretch", disabled=not confirmer_retrait):
+                try:
+                    # 1. Lecture de la liste sur Firestore
+                    coop_doc_ref = db.db.collection("cooperatives").document(nom_coop_active)
+                    coop_data = coop_doc_ref.get().to_dict()
+                    membres_actuels = coop_data.get("membres", [])
+                    
+                    # 2. Retrait physique du tableau NoSQL
+                    if membre_a_retirer in membres_actuels:
+                        membres_actuels.remove(membre_a_retirer)
+                        coop_doc_ref.update({"membres": membres_actuels})
+                        
+                        # 3. Écriture immédiate du log d'audit
+                        db.enregistrer_log(
+                            type_action="COOPERATIVE",
+                            details=f"Le joueur [{joueur_actif}] a retiré le membre [{membre_a_retirer}] de la coopérative [{nom_coop_active}]."
+                        )
+                        
+                        # CORRECTIF TECHNIQUE : Reset forcé du composant selectbox en session state
+                        st.session_state["selectbox_retirer_membre_coop"] = "-- Choisir un membre --"
+                        
+                        # Déconnexion automatique si le joueur s'auto-licencie
+                        if membre_a_retirer == joueur_actif:
+                            st.session_state["auth_suivi_coop"] = None
+                            st.session_state["auth_suivi_joueur"] = None
+                        
+                        st.success(f"🏃 {membre_a_retirer} a été retiré avec succès !")
+                        st.cache_data.clear()
+                        st.rerun()
+                except Exception as e:
+                    st.error(f"❌ Erreur lors du retrait : {e}")
+
+        st.markdown("---")
+        st.markdown("##### ➕ Enregistrer un NOUVEAU Réinvestissement Cash (Rallonge)")
+        with st.form("form_nouveau_reinvestissement_cash"):
+            c_re1, c_fl2 = st.columns(2)
+            with c_re1: membre_reinvestit = st.selectbox("Sélectionner le collaborateur :", membres_inscrits)
+            with c_fl2: montant_rallonge = st.number_input("Montant de l'apport complémentaire (€) :", min_value=0.0, value=0.0, step=5000.0)
+                
+            if st.form_submit_button("💰 APPLIQUER LA RALLONGE", width="stretch"):
+                if montant_rallonge <= 0:
+                    st.error("❌ Veuillez saisir un montant supérieur à 0 €.")
+                else:
+                    db.ajouter_reinvestissement_membre(nom_coop_active, membre_reinvestit, montant_rallonge)
+                    db.enregistrer_log(type_action="COMPTABILITE", details=f"Rallonge financière de {montant_rallonge} € appliquée à [{membre_reinvestit}].")
+                    st.success(f"🎯 Rallonge validée pour [ {membre_reinvestit} ] !")
+                    st.cache_data.clear()
+                    st.rerun()
+                    
+        st.markdown("---")
+        st.markdown("##### 💰 Éditer le Capital Initial d'Origine")
+        with st.form("form_ajustement_capitaux_coop"):
+            champs_capitaux = {}
+            for mb in membres_inscrits:
+                capital_actuel = float(dict_capitaux.get(mb, 0.0))
+                champs_capitaux[mb] = st.number_input(f"Capital de base pour [ {mb} ] (€) :", min_value=0.0, value=capital_actuel, step=10000.0, key=f"input_ajust_cap_{mb}")
+            
+            if st.form_submit_button("💾 VERROUILLER LE COMPTE DE BASE", width="stretch"):
+                for mb_nom, val_money in champs_capitaux.items():
+                    db.fixer_capital_initial_membre(nom_coop_active, mb_nom, val_money)
+                db.enregistrer_log(type_action="COMPTABILITE", details=f"Mise à jour globale des capitaux initiaux pour {nom_coop_active}.")
+                st.success("🎯 Tous les investissements de base ont été verrouillés.")
+                st.cache_data.clear()
+                st.rerun()
+
+        st.markdown("---")
+        if slots_occupes < 4:
+            st.markdown("##### ➕ Ajouter de nouveaux collaborateurs")
+            texte_bloc_membres = st.text_input("Saisissez les pseudos manquants (séparés par un espace) :", value="", placeholder="Ex: Grego73 Adri1").strip()
+            
+            if st.button("📝 ENREGISTRER L'ÉQUIPE EN BLOC", type="primary", width="stretch"):
+                if not texte_bloc_membres:
+                    st.error("⚠️ Saisissez au moins un pseudo.")
+                else:
+                    statut_ins, msg_ins = db.ajouter_membres_bloc_coop(nom_coop_active, texte_bloc_membres)
+                    if statut_ins:
+                        db.enregistrer_log(type_action="COOPERATIVE", details=f"Recrutement de nouveaux membres en bloc dans {nom_coop_active}.")
+                        st.success(msg_ins)
+                        st.rerun()
+                    else:
+                        st.error(msg_ins)
+        else:
+            st.warning("🚫 Votre équipe est complète (4/4). Vous ne pouvez plus rajouter de joueurs.")
 
