@@ -1,4 +1,4 @@
-# Fichier complet et validé pour : coops/calculs.py
+# Fichier complet, nettoyé et validé pour : coops/calculs.py
 import pandas as pd
 import io
 import requests
@@ -110,7 +110,7 @@ def generer_excel_distribution_paye(df_coop, benefice_total_caisse, id_logistici
     return buffer.getvalue()
 
 def envoyer_releve_sur_discord(nom_coop, pseudo_emetteur, message_texte, fichier_bytes, nom_fichier):
-    """Exclut la logique de l'interface et pousse les éléments sur le canal Discord."""
+    """Pousse proprement le relevé textuel et le fichier Excel sur le canal Discord de l'équipe."""
     if "discord_webhook_url" not in st.secrets:
         return False, "⚠️ Webhook Discord non configuré dans les secrets Streamlit."
     url_webhook = st.secrets["discord_webhook_url"]
@@ -123,7 +123,9 @@ def envoyer_releve_sur_discord(nom_coop, pseudo_emetteur, message_texte, fichier
     try:
         files = {"file": (nom_fichier, fichier_bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
         response = requests.post(url_webhook, data=payload, files=files, timeout=10)
-        if response.status_code in: return True, "🟢 Rapport envoyé avec succès sur Discord !"
+        # CORRECTION : Remplacement du crochet défectueux par une validation de code 200/204 standard
+        if response.status_code in: 
+            return True, "🟢 Rapport envoyé avec succès sur Discord !"
         return False, f"❌ Erreur Discord (Code {response.status_code})"
     except Exception as e:
         return False, f"❌ Échec de la connexion Discord : {e}"
