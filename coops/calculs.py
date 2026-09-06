@@ -111,8 +111,14 @@ def generer_excel_distribution_paye(df_coop, benefice_total_caisse, id_logistici
             
     return buffer.getvalue()
 
-def envoyer_releve_sur_discord(nom_coop, pseudo_emetteur, df_coop, benefice_total_caisse, id_logisticien, fichier_bytes, nom_fichier):
-    """Pousse proprement le relevé textuel et le fichier Excel sur le canal Discord de l'équipe."""
+def envoyer_releve_sur_discord(nom_coop, pseudo_emetteur, df_coop, liste_flux, benefice_total_caisse, id_logisticien, fichier_bytes, nom_fichier):
+    """
+    Pousse proprement le relevé textuel et le fichier Excel sur le canal Discord de l'équipe
+    en calculant les dividendes et le classement basé sur liste_flux.
+    """
+    import streamlit as st
+    import requests
+
     if "discord_webhook_url" not in st.secrets:
         return False, "⚠️ Webhook Discord non configuré dans les secrets Streamlit."
     url_webhook = st.secrets["discord_webhook_url"]
@@ -136,17 +142,18 @@ def envoyer_releve_sur_discord(nom_coop, pseudo_emetteur, df_coop, benefice_tota
         badge_log = " 👑 (+5% Prime)" if pseudo == id_logisticien else ""
         texte_membres += f"👤 {pseudo:<12} ➔ {(argent_dividendes + prime_lo):,.2f} €  ({pct_dividende:.1f}%{badge_log})\n"
 
-    # 2. EXTRACTEUR ET TRI SÉCURISÉ DES SOUVENIRS DU SERVEUR
+    # 2. EXTRACTEUR ET TRI SÉCURISÉ DU RESTE DU SERVEUR
     stats_acheteurs = {}
-    for fl in liste_flux:
-        j_nom = fl.get("joueur", "Inconnu")
-        if j_nom.lower().startswith("réappro") or fl.get("type") == "REAPPROVISIONNEMENT": 
-            continue
-        volume_ligne = sum(fl.get("materiaux", {}).values())
-        if volume_ligne > 0:
-            stats_acheteurs[j_nom] = stats_acheteurs.get(j_nom, 0.0) + volume_ligne
+    if liste_flux:
+        for fl in liste_flux:
+            j_nom = fl.get("joueur", "Inconnu")
+            if j_nom.lower().startswith("réappro") or fl.get("type") == "REAPPROVISIONNEMENT": 
+                continue
+            volume_ligne = sum(fl.get("materiaux", {}).values())
+            if volume_ligne > 0:
+                stats_acheteurs[j_nom] = stats_acheteurs.get(j_nom, 0.0) + volume_ligne
 
-    # CORRECTIF DU TRI : Tri précis basé exclusivement sur l'index de la valeur [1] (Le volume)
+    # Tri précis basé exclusivement sur le volume de tonnes
     acheteurs_tries = sorted(stats_acheteurs.items(), key=lambda x: x[1], reverse=True)
     
     texte_classement_acheteurs = ""
