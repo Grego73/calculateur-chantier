@@ -1,4 +1,4 @@
-# Contenu complet et validé pour : onglets/ajouter_chantier.py
+# Contenu complet validé et corrigé pour : onglets/ajouter_chantier.py
 
 import streamlit as st
 import pandas as pd
@@ -77,29 +77,43 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
     
     liste_triee = ["Choisir un chantier pré-configuré..."] + sorted([k for k in CATALOGUE_CHANTIERS.keys() if k != "Choisir un chantier pré-configuré..."])
     
+    # Initialisations de session_state
     if "val_revenus" not in st.session_state:
         st.session_state["val_revenus"] = 0.0
         st.session_state["val_jours"] = 0
+        st.session_state["val_heures"] = 0
+        st.session_state["val_minutes"] = 0
         for k in ["sable","terre","enrobe","armature","tole","beton","panneaux","tuyaux","canalisations","poutres"]:
             st.session_state[f"val_{k}"] = 0.0
-
-    # SÉCURITÉ : Initialisation du compteur de rafraîchissement si absent
+            
     if "compteur_refresh_engins" not in st.session_state:
         st.session_state["compteur_refresh_engins"] = 0
-    
-    # --- ACTION DE RECEPTION DYNAMIQUE PAR ÉTAPES CORRIGÉE ANTI-CRASH ---
+
+    # --- ACTION DE RECEPTION DYNAMIQUE PAR ÉTAPES ---
     def mise_a_jour_cache_modele():
         selection = st.session_state["select_modele_chantier_dynamique"]
+        
+        # On force le changement de clé de l'éditeur SEULEMENT au changement de modèle
+        st.session_state["compteur_refresh_engins"] += 1
+        
+        # Nettoyage ciblé des anciens états des data_editors
+        for key in list(st.session_state.keys()):
+            if "editor_rh_data" in key or "editor_engins_data" in key:
+                del st.session_state[key]
+
         if selection == "Choisir un chantier pré-configuré...":
+            st.session_state["val_revenus"] = 0.0
+            st.session_state["val_jours"] = 0
+            st.session_state["val_heures"] = 0
+            st.session_state["val_minutes"] = 0
+            for mat in ["sable","terre","enrobe","armature","tole","beton","panneaux","tuyaux","canalisations","poutres"]:
+                st.session_state[f"val_{mat}"] = 0.0
+            st.session_state["cache_df_rh"] = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "🕹️ Conducteurs", "🧑‍💼 Chefs", "👷 Ouvriers"])
+            st.session_state["cache_df_engins"] = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "Type d'engin requis", "Niveau requis", "À louer ?"])
             return
             
         modele = CATALOGUE_CHANTIERS[selection]
         etapes_cloud = modele.get("etapes_techniques", [])
-        
-        # Nettoyage préventif des états d'éditeurs (sans toucher aux clés interdites rattachées directement)
-        for k in ["editor_rh_data", "editor_engins_data"]:
-            if k in st.session_state: 
-                del st.session_state[k]
             
         # Paramètres globaux temporels et financiers
         st.session_state["val_revenus"] = float(modele.get("revenus", 0.0))
@@ -149,10 +163,8 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         # Stockage dans des variables "caches" tampon
         st.session_state["cache_df_rh"] = pd.DataFrame(lignes_rh)
         
-        # --- CORRECTION ANTY-DOUBLON ICI ---
         df_engins_brut = pd.DataFrame(lignes_engins)
         if not df_engins_brut.empty:
-            # On élimine les doublons stricts basés sur l'étape, le type et le niveau requis
             st.session_state["cache_df_engins"] = df_engins_brut.drop_duplicates(
                 subset=["N° Étape", "Type d'engin requis", "Niveau requis"], 
                 keep="first"
@@ -160,10 +172,8 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         else:
             st.session_state["cache_df_engins"] = df_engins_brut
 
-    # --- ACTION COMPLÉMENTAIRE CRITIQUE POUR FORCER LE RENOUVELLEMENT DE L'ÉDITEUR ---
-    if "compteur_refresh_engins" not in st.session_state:
-        st.session_state["compteur_refresh_engins"] = 0
-    st.session_state["compteur_refresh_engins"] += 1
+    # Récupération de l'index de rafraîchissement stabilisé
+    idx_refresh = st.session_state["compteur_refresh_engins"]
 
     chantier_selectionne = st.selectbox(
         "🚀 Sélectionner un modèle de chantier dynamique :", 
@@ -183,10 +193,8 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         c_j, c_h, c_m = st.columns(3)
         
         with c_j: jours_saisis = st.number_input("Jours", min_value=0, value=st.session_state["val_jours"], step=1)
-        with c_h: heures_saisies = st.number_input("Heures", min_value=0, max_value=23, value=st.session_state.get("val_heures", 0), step=1)
-        with c_m: minutes_saisies = st.number_input("Minutes", min_value=0, max_value=59, value=st.session_state.get("val_minutes", 0), step=1)
-
-
+        with c_h: heures_saisies = st.number_input("Heures", min_value=0, max_value=23, value=st.session_state["val_heures"], step=1)
+        with c_m: minutes_saisies = st.number_input("Minutes", min_value=0, max_value=59, value=st.session_state["val_minutes"], step=1)
         heures_en_jours = heures_saisies / 24.0
         minutes_en_jours = minutes_saisies / 1440.0
         jours_totaux = float(jours_saisis + heures_en_jours + minutes_en_jours)
@@ -237,11 +245,10 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         st.markdown("**👥 Planification des Effectifs requis à l'Étape :**")
         df_rh_init = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "🕹️ Conducteurs", "🧑‍💼 Chefs", "👷 Ouvriers"])
 
-        # Lecture depuis la variable tampon intermédiaire sécurisée contre la règle d'écriture directe
         raw_rh_state = st.session_state.get("cache_df_rh", df_rh_init)
 
         tableau_employes_etapes = st.data_editor(
-            raw_rh_state, num_rows="dynamic", use_container_width=True, key="editor_rh_data",
+            raw_rh_state, num_rows="dynamic", use_container_width=True, key=f"editor_rh_data_{idx_refresh}",
             column_config={
                 "N° Étape": st.column_config.NumberColumn("N°", min_value=1, step=1, required=True, width="small"),
                 "Durée Étape (jours)": st.column_config.NumberColumn("Jours", min_value=1, step=1, required=True, width="small"),
@@ -254,25 +261,19 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         st.markdown("### 🚜 --- TABLE DES ENGINS NÉCESSAIRES ---")
         df_besoins_init = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "Type d'engin requis", "Niveau requis", "À louer ?"])
         
-        # Lecture depuis la variable tampon intermédiaire pour les engins requis
         raw_engins_state = st.session_state.get("cache_df_engins", df_besoins_init)
 
-        # Récupération de l'index de rafraîchissement
-        idx_refresh = st.session_state.get("compteur_refresh_engins", 0)
-
-        # L'éditeur possède maintenant une clé contenant l'index (ex: "editor_engins_data_3")
         engins_necessaires = st.data_editor(
             raw_engins_state, num_rows="dynamic", use_container_width=True, 
-            key=f"editor_engins_data_{idx_refresh}", # <-- LA CORRECTION TECHNIQUE EST ICI
+            key=f"editor_engins_data_{idx_refresh}", 
             column_config={
                 "N° Étape": st.column_config.NumberColumn("N°", min_value=1, step=1, required=True, width="small"),
                 "Durée Étape (jours)": st.column_config.NumberColumn("Durée (jours)", min_value=1, step=1, required=True),
-                "Type d'engin requis": st.column_config.TextColumn("Type d'engin requis", disabled=True),
+                "Type d'engin requis": st.column_config.TextColumn("Type d'engin requis", disabled=False),
                 "Niveau requis": st.column_config.SelectboxColumn("Niveau requis", options=["N1", "N2", "N3", "N4"], required=True),
                 "À louer ?": st.column_config.CheckboxColumn("À louer ?", default=False)
             }
         )
-
 
         engins_transferes_list = []
         if engins_necessaires is not None and not engins_necessaires.empty and "À louer ?" in engins_necessaires.columns:
@@ -325,7 +326,6 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
     # ==============================================================================
     jours_factures_jeu = math.ceil(jours_totaux)
     total_mats_recap = float(total_mats_direct)
-
     total_location_recap = 0.0
     if engins_edites is not None and not engins_edites.empty:
         df_propres_direct = engins_edites.dropna(subset=["engin_modele"])
@@ -360,7 +360,6 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
     gain_par_jour_recap = float(benefice_net_recap / jours_totaux if jours_totaux > 0 else 0.0)
     roi_par_jour_recap = float(roi_recap / jours_totaux if jours_totaux > 0 else roi_recap)
 
-    # --- CORRECTION DE SYNTAXE ET UNIFORMISATION DU FORMAT DES JOURS ---
     txt_mats = f"{total_mats_recap:,.0f}".replace(",", " ")
     txt_loc = f"{total_location_recap:,.0f}".replace(",", " ")
     txt_sal = f"{total_salaires_recap:,.0f}".replace(",", " ")
@@ -368,15 +367,12 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
     txt_gain_jour = f"{gain_par_jour_recap:,.0f}".replace(",", " ")
     txt_benefice = f"{abs(benefice_net_recap):,.0f}".replace(",", " ")
     
-    # Formatage de la Durée Générale
     txt_duree_precise = f"{jours_saisis}j {heures_saisies}h {minutes_saisies}m" if jours_totaux > 0 else "0j"
     
-    # Formatage identique pour le Cumul Étape (Conversion des décimales en heures si existantes)
     jours_e_entiers = int(total_jours_etapes)
     heures_e_restantes = int(round((total_jours_etapes - jours_e_entiers) * 24))
     txt_duree_etapes = f"{jours_e_entiers}j {heures_e_restantes}h 0m"
 
-    # --- METRICS EN BAS ---
     st.markdown("---")
     st.markdown("### 📊 Récapitulatif Global Estimé (Règles du Jeu)")
     c_rc1, c_rc2, c_rc3, c_rc4, c_rc5, c_rc6, c_rc7 = st.columns(7)
@@ -385,10 +381,9 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
     with c_rc3: st.metric(label="👥 Total Salaires", value=f"{txt_sal} €")
     with c_rc4: st.metric(label="📉 Dépenses Totales", value=f"{txt_depenses} €")
     with c_rc5: st.metric(label="⏱️ Durée Générale", value=txt_duree_precise)
-    with c_rc6: st.metric(label="⚙️ Cumul Étape", value=txt_duree_etapes) # Affichage uniformisé
+    with c_rc6: st.metric(label="⚙️ Cumul Étape", value=txt_duree_etapes) 
     with c_rc7: st.metric(label="📈 Gain / Jour", value=f"{txt_gain_jour} €/j")
 
-    # --- REMPLACEMENT DU BLOCAGE PAR UN SIMPLE ALERT DE COMPARAISON SANS MATRICULE DE BLOC ---
     planning_incoherent = abs(jours_totaux - total_jours_etapes) > 0.05
 
     if planning_incoherent:
@@ -404,8 +399,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
     else: 
         st.error(f"🔴 **Chantier déficitaire :** Perte de **{txt_benefice} €** (ROI Global : **{roi_recap:.2f} %**)")
 
-    # LE BOUTON EST DÉSORMAIS TOUJOURS ACTIF (disabled=False)
-    if st.button("LANCER LE CALCUL & ENREGISTRER", type="primary", use_container_width=True, disabled=False):
+    if st.button("LANCER LE CALCUL & ENREGISTRER", type="primary", use_container_width=True):
         df_actuel = db.charger_donnees()
         doublon_existe = False if df_actuel.empty else not df_actuel[(df_actuel["Nom du Chantier"] == nom_chantier) & (df_actuel["Revenus (€)"] == revenus)].empty
         
@@ -431,3 +425,6 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
 
     if "temp_submit_data" in st.session_state:
         popup_confirmation_enregistrement()
+
+
+
