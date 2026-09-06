@@ -104,6 +104,31 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
                 }
             )
             if id_log: st.success(f"👑 **Félicitations à [{id_log}]** (Responsable Logistique de la semaine) !")
+            # --- EXTENSION : SIMULATEUR DE DISTRIBUTION ET TÉLÉCHARGEMENT EXCEL ---
+            st.markdown("---")
+            st.markdown("##### 💵 Calculateur de Paye & Exportation du Relevé de Compte")
+            
+            c_paye1, c_paye2 = st.columns([1, 2])
+            with c_paye1:
+                caisse_coop_saisie = st.number_input(
+                    "Bénéfice total à distribuer cette semaine (€) :", 
+                    min_value=0.0, value=1000.0, step=500.0, key="input_calcul_paye_euros_coop"
+                )
+            with c_paye2:
+                st.write("") # Espacement visuel
+                st.write("") 
+                
+                # Génération du fichier Excel via notre module séparé
+                from coops.calculs import generer_excel_distribution_paye
+                data_paye_bytes = generer_excel_distribution_paye(df_coop, caisse_coop_saisie, id_log)
+                
+                st.download_button(
+                    label="📥 TÉLÉCHARGER LE RELEVÉ DE PAYE DES ASSOCIÉS (EXCEL)",
+                    data=data_paye_bytes,
+                    file_name=f"releve_paye_hebdo_{nom_coop_active}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    width="stretch"
+                )
 
     # ==============================================================================
     # --- TABLEAU 2 : TOUS LES ACTEURS DU MARCHÉ & GRAPHIQUE DES QUANTITÉS ---
