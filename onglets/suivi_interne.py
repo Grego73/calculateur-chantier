@@ -86,20 +86,20 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
             # CORRECTIF : Alignement des paramètres pour envoyer_releve_sur_discord
             if st.button("🚀 EXPÉDIER LE BILAN ET LA PAIE SUR DISCORD", type="primary", width="stretch"):
                 with st.spinner("Envoi du relevé de compte et du classement sur Discord..."):
-                    # On envoie exactement les variables requises pour le calcul du Top Acheteurs
+                    # AJUSTEMENT : Ajout de liste_flux dans les paramètres
                     statut, msg = envoyer_releve_sur_discord(
                         nom_coop=nom_coop_active,
                         pseudo_emetteur=joueur_actif,
                         df_coop=df_coop,
+                        liste_flux=liste_flux, # <-- LA CORRECTION TECHNIQUE EST ICI
                         benefice_total_caisse=caisse_saisie,
                         id_logisticien=id_log,
                         fichier_bytes=data_paye_bytes,
                         nom_fichier=f"releve_comptable_{nom_coop_active}.xlsx"
                     )
-                    if statut: 
-                        st.success(msg)
-                    else: 
-                        st.error(msg)
+                    if statut: st.success(msg)
+                    else: st.error(msg)
+
 
     # ==============================================================================
     # --- TAB 2 : MARCHE GLOBAL & CLASSEMENT GÉNÉRAL DES ACHETEURS ---
