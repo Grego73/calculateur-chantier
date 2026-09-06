@@ -288,9 +288,15 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                         if etape_courante_num is not None:
                             target_etape = chantiers_detectes[nom_courant]["etapes_techniques"][etape_courante_num]
                             
-                            if "durée de l'étape :" in l_clean.lower() or "duree de l'etape :" in l_clean.lower():
-                                num_txt = "".join(c for c in l_clean.split(",") if c.isdigit())
-                                if num_txt: target_etape["duree_jours"] = int(num_txt)
+                            if "durée de l'étape" in l_clean.lower() or "duree de l'etape" in l_clean.lower():
+                                # On isole ce qui est juste après les deux points ':' (ex: " 4 jours, employés requis :")
+                                partie_droite = l_clean.split(":", 1)[-1]
+                                # On ne garde que ce qui est avant la première virgule (ex: " 4 jours")
+                                texte_jours = partie_droite.split(",", 1)[0]
+                                
+                                num_txt = "".join(c for c in texte_jours if c.isdigit())
+                                if num_txt: 
+                                    target_etape["duree_jours"] = int(num_txt)
                                 continue
                             
                             if ":" in l_clean and any(k in l_clean.lower() for k in ["chef", "ouvrier", "conducteur"]):
