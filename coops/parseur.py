@@ -4,7 +4,7 @@ import re
 def analyser_historique_brut(texte_brut, membres_inscrits, joueur_actif):
     """
     Analyse le fil des événements bruts et sépare de manière 100% étanche
-    les réapprovisionnements (rachats coop) et les achats (consommation).
+    les réapprovisionnements (nominatifs ou globaux) et les achats.
     """
     lignes_brutes = texte_brut.split("\n")
     regex_date = re.compile(r"Le\s*(\d{2}/\d{2}/\d{4})\s*[aà]\s*(\d{2}:\d{2})", re.IGNORECASE)
@@ -46,39 +46,47 @@ def analyser_historique_brut(texte_brut, membres_inscrits, joueur_actif):
                 if mat_cle:
                     l_lower = l_clean.lower()
                     
-                    # --- DOUBLE SÉCURITÉ : VERROUILLAGE DU RÉAPPROVISIONNEMENT ---
+                    # --- 1. DETECTION SÉCURISÉE DES RÉAPPROVISIONNEMENTS ---
                     if "réappro" in l_lower or "reappro" in l_lower:
                         type_mouv_final = "REAPPROVISIONNEMENT"
-                        if "réapprovisionne de" in l_lower:
-                            acteur_final = l_clean.split("réapprovisionne")[0].strip()
-                        elif "réapprovisionnement de" in l_lower or "reapprovisionnement de" in l_lower:
-                            acteur_final = "Réapprovisionnement Global"
+                        
+                        # Cas A : Réapprovisionnement nominatif (ex: "Grego73 réapprovisionne de...")
+                        if "réapprovisionne de" in l_lower or "reapprovisionne de" in l_lower:
+                            # On découpe sur le mot clé de l'action
+                            separateur = "réapprovisionne" if "réapprovisionne" in l_lower else "reapprovisionne"
+                            parties = l_clean.split(separateur, 1)
+                            acteur_final = parties[0].strip()
+                        
+                        # Cas B : Réapprovisionnement anonyme (ex: "Réapprovisionnement de 500 unité(s)...")
                         else:
                             acteur_final = "Réapprovisionnement Global"
                             
-                    # --- BLOC DES ACHATS (UNIQUEMENT SI CE N'EST PAS UN RÉAPPRO) ---
+                    # --- 2. DETECTION SÉCURISÉE DES ACHATS (INTERNE / CLIENT) ---
                     elif "acheté" in l_lower or "achete" in l_lower:
-                        if "a acheté" in l_lower:
-                            acteur_final = l_clean.split("a acheté")[0].strip()
+                        if "a acheté" in l_lower or "a achete" in l_lower:
+                            separateur = "a acheté" if "a acheté" in l_lower else "a achete"
+                            parties = l_clean.split(separateur, 1)
+                            acteur_final = parties[0].strip()
                         else:
                             acteur_final = joueur_actif
                             
-                        # Tri automatique : Interne (Coop) ou Externe (Client)
                         type_mouv_final = "ACHAT_INTERNE" if acteur_final in membres_inscrits else "ACHAT_EXTERNE"
                         
                     else:
-                        # Sécurité par défaut
                         acteur_final = joueur_actif
                         type_mouv_final = "REAPPROVISIONNEMENT"
 
-                    # Nettoyage ultime du pseudo pour enlever les résidus de texte
-                    acteur_final = acteur_final.replace("Le ", "").strip()
+                    # Nettoyage ultime du pseudo (on enlève un potentiel "Le " résiduel du début de la ligne)
+                    if acteur_final.startswith("Le ") or acteur_final.startswith("le "):
+                        acteur_final = acteur_final[3:].strip()
+                    
+                    acteur_final = acteur_final.strip()
                     if not acteur_final:
                         acteur_final = "Réapprovisionnement Global"
 
                     actions_detectees.append({
                         "date": date_courante, "heure": heure_courante,
-                        "acteur": acteur_final, "type": type_mouv_final,
+                        "acteur": actor_final, "type": type_mouv_final,
                         "materiaux": {mat_cle: qte_val}
                     })
                     
