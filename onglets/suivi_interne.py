@@ -230,50 +230,31 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
                             st.cache_data.clear(); st.rerun()
                     except Exception as e: st.error(f"❌ Erreur : {e}")
 
-            # --- RETOUR DU BOUTON D'AJOUT DE JOUEUR (SI MOINS DE 4) ---
+            # --- 3. RECRUTEMENT EN BLOC (UNE SEULE FOIS, SÉCURISÉ) ---
             st.markdown("---")
             slots_occupes = len(membres_inscrits)
             if slots_occupes < 4:
                 st.markdown("##### ➕ 3. Recrutement de Collaborateurs en Bloc")
-                texte_bloc_membres = st.text_input("Saisissez les pseudos à inscrire (séparés par un espace) :", value="", placeholder="Ex: Adri1 Julo").strip()
-                if st.button("📝 ENREGISTRER L'ÉQUIPE EN BLOC", type="primary", width="stretch") and texte_bloc_membres:
-                    statut_ins, msg_ins = db.ajouter_membres_bloc_coop(nom_coop_active, texte_bloc_membres)
-                    if statut_ins:
-                        db.enregistrer_log(type_action="COOPERATIVE", details=f"Le Créateur [{joueur_actif}] a recruté du personnel en bloc.")
-                        st.success(msg_ins)
-                        st.cache_data.clear(); st.rerun()
-                    else:
-                        st.error(msg_ins)
-            else:
-                st.warning("🚫 Votre équipe est complète (4/4). Vous ne pouvez plus rajouter de joueurs.")
-            # --- 3. RECRUTEMENT EN BLOC (SÉCURISÉ PAR CLÉ UNIQUE) ---
-            st.markdown("---")
-            slots_occupes = len(membres_inscrits)
-            if slots_occupes < 4:
-                st.markdown("##### ➕ 3. Recrutement de Collaborateurs en Bloc")
-                
-                # CORRECTIF : Ajout d'une clé d'identification unique 'key="input_recrutement_bloc_final_v3"'
                 texte_bloc_membres = st.text_input(
                     "Saisissez les pseudos à inscrire (séparés par un espace) :", 
                     value="", 
                     placeholder="Ex: Adri1 Julo",
-                    key="input_recrutement_bloc_final_v3"
+                    key="input_recrutement_bloc_final_unique"
                 ).strip()
                 
-                if st.button("📝 ENREGISTRER L'ÉQUIPE EN BLOC", type="primary", width="stretch", key="btn_recrutement_bloc_submit_v3"):
+                if st.button("📝 ENREGISTRER L'ÉQUIPE EN BLOC", type="primary", width="stretch", key="btn_recrutement_bloc_submit_unique"):
                     if texte_bloc_membres:
                         statut_ins, msg_ins = db.ajouter_membres_bloc_coop(nom_coop_active, texte_bloc_membres)
                         if statut_ins:
                             db.enregistrer_log(type_action="COOPERATIVE", details=f"Le Créateur [{joueur_actif}] a recruté du personnel en bloc.")
                             st.success(msg_ins)
-                            st.cache_data.clear()
-                            st.rerun()
+                            st.cache_data.clear(); st.rerun()
                         else:
                             st.error(msg_ins)
             else:
                 st.warning("🚫 Votre équipe est complète (4/4). Vous ne pouvez plus rajouter de joueurs.")
 
-            # --- 📈 4. STATISTIQUES D'UTILISATION & SUIVI CONNEXIONS (SÉCURISÉ) ---
+            # --- 📈 4. STATISTIQUES D'UTILISATION & SUIVI CONNEXIONS ---
             st.markdown("---")
             st.markdown("##### 📈 4. Statistiques d'Utilisation & Activité de l'Équipe")
             st.caption("Suivi des connexions et de l'utilisation du programme à partir du journal d'audit Cloud.")
@@ -300,13 +281,11 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
                     else:
                         st.caption("ℹ️ Aucun log de connexion récent détecté.")
                         
-                    # 2. Graphique d'utilisation générale du programme (SÉCURISÉ PAR CLÉ)
+                    # 2. Graphique d'utilisation générale
                     if "type_action" in df_logs.columns:
                         st.markdown("**📊 Répartition de l'utilisation des modules :**")
                         compteur_actions = df_logs["type_action"].value_counts().reset_index()
                         compteur_actions.columns = ["Module de l'Application", "Nombre d'actions posées"]
-                        
-                        # CORRECTIF : Isolation graphique par clé d'affichage
-                        st.bar_chart(compteur_actions.set_index("Module de l'Application"), color="#2563EB", key="graph_utilisation_modules_coop_v3")
+                        st.bar_chart(compteur_actions.set_index("Module de l'Application"), color="#2563EB", key="graph_utilisation_modules_coop_unique")
             except Exception as e:
                 st.caption(f"ℹ️ Tableau de bord statistique momentanément indisponible ({e}).")
