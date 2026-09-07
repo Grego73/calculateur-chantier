@@ -3,8 +3,8 @@ import re
 
 def analyser_historique_brut(texte_brut, membres_inscrits, joueur_actif):
     """
-    Analyse le fil des événements bruts du lundi et extrait les actions 
-    de Réappro et d'Achats nominatifs avec nettoyage strict des espaces.
+    Analyse le fil des événements bruts et sépare de manière 100% étanche
+    les réapprovisionnements (rachats coop) et les achats (consommation).
     """
     lignes_brutes = texte_brut.split("\n")
     regex_date = re.compile(r"Le\s*(\d{2}/\d{2}/\d{4})\s*[aà]\s*(\d{2}:\d{2})", re.IGNORECASE)
@@ -44,22 +44,37 @@ def analyser_historique_brut(texte_brut, membres_inscrits, joueur_actif):
                 elif "poutre" in type_mat_brut: mat_cle = "poutres"
 
                 if mat_cle:
-                    # --- CORRECTIF : Nettoyage strict avec .strip() pour éliminer les espaces parasites ---
-                    if "réapprovisionne de" in l_clean.lower():
-                        parties = l_clean.split("réapprovisionne", 1)
-                        # On prend la partie gauche (le pseudo) et on retire les espaces vides autour
-                        acteur_final = parties[0].strip() if parties[0].strip() else "Réapprovisionnement Global"
+                    l_lower = l_clean.lower()
+                    
+                    # --- DOUBLE SÉCURITÉ : VERROUILLAGE DU RÉAPPROVISIONNEMENT ---
+                    if "réappro" in l_lower or "reappro" in l_lower:
                         type_mouv_final = "REAPPROVISIONNEMENT"
-                    elif l_clean.lower().startswith("réapprovisionnement de"):
-                        acteur_final = "Réapprovisionnement Global"
-                        type_mouv_final = "REAPPROVISIONNEMENT"
-                    elif "a acheté" in l_clean.lower():
-                        parties = l_clean.split("a acheté", 1)
-                        acteur_final = parties[0].strip() if parties[0].strip() else joueur_actif
+                        if "réapprovisionne de" in l_lower:
+                            acteur_final = l_clean.split("réapprovisionne")[0].strip()
+                        elif "réapprovisionnement de" in l_lower or "reapprovisionnement de" in l_lower:
+                            acteur_final = "Réapprovisionnement Global"
+                        else:
+                            acteur_final = "Réapprovisionnement Global"
+                            
+                    # --- BLOC DES ACHATS (UNIQUEMENT SI CE N'EST PAS UN RÉAPPRO) ---
+                    elif "acheté" in l_lower or "achete" in l_lower:
+                        if "a acheté" in l_lower:
+                            acteur_final = l_clean.split("a acheté")[0].strip()
+                        else:
+                            acteur_final = joueur_actif
+                            
+                        # Tri automatique : Interne (Coop) ou Externe (Client)
                         type_mouv_final = "ACHAT_INTERNE" if acteur_final in membres_inscrits else "ACHAT_EXTERNE"
+                        
                     else:
+                        # Sécurité par défaut
                         acteur_final = joueur_actif
                         type_mouv_final = "REAPPROVISIONNEMENT"
+
+                    # Nettoyage ultime du pseudo pour enlever les résidus de texte
+                    acteur_final = acteur_final.replace("Le ", "").strip()
+                    if not acteur_final:
+                        acteur_final = "Réapprovisionnement Global"
 
                     actions_detectees.append({
                         "date": date_courante, "heure": heure_courante,
