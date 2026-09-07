@@ -197,6 +197,7 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
                 st.cache_data.clear()
                 st.rerun()
 
+        # Commandes exclusives du Créateur (Niveau 3)
         if niveau_actuel >= 3:
             st.markdown("---")
             st.markdown("##### 👑 1. Attribution des Mots de Passe des Grades")
@@ -207,9 +208,7 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
                 
                 if st.form_submit_button("💾 VERROUILLER ET SAUVEGARDER LES CODES", width="stretch"):
                     db.db.collection("cooperatives").document(nom_coop_active).update({
-                        "mdp_niveau1": nouveau_mdp_niv1, 
-                        "mdp_niveau2": nouveau_mdp_niv2, 
-                        "mdp_niveau3": nouveau_mdp_niv3
+                        "mdp_niveau1": nouveau_mdp_niv1, "mdp_niveau2": nouveau_mdp_niv2, "mdp_niveau3": nouveau_mdp_niv3
                     })
                     st.success("🟢 Les mots de passe des grades ont été mis à jour avec succès !")
                     st.rerun()
@@ -226,10 +225,24 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
                             membres_actuels.remove(m_retirer)
                             coop_doc_ref.update({"membres": membres_actuels})
                             db.enregistrer_log(type_action="COOPERATIVE", details=f"Le Créateur [{joueur_actif}] a banni [{m_retirer}].")
-                            if m_retirer == joueur_actif: 
-                                st.session_state["auth_suivi_coop"] = None
+                            if m_retirer == joueur_actif: st.session_state["auth_suivi_coop"] = None
                             st.success(f"🏃 {m_retirer} retiré !")
-                            st.cache_data.clear()
-                            st.rerun()
-                    except Exception as e: 
-                        st.error(f"❌ Erreur : {e}")
+                            st.cache_data.clear(); st.rerun()
+                    except Exception as e: st.error(f"❌ Erreur : {e}")
+
+            # --- RETOUR DU BOUTON D'AJOUT DE JOUEUR (SI MOINS DE 4) ---
+            st.markdown("---")
+            slots_occupes = len(membres_inscrits)
+            if slots_occupes < 4:
+                st.markdown("##### ➕ 3. Recrutement de Collaborateurs en Bloc")
+                texte_bloc_membres = st.text_input("Saisissez les pseudos à inscrire (séparés par un espace) :", value="", placeholder="Ex: Adri1 Julo").strip()
+                if st.button("📝 ENREGISTRER L'ÉQUIPE EN BLOC", type="primary", width="stretch") and texte_bloc_membres:
+                    statut_ins, msg_ins = db.ajouter_membres_bloc_coop(nom_coop_active, texte_bloc_membres)
+                    if statut_ins:
+                        db.enregistrer_log(type_action="COOPERATIVE", details=f"Le Créateur [{joueur_actif}] a recruté du personnel en bloc.")
+                        st.success(msg_ins)
+                        st.cache_data.clear(); st.rerun()
+                    else:
+                        st.error(msg_ins)
+            else:
+                st.warning("🚫 Votre équipe est complète (4/4). Vous ne pouvez plus rajouter de joueurs.")
