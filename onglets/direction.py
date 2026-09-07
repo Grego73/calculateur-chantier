@@ -540,99 +540,111 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
         key="selectbox_audit_tables_nosql_direction_master"
     )
 
-    # --- TABLE 1 : LES MODÈLES DE CHANTIERS AVEC EXPLORATEUR D'ÉTAPES (RH, MATS, ENGINS) ---
+    # --- TABLE 1 : LES MODÈLES DE CHANTIERS AVEC AFFICHAGE DIRECT DE TOUTES LES COLONNES CUMULÉES ---
     if choix_table == "Modèles de Chantiers Pré-configurés":
         try:
-            # 1. Lecture complète de la collection sur Firebase
+            # 1. Lecture de la collection de vos modèles sur Firebase
             modeles_stream = db.db.collection("modeles_chantiers").stream()
-            dict_modeles_complets = {}
-            lignes_mod = []
+            lignes_globales_modeles = []
             
             for doc in modeles_stream:
                 d = doc.to_dict()
-                dict_modeles_complets[doc.id] = d  # On garde toutes les données en mémoire vive
-                lignes_mod.append({
+                etapes = d.get("etapes_techniques", [])
+                
+                # Initialisation des compteurs de cumuls pour extraire les données cachées des étapes
+                total_cond = 0
+                total_chef = 0
+                total_ouvrier = 0
+                
+                # Dictionnaire pour cumuler tous les types de matériaux du modèle
+                cumul_mats = {
+                    "sable": 0.0, "terre": 0.0, "enrobe": 0.0, "armature": 0.0, 
+                    "tole": 0.0, "beton": 0.0, "panneaux": 0.0, "tuyaux": 0.0, 
+                    "canalisations": 0.0, "poutres": 0.0
+                }
+                
+                # Nombre d'engins lourds au total sur ce chantier
+                total_engins_count = 0
+                
+                # Boucle de calcul automatique pour fusionner les sous-étapes en colonnes directes
+                for etape in etapes:
+                    total_cond += int(etape.get("jh_cond", 0))
+                    total_chef += int(etape.get("jh_chef", 0))
+                    total_ouvrier += int(etape.get("jh_ouvrier", 0))
+                    
+                    # Cumul des matériaux de l'étape
+                    mats_etape = etape.get("materiaux", {})
+                    for m_nom, qte in mats_etape.items():
+                        m_nom_clean = m_nom.lower().replace("é", "e").replace("ô", "o")
+                        if m_nom_clean in cumul_mats:
+                            cumul_mats[m_nom_clean] += float(qte)
+                            
+                    # Cumul du nombre d'engins requis
+                    total_engins_count += len(etape.get("engins", []))
+                
+                # Ajout de la ligne consolidée avec toutes les colonnes techniques demandées
+                lignes_globales_modeles.append({
                     "ID Document": doc.id,
-                    "Nom du Modèle": doc.id,
-                    "Chiffre d'Affaires": f"{d.get('revenus', 0):,.0f} €".replace(",", " ")
+                    "🏗️ Nom du Modèle": doc.id,
+                    "💰 CA Prévu (€)": float(d.get("revenus", 0.0)),
+                    "⏱️ Durée (j)": int(d.get("jours_globaux", 0)),
+                    "🕹️ Cond (jh)": total_cond,
+                    "🧑‍💼 Chefs (jh)": total_chef,
+                    "👷 Ouv (jh)": total_ouvrier,
+                    "🧱 Sable (t)": cumul_mats["sable"],
+                    "🧱 Terre (t)": cumul_mats["terre"],
+                    "🧱 Enrobé (t)": cumul_mats["enrobe"],
+                    "🧱 Béton (t)": cumul_mats["beton"],
+                    "🔩 Armat. (u)": cumul_mats["armature"],
+                    "💿 Tôles (u)": cumul_mats["tole"],
+                    "🪵 Poutres (u)": cumul_mats["poutres"],
+                    "🚰 Tuyaux (u)": cumul_mats["tuyaux"],
+                    "🚜 Engins (Qté)": total_engins_count
                 })
                 
-            if lignes_mod:
-                df_mod = pd.DataFrame(lignes_mod)
-                df_mod["Supprimer ?"] = False
+            if lignes_globales_modeles:
+                df_global_mod = pd.DataFrame(lignes_globales_modeles)
+                df_global_mod["Supprimer ?"] = False
                 
-                # Tableau principal de nettoyage
+                # --- AFFICHAGE DIRECT DU GRAND TABLEAU MULTI-COLONNES CONFIGURÉ ---
                 mod_edite = st.data_editor(
-                    df_mod, width="stretch", hide_index=True, key="editor_nettoyage_modeles_v5",
-                    column_config={"ID Document": None}  # Masque l'ID brut doublon
+                    df_global_mod, width="stretch", hide_index=True, key="editor_nettoyage_modeles_direct_v6",
+                    column_config={
+                        "ID Document": None,  # Masque la colonne ID technique doublon
+                        "💰 CA Prévu (€)": st.column_config.NumberColumn(format="%.0f €"),
+                        "⏱️ Durée (j)": st.column_config.NumberColumn(format="%d j"),
+                        "🕹️ Cond (jh)": st.column_config.NumberColumn(format="%d jh"),
+                        "🧑‍💼 Chefs (jh)": st.column_config.NumberColumn(format="%d jh"),
+                        "👷 Ouv (jh)": st.column_config.NumberColumn(format="%d jh"),
+                        "🧱 Sable (t)": st.column_config.NumberColumn(format="%.0f t"),
+                        "🧱 Terre (t)": st.column_config.NumberColumn(format="%.0f t"),
+                        "🧱 Enrobé (t)": st.column_config.NumberColumn(format="%.0f t"),
+                        "🧱 Béton (t)": st.column_config.NumberColumn(format="%.0f t"),
+                        "🔩 Armat. (u)": st.column_config.NumberColumn(format="%d u"),
+                        "💿 Tôles (u)": st.column_config.NumberColumn(format="%d u"),
+                        "🪵 Poutres (u)": st.column_config.NumberColumn(format="%d u"),
+                        "🚰 Tuyaux (u)": st.column_config.NumberColumn(format="%d u"),
+                        "🚜 Engins (Qté)": st.column_config.NumberColumn(format="%d machine(s)"),
+                        "Supprimer ?": st.column_config.CheckboxColumn(default=False)
+                    }
                 )
                 
-                if st.button("🔥 EFFACER LES MODÈLES SÉLECTIONNÉS", type="primary", width="stretch", key="btn_clear_mod_v5"):
+                # Bouton de suppression collective connecté aux lignes cochées
+                if st.button("🔥 EFFACER LES MODÈLES SÉLECTIONNÉS", type="primary", width="stretch", key="btn_clear_mod_direct_v6"):
                     docs_a_supprimer = mod_edite[mod_edite["Supprimer ?"] == True]["ID Document"].tolist()
-                    for doc_id in docs_a_supprimer:
-                        db.db.collection("modeles_chantiers").document(doc_id).delete()
-                    st.success(f"🟢 {len(docs_a_supprimer)} modèle(s) effacé(s) de Firebase.")
-                    st.cache_data.clear(); st.rerun()
-                
-                # --- 🔍 LE NOUVEAU MOTEUR D'EXPLORATION DES ÉTAPES TECHNIQUES ---
-                st.markdown("---")
-                st.markdown("#### 🔍 Explorateur d'ÉTAPES (RH, Matériaux & Engins Requis)")
-                st.caption("Sélectionnez l'un de vos modèles ci-dessous pour déplier l'intégralité de sa structure NoSQL Cloud.")
-                
-                modele_a_inspecter = st.selectbox(
-                    "Choisir un modèle de chantier à inspecter en détail :",
-                    ["-- Sélectionner un modèle --"] + list(dict_modeles_complets.keys()),
-                    key="selectbox_inspecteur_details_modeles"
-                )
-                
-                if m_inspecter != "-- Sélectionner un modèle --":
-                    donnees_du_modele = dict_modeles_complets[m_inspecter]
-                    etapes_techniques = donnees_du_modele.get("etapes_techniques", [])
-                    
-                    st.info(f"📋 **Fiche technique du modèle :** {m_inspecter} | **Revenus :** {donnees_du_modele.get('revenus', 0):,} € | **Durée estimée :** {donnees_du_modele.get('jours_globaux', 0)} jours".replace(",", " "))
-                    
-                    if not etapes_techniques:
-                        st.warning("⚠️ Ce modèle ne contient aucune sous-étape technique configurée.")
+                    if not docs_a_supprimer:
+                        st.error("⚠️ Veuillez cocher au moins une case avant de valider la suppression.")
                     else:
-                        # Boucle d'affichage pour chaque étape du chantier
-                        for etape in sorted(etapes_techniques, key=lambda x: x.get("num_etape", 1)):
-                            num_e = etape.get("num_etape", 1)
-                            duree_e = etape.get("duree_jours", 1)
-                            
-                            with st.expander(f"⚙️ ÉTAPE N°{num_e} ({duree_e} jours)", expanded=True):
-                                c_rh, c_mat, c_eng = st.columns(3)
-                                
-                                # Colonne A : Main d'œuvre (RH)
-                                with c_rh:
-                                    st.markdown("**👥 Main-d'œuvre requise :**")
-                                    st.write(f"- 🕹️ Conducteurs : `{etape.get('jh_cond', 0)}` jh")
-                                    st.write(f"- 🧑‍💼 Chefs d'équipe : `{etape.get('jh_chef', 0)}` jh")
-                                    st.write(f"- 👷 Ouvriers : `{etape.get('jh_ouvrier', 0)}` jh")
-                                    
-                                # Colonne B : Matériaux de l'étape
-                                with c_mat:
-                                    st.markdown("**🧱 Matériaux à consommer :**")
-                                    dict_mats = etape.get("materiaux", {})
-                                    if dict_mats:
-                                        for mat_nom, qte in dict_mats.items():
-                                            if qte > 0:
-                                                st.write(f"- {mat_nom.capitalize()} : `{int(qte)}` u/t")
-                                    else:
-                                        st.caption("Aucun matériau requis à cette étape.")
-                                        
-                                # Colonne C : Engins requis à l'étape
-                                with c_eng:
-                                    st.markdown("**🚜 Engins de chantier requis :**")
-                                    liste_engins = etape.get("engins", [])
-                                    if liste_engins:
-                                        for engin in liste_engins:
-                                            st.write(f"- {engin.get('type', 'Engin')} (Niveau `{engin.get('niveau', 'N1')}`)")
-                                    else:
-                                        st.caption("Aucun engin lourd requis à cette étape.")
+                        for doc_id in docs_a_supprimer:
+                            db.db.collection("modeles_chantiers").document(doc_id).delete()
+                        db.enregistrer_log("NETTOYAGE", f"Suppression de {len(docs_a_supprimer)} modèle(s) de chantier(s) pré-configuré(s).")
+                        st.success(f"🟢 {len(docs_a_supprimer)} modèle(s) effacé(s) avec succès de Firebase.")
+                        st.cache_data.clear(); st.rerun()
             else:
-                st.info("💡 Catalogue de modèles vide.")
+                st.info("💡 Le catalogue des modèles pré-configurés est vide.")
         except Exception as e: 
-            st.error(f"❌ Erreur lors de l'extraction des sous-données : {e}")
+            st.error(f"❌ Erreur lors de la compilation directe des colonnes : {e}")
+
 
 
     # --- TABLE 2 : TOUTES LES COLONNES DES CHANTIERS DE LA SEMAINE ---
