@@ -50,14 +50,10 @@ def analyser_historique_brut(texte_brut, membres_inscrits, joueur_actif):
                     if "réappro" in l_lower or "reappro" in l_lower:
                         type_mouv_final = "REAPPROVISIONNEMENT"
                         
-                        # Cas A : Réapprovisionnement nominatif (ex: "Grego73 réapprovisionne de...")
                         if "réapprovisionne de" in l_lower or "reapprovisionne de" in l_lower:
-                            # On découpe sur le mot clé de l'action
                             separateur = "réapprovisionne" if "réapprovisionne" in l_lower else "reapprovisionne"
-                            parties = l_clean.split(separateur, 1)
-                            acteur_final = parties[0].strip()
-                        
-                        # Cas B : Réapprovisionnement anonyme (ex: "Réapprovisionnement de 500 unité(s)...")
+                            parties = l_clean.split(separateur, 1)[0]
+                            acteur_final = parties.strip()
                         else:
                             acteur_final = "Réapprovisionnement Global"
                             
@@ -65,8 +61,8 @@ def analyser_historique_brut(texte_brut, membres_inscrits, joueur_actif):
                     elif "acheté" in l_lower or "achete" in l_lower:
                         if "a acheté" in l_lower or "a achete" in l_lower:
                             separateur = "a acheté" if "a acheté" in l_lower else "a achete"
-                            parties = l_clean.split(separateur, 1)
-                            acteur_final = parties[0].strip()
+                            parties = l_clean.split(separateur, 1)[0]
+                            acteur_final = parties.strip()
                         else:
                             acteur_final = joueur_actif
                             
@@ -76,7 +72,7 @@ def analyser_historique_brut(texte_brut, membres_inscrits, joueur_actif):
                         acteur_final = joueur_actif
                         type_mouv_final = "REAPPROVISIONNEMENT"
 
-                    # Nettoyage ultime du pseudo (on enlève un potentiel "Le " résiduel du début de la ligne)
+                    # Nettoyage des chaînes et résidus temporels
                     if acteur_final.startswith("Le ") or acteur_final.startswith("le "):
                         acteur_final = acteur_final[3:].strip()
                     
@@ -84,9 +80,12 @@ def analyser_historique_brut(texte_brut, membres_inscrits, joueur_actif):
                     if not acteur_final:
                         acteur_final = "Réapprovisionnement Global"
 
+                    # CORRECTIF : Remplacement de "actor_final" par la bonne variable française "acteur_final"
                     actions_detectees.append({
-                        "date": date_courante, "heure": heure_courante,
-                        "acteur": actor_final, "type": type_mouv_final,
+                        "date": date_courante, 
+                        "heure": heure_courante,
+                        "acteur": acteur_final, 
+                        "type": type_mouv_final,
                         "materiaux": {mat_cle: qte_val}
                     })
                     
