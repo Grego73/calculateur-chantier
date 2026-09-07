@@ -522,101 +522,101 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                 
             total_modeles = len(res_modeles)
 
-# À insérer dans onglets/direction.py sous la section "Centre de Contrôle"
-
-st.markdown("### 📁 Centre de Contrôle et Nettoyage des Tables")
-st.caption("Sélectionnez une table système pour inspecter les données brutes. Cochez les cases en fin de ligne pour supprimer définitivement des éléments sur Firebase.")
-
-# Menu déroulant mis à jour
-table_option = st.selectbox(
-    "Choisir la table système à auditer :",
-    ["Modèles de Chantiers Pré-configurés", "Chantiers Validés (Historique Général)"],
-    key="selectbox_audit_tables_nosql"
-)
-
-if table_option == "Modèles de Chantiers Pré-configurés":
-    try:
-        modeles_stream = db.db.collection("modeles_chantiers").stream()
-        lignes_mod = []
-        for doc in modeles_stream:
-            d = doc.to_dict()
-            lignes_mod.append({
-                "ID Document": doc.id,
-                "Nom du Modèle": doc.id,
-                "Chiffre d'Affaires": f"{d.get('revenus', 0):,.0f} €".replace(",", " ")
-            })
-        if lignes_mod:
-            df_mod = pd.DataFrame(lignes_mod)
-            df_mod["Supprimer ?"] = False
-            mod_edite = st.data_editor(df_mod, width="stretch", hide_index=True, key="editor_nettoyage_modeles")
+            # À insérer dans onglets/direction.py sous la section "Centre de Contrôle"
             
-            if st.button(f"🔥 EFFACER LES MODÈLES SÉLECTIONNÉS", type="primary", width="stretch"):
-                docs_a_supprimer = mod_edite[mod_edite["Supprimer ?"] == True]["ID Document"].tolist()
-                for doc_id in docs_a_supprimer:
-                    db.db.collection("modeles_chantiers").document(doc_id).delete()
-                st.success(f"🟢 {len(docs_a_supprimer)} modèle(s) effacé(s) de Firebase.")
-                st.cache_data.clear(); st.rerun()
-        else:
-            st.info("Catalogue vide.")
-    except Exception as e:
-        st.error(f"Erreur catalogue : {e}")
-
-elif table_option == "Chantiers Validés (Historique Général)":
-    try:
-        chantiers_stream = db.db.collection("chantiers").stream()
-        lignes_chantiers = []
-        
-        for doc in chantiers_stream:
-            d = doc.to_dict()
-            lignes_chantiers.append({
-                "ID Document": doc.id,
-                "🏗️ Nom du Chantier": doc.id,
-                "💰 CA (€)": float(d.get("revenus", 0.0)),
-                "🧱 Matériaux (€)": float(d.get("cout_materiaux", 0.0)),
-                "🚜 Locations (€)": float(d.get("cout_location", 0.0)),
-                "👥 Salaires (€)": float(d.get("cout_salaires", 0.0)),
-                "📉 Dépenses (€)": float(d.get("depenses_totales", 0.0)),
-                "📈 Bénéfice (€)": float(d.get("benefice_net", 0.0)),
-                "⏱️ Durée (j)": float(d.get("jours", 0.0)),
-                "⚡ Gain/j (€)": float(d.get("gain_par_jour", 0.0)),
-                "📊 ROI (%)": f"{d.get('roi', 0.0):.2f} %"
-            })
+            st.markdown("### 📁 Centre de Contrôle et Nettoyage des Tables")
+            st.caption("Sélectionnez une table système pour inspecter les données brutes. Cochez les cases en fin de ligne pour supprimer définitivement des éléments sur Firebase.")
             
-        if lignes_chantiers:
-            df_ch = pd.DataFrame(lignes_chantiers)
-            df_ch["Supprimer ?"] = False
-            
-            # Affichage exhaustif de toutes les colonnes techniques NoSQL
-            ch_edite = st.data_editor(
-                df_ch, width="stretch", hide_index=True, key="editor_nettoyage_chantiers_globaux",
-                column_config={
-                    "ID Document": None,  # Masque la colonne technique
-                    "💰 CA (€)": st.column_config.NumberColumn(format="%.0f €"),
-                    "🧱 Matériaux (€)": st.column_config.NumberColumn(format="%.0f €"),
-                    "🚜 Locations (€)": st.column_config.NumberColumn(format="%.0f €"),
-                    "👥 Salaires (€)": st.column_config.NumberColumn(format="%.0f €"),
-                    "📉 Dépenses (€)": st.column_config.NumberColumn(format="%.0f €"),
-                    "📈 Bénéfice (€)": st.column_config.NumberColumn(format="%.0f €"),
-                    "⏱️ Durée (j)": st.column_config.NumberColumn(format="%.2f j"),
-                    "⚡ Gain/j (€)": st.column_config.NumberColumn(format="%.0f €/j"),
-                    "Supprimer ?": st.column_config.CheckboxColumn(default=False)
-                }
+            # Menu déroulant mis à jour
+            table_option = st.selectbox(
+                "Choisir la table système à auditer :",
+                ["Modèles de Chantiers Pré-configurés", "Chantiers Validés (Historique Général)"],
+                key="selectbox_audit_tables_nosql"
             )
             
-            if st.button("🔥 EXPULSER ET SUPPRIMER LES CHANTIERS SÉLECTIONNÉS", type="primary", width="stretch", key="btn_suppr_ch_direction"):
-                ids_a_detruire = ch_edite[ch_edite["Supprimer ?"] == True]["ID Document"].tolist()
-                if not ids_a_detruire:
-                    st.error("⚠️ Veuillez cocher au moins une case avant de valider la suppression.")
-                else:
-                    for doc_id in ids_a_detruire:
-                        db.db.collection("chantiers").document(doc_id).delete()
-                    db.enregistrer_log("NETTOYAGE", f"Suppression de {len(ids_a_detruire)} chantier(s) de l'historique général.")
-                    st.success(f"💥 {len(ids_a_detruire)} chantier(s) supprimé(s) définitivement du Cloud !")
-                    st.cache_data.clear(); st.rerun()
-        else:
-            st.info("💡 La table des chantiers enregistrés est vierge.")
-    except Exception as e:
-        st.error(f"❌ Erreur lors de la lecture de la table des chantiers : {e}")
+            if table_option == "Modèles de Chantiers Pré-configurés":
+                try:
+                    modeles_stream = db.db.collection("modeles_chantiers").stream()
+                    lignes_mod = []
+                    for doc in modeles_stream:
+                        d = doc.to_dict()
+                        lignes_mod.append({
+                            "ID Document": doc.id,
+                            "Nom du Modèle": doc.id,
+                            "Chiffre d'Affaires": f"{d.get('revenus', 0):,.0f} €".replace(",", " ")
+                        })
+                    if lignes_mod:
+                        df_mod = pd.DataFrame(lignes_mod)
+                        df_mod["Supprimer ?"] = False
+                        mod_edite = st.data_editor(df_mod, width="stretch", hide_index=True, key="editor_nettoyage_modeles")
+                        
+                        if st.button(f"🔥 EFFACER LES MODÈLES SÉLECTIONNÉS", type="primary", width="stretch"):
+                            docs_a_supprimer = mod_edite[mod_edite["Supprimer ?"] == True]["ID Document"].tolist()
+                            for doc_id in docs_a_supprimer:
+                                db.db.collection("modeles_chantiers").document(doc_id).delete()
+                            st.success(f"🟢 {len(docs_a_supprimer)} modèle(s) effacé(s) de Firebase.")
+                            st.cache_data.clear(); st.rerun()
+                    else:
+                        st.info("Catalogue vide.")
+                except Exception as e:
+                    st.error(f"Erreur catalogue : {e}")
+            
+            elif table_option == "Chantiers Validés (Historique Général)":
+                try:
+                    chantiers_stream = db.db.collection("chantiers").stream()
+                    lignes_chantiers = []
+                    
+                    for doc in chantiers_stream:
+                        d = doc.to_dict()
+                        lignes_chantiers.append({
+                            "ID Document": doc.id,
+                            "🏗️ Nom du Chantier": doc.id,
+                            "💰 CA (€)": float(d.get("revenus", 0.0)),
+                            "🧱 Matériaux (€)": float(d.get("cout_materiaux", 0.0)),
+                            "🚜 Locations (€)": float(d.get("cout_location", 0.0)),
+                            "👥 Salaires (€)": float(d.get("cout_salaires", 0.0)),
+                            "📉 Dépenses (€)": float(d.get("depenses_totales", 0.0)),
+                            "📈 Bénéfice (€)": float(d.get("benefice_net", 0.0)),
+                            "⏱️ Durée (j)": float(d.get("jours", 0.0)),
+                            "⚡ Gain/j (€)": float(d.get("gain_par_jour", 0.0)),
+                            "📊 ROI (%)": f"{d.get('roi', 0.0):.2f} %"
+                        })
+                        
+                    if lignes_chantiers:
+                        df_ch = pd.DataFrame(lignes_chantiers)
+                        df_ch["Supprimer ?"] = False
+                        
+                        # Affichage exhaustif de toutes les colonnes techniques NoSQL
+                        ch_edite = st.data_editor(
+                            df_ch, width="stretch", hide_index=True, key="editor_nettoyage_chantiers_globaux",
+                            column_config={
+                                "ID Document": None,  # Masque la colonne technique
+                                "💰 CA (€)": st.column_config.NumberColumn(format="%.0f €"),
+                                "🧱 Matériaux (€)": st.column_config.NumberColumn(format="%.0f €"),
+                                "🚜 Locations (€)": st.column_config.NumberColumn(format="%.0f €"),
+                                "👥 Salaires (€)": st.column_config.NumberColumn(format="%.0f €"),
+                                "📉 Dépenses (€)": st.column_config.NumberColumn(format="%.0f €"),
+                                "📈 Bénéfice (€)": st.column_config.NumberColumn(format="%.0f €"),
+                                "⏱️ Durée (j)": st.column_config.NumberColumn(format="%.2f j"),
+                                "⚡ Gain/j (€)": st.column_config.NumberColumn(format="%.0f €/j"),
+                                "Supprimer ?": st.column_config.CheckboxColumn(default=False)
+                            }
+                        )
+                        
+                        if st.button("🔥 EXPULSER ET SUPPRIMER LES CHANTIERS SÉLECTIONNÉS", type="primary", width="stretch", key="btn_suppr_ch_direction"):
+                            ids_a_detruire = ch_edite[ch_edite["Supprimer ?"] == True]["ID Document"].tolist()
+                            if not ids_a_detruire:
+                                st.error("⚠️ Veuillez cocher au moins une case avant de valider la suppression.")
+                            else:
+                                for doc_id in ids_a_detruire:
+                                    db.db.collection("chantiers").document(doc_id).delete()
+                                db.enregistrer_log("NETTOYAGE", f"Suppression de {len(ids_a_detruire)} chantier(s) de l'historique général.")
+                                st.success(f"💥 {len(ids_a_detruire)} chantier(s) supprimé(s) définitivement du Cloud !")
+                                st.cache_data.clear(); st.rerun()
+                    else:
+                        st.info("💡 La table des chantiers enregistrés est vierge.")
+                except Exception as e:
+                    st.error(f"❌ Erreur lors de la lecture de la table des chantiers : {e}")
 
 
             # --------------------------------------------------------------------------
