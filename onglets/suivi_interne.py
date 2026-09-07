@@ -1,9 +1,9 @@
-# Contenu complet validé et structuré pour : onglets/suivi_interne.py
+# Contenu complet validé et corrigé pour : onglets/suivi_interne.py
 import streamlit as st
 import pandas as pd
 import database as db
 
-# Importations depuis le package coops
+# SÉPARATION STRICTE : Importations depuis le package coops
 from coops.calculs import compiler_compta_membres, appliquer_parts_et_primes, generer_excel_distribution_paye, envoyer_releve_sur_discord
 from coops.parseur import analyser_historique_brut
 
@@ -14,7 +14,7 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
     if "coop_privilege_level" not in st.session_state:
         st.session_state["coop_privilege_level"] = 1
 
-    # --- ÉCRAN DE CONNEXION ÉPURÉ (UNE SEULE CASE DE MOT DE PASSE) ---
+    # --- ÉCRAN DE CONNEXION ÉPURÉ ---
     if st.session_state["auth_suivi_coop"] is None:
         coops_enregistrees = db.lister_toutes_les_cooperatives()
         options_coop = ["-- Choisir une coopérative existante --"] + coops_enregistrees + ["➕ Créer une nouvelle coopérative..."]
@@ -77,21 +77,19 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
             st.markdown("---")
             st.markdown("##### 💵 Calculateur de Paye & Routage Discord")
             c_p1, c_p2 = st.columns(2)
-            with c_p1: caisse_saisie = st.number_input("Bénéfice total à distribuer (€) :", min_value=0.0, value=1000.0, step=500.0)
+            with c_p1: caisse_saisie = st.number_input("Bénéfice total à distribuer (" + "€" + ") :", min_value=0.0, value=1000.0, step=500.0)
             with c_p2:
                 st.write("")
                 data_paye_bytes = generer_excel_distribution_paye(df_coop, caisse_saisie, id_log)
                 st.download_button(label="📥 TÉLÉCHARGER LE RELEVÉ EXCEL", data=data_paye_bytes, file_name="releve_paye.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", width="stretch")
             
-            # CORRECTIF : Alignement des paramètres pour envoyer_releve_sur_discord
             if st.button("🚀 EXPÉDIER LE BILAN ET LA PAIE SUR DISCORD", type="primary", width="stretch"):
                 with st.spinner("Envoi du relevé de compte et du classement sur Discord..."):
-                    # AJUSTEMENT : Ajout de liste_flux dans les paramètres
                     statut, msg = envoyer_releve_sur_discord(
                         nom_coop=nom_coop_active,
                         pseudo_emetteur=joueur_actif,
                         df_coop=df_coop,
-                        liste_flux=liste_flux, # <-- LA CORRECTION TECHNIQUE EST ICI
+                        liste_flux=liste_flux,
                         benefice_total_caisse=caisse_saisie,
                         id_logisticien=id_log,
                         fichier_bytes=data_paye_bytes,
@@ -100,103 +98,34 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
                     if statut: st.success(msg)
                     else: st.error(msg)
 
-
-    # ==============================================================================
-    # --- TAB 2 : MARCHE GLOBAL & CLASSEMENT GÉNÉRAL DES ACHETEURS ---
-    # ==============================================================================
+    # --- TAB 2 : MARCHE GLOBAL ---
     with tab_joueurs_externes:
-        st.markdown("#### 🌍 Classement Général des Acheteurs (Membres & Clients)")
-        st.caption("Registre centralisé et classé par volume d'achat total pour l'ensemble des acteurs du serveur.")
+        st.markdown("#### 🌍 Registre Général des Flux du Marché")
+        if liste_flux:
+            stats_g, mats_g = {}, {}
+            for f in liste_flux:
+                j = f.get("joueur", "Inconnu")
+                if j.lower().startswith("réappro"): continue
+                if j not in stats_g: stats_g[j] = 0.0
+                for m_k, m_v in f.get("materiaux", {}).items():
+                    stats_g[j] += m_v
+                    mats_g[m_k.capitalize()] = mats_g.get(m_k.capitalize(), 0.0) + m_v
+            st.dataframe(pd.DataFrame([{"Joueur": k, "Statut": "🏆 Membre" if k in membres_inscrits else "👤 Client", "Volume (u)": v} for k, v in stats_g.items()]), width="stretch", hide_index=True)
+            if mats_g: st.bar_chart(pd.DataFrame(list(mats_g.items()), columns=["Matériau", "Volume"]).set_index("Matériau"), color="#ff4b4b")
 
-        if not liste_flux:
-            st.info("💡 Aucun mouvement d'achat n'est enregistré sur le réseau pour le moment.")
-        else:
-            stats_globales = {}
-            total_par_materiau = {}
-
-            # Extraction et compilation des flux de tous les acheteurs du serveur
-            for f_g in liste_flux:
-                j_nom = f_g.get("joueur", "Inconnu")
-                # On filtre les lignes de réapprovisionnement logistique pour ne garder que les achats
-                if j_nom.lower().startswith("réappro") or f_g.get("type") == "REAPPROVISIONNEMENT": 
-                    continue
-                
-                if j_nom not in stats_globales:
-                    stats_globales[j_nom] = {"Volume Total Acheté (u)": 0.0, "detail_mats": {}}
-
-                mats_dict = f_g.get("materiaux", {})
-                for m_key, m_val in mats_dict.items():
-                    m_key_cap = m_key.capitalize()
-                    stats_globales[j_nom]["Volume Total Acheté (u)"] += m_val
-                    stats_globales[j_nom]["detail_mats"][m_key_cap] = stats_globales[j_nom]["detail_mats"].get(m_key_cap, 0.0) + m_val
-                    total_par_materiau[m_key_cap] = total_par_materiau.get(m_key_cap, 0.0) + m_val
-
-            lignes_affichage = []
-            for joueur, data_ex in stats_globales.items():
-                details_ressources = data_ex["detail_mats"]
-                if details_ressources:
-                    # Détection automatique de la ressource la plus consommée par le joueur
-                    materiau_favori = max(details_ressources, key=details_ressources.get)
-                    volume_favori = details_ressources[materiau_favori]
-                    txt_recap_favori = f"{materiau_favori} ({int(volume_favori)} u)"
-                else:
-                    txt_recap_favori = "Aucun"
-
-                # Affectation du badge de statut (Interne ou Client Externe)
-                badge_statut = "🏆 Membre Coop" if joueur in membres_inscrits else "👤 Client / Joueur Externe"
-
-                lignes_affichage.append({
-                    "Statut": badge_statut,
-                    "Joueur": joueur,
-                    "Volume Global Acquis (u)": data_ex["Volume Total Acheté (u)"],
-                    "Matériau le plus acheté": txt_recap_favori
-                })
-
-            if lignes_affichage:
-                # Création du DataFrame et tri automatique du plus grand au plus petit acheteur
-                df_ext = pd.DataFrame(lignes_affichage).sort_values(by="Volume Global Acquis (u)", ascending=False).reset_index(drop=True)
-                
-                # Injection d'une colonne de classement dynamique (Rang #1, #2, #3...)
-                df_ext.index = df_ext.index + 1
-                df_ext.index.name = "Rang"
-                df_ext = df_ext.reset_index()
-
-                # Affichage du tableau de bord du Marché Global
-                st.dataframe(
-                    df_ext, width="stretch", hide_index=True,
-                    column_config={
-                        "Rang": st.column_config.NumberColumn("👑 Clst", format="#%d", width="small"),
-                        "Statut": st.column_config.TextColumn("🏷️ Statut Réseau"),
-                        "Joueur": st.column_config.TextColumn("👤 Pseudo de l'Acheteur"),
-                        "Volume Global Acquis (u)": st.column_config.NumberColumn("📦 Volume Total (u)", format="%,d u"),
-                        "Matériau le plus acheté": st.column_config.TextColumn("💎 Matériau Favori")
-                    }
-                )
-                
-                # --- LE RETOUR DE VOTRE GRAPHIQUE DES RESSOURCES ---
-                st.markdown("---")
-                st.markdown("### 📊 Classement des Matériaux les plus Consommés sur le Serveur")
-                
-                if total_par_materiau:
-                    df_graph_mats = pd.DataFrame(list(total_par_materiau.items()), columns=["Matériau", "Quantité Totale Consommée (u)"])
-                    df_graph_mats = df_graph_mats.sort_values(by="Quantité Totale Consommée (u)", ascending=True)
-                    st.bar_chart(data=df_graph_mats, x="Matériau", y="Quantité Totale Consommée (u)", color="#ff4b4b")
-            else:
-                st.info("💡 Aucun volume d'achat n'a pu être extrait du fil des événements pour le moment.")
-
-    # --- TAB 3 : PARSEUR LOGS ---
+    # --- TAB 3 : PARSEUR LOGS (ALIGNEMENT FIXE SÉCURISÉ) ---
     with tab_depot_flux:
         st.markdown("#### 📥 Alimenter le Système via le Fil des Événements")
         texte_logs = st.text_area("Collez l'historique brut du jeu ici :", height=200, key="area_parseur_coop")
-            if st.button("🚀 ENREGISTRER L'HISTORIQUE ET FILTRER LES DOUBLONS", type="primary", width="stretch") and texte_logs.strip():
-                mouvements = analyser_historique_brut(texte_logs, membres_inscrits, joueur_actif)
-                for mv in mouvements: 
-                    db.enregistrer_ligne_historique_brute(nom_coop_active, mv["date"], mv["heure"], mv["acteur"], mv["type"], mv["materiaux"])
-                st.success(f"🎯 Synchronisation réussie !")
-                st.cache_data.clear()
-                st.rerun()
+        if st.button("🚀 ENREGISTRER L'HISTORIQUE ET FILTRER LES DOUBLONS", type="primary", width="stretch") and texte_logs.strip():
+            mouvements = analyser_historique_brut(texte_logs, membres_inscrits, joueur_actif)
+            for mv in mouvements: 
+                db.enregistrer_ligne_historique_brute(nom_coop_active, mv["date"], mv["heure"], mv["acteur"], mv["type"], mv["materiaux"])
+            st.success("🎯 Synchronisation réussie !")
+            st.cache_data.clear()
+            st.rerun()
 
-        # --- RETOUR DU BLOC DES 5 DERNIÈRES ENTRÉES EFFECTIVES DU JEU ---
+        # CORRECTIF D'INDENTATION : Placé à 8 espaces de retrait pour rester aligné sous with tab_depot_flux
         st.markdown("---")
         st.markdown("##### ⏱️ Les 5 dernières entrées de l'historique du jeu (Flux Matériaux)")
         
@@ -207,12 +136,10 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
                     if c_req not in df_flux_recents.columns: 
                         df_flux_recents[c_req] = ""
 
-                # Filtrage strict sur les vraies actions issues des logs
                 types_jeu_valides = ["REAPPROVISIONNEMENT", "ACHAT_INTERNE", "ACHAT_EXTERNE"]
                 df_flux_recents = df_flux_recents[df_flux_recents["type"].isin(types_jeu_valides)]
 
                 if not df_flux_recents.empty:
-                    # Algorithme de tri chronologique
                     def generer_cle_tri_jeu(row):
                         d_txt = str(row.get("date_jeu", "01/01/2000")).strip()
                         h_txt = str(row.get("heure_jeu", "00:00")).strip()
@@ -226,10 +153,8 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
                     df_flux_recents["cle_tri_jeu"] = df_flux_recents.apply(generer_cle_tri_jeu, axis=1)
                     df_flux_recents = df_flux_recents.sort_values(by="cle_tri_jeu", ascending=False).head(5)
 
-                    # Formatage textuel des matériaux
                     def formater_materiaux(dict_mats):
-                        if not isinstance(dict_mats, dict) or not dict_mats: 
-                            return "Aucun"
+                        if not isinstance(dict_mats, dict) or not dict_mats: return "Aucun"
                         return ", ".join([f"{k.capitalize()} ({int(v)} u)" for k, v in dict_mats.items()])
 
                     df_flux_recents["Détail Matériaux"] = df_flux_recents["materiaux"].apply(formater_materiaux)
@@ -238,48 +163,43 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
                         mapping = {"REAPPROVISIONNEMENT": "🧱 Réappro", "ACHAT_INTERNE": "🛒 Achat Int.", "ACHAT_EXTERNE": "🌍 Achat Ext."}
                         return mapping.get(t, t)
                     df_flux_recents["Type"] = df_flux_recents["type"].apply(mapper_type)
-
                     df_flux_recents = df_flux_recents[["date_jeu", "heure_jeu", "joueur", "Type", "Détail Matériaux"]]
 
                     st.dataframe(
                         df_flux_recents, width="stretch", hide_index=True,
                         column_config={
-                            "date_jeu": st.column_config.TextColumn("📅 Date Jeu"),
+                            "date_jeu": st.column_config.TextColumn("📅 Date Jeu"), 
                             "heure_jeu": st.column_config.TextColumn("⏱️ Heure Jeu"),
-                            "joueur": st.column_config.TextColumn("👤 Joueur / Acteur"),
+                            "joueur": st.column_config.TextColumn("👤 Joueur / Acteur"), 
                             "Type": st.column_config.TextColumn("🏷️ Action"),
                             "Détail Matériaux": st.column_config.TextColumn("🧱 Ressources transférées")
                         }
                     )
                 else:
-                    st.info("💡 Aucun log d'événement de matériel (jeu) n'est enregistré dans l'historique.")
+                    st.info("💡 Aucun log d'événement de matériel n'est enregistré pour le moment.")
             except Exception as e:
-                st.caption(f"ℹ️ Impossible de mettre en forme le flux récent du jeu ({e}).")
+                st.caption(f"ℹ️ Impossible de mettre en forme le flux récent ({e}).")
         else:
             st.info("💡 L'historique de cette coopérative est vierge pour le moment.")
 
-
-    # --- TAB 4 : PANNEAU DE GESTION DES PASSES & ATTRIBUTION DES DROITS ---
+    # --- TAB 4 : GESTION DROITS (ADMIN) ---
     with tab_gestion_membres:
         st.markdown("#### ⚙️ Gérer les Collaborateurs (Admin)")
         if niveau_actuel < 2:
             st.error("🔒 Accès refusé : Niveau 2 minimum requis pour voir l'administration.")
             return
 
-        # Rallonge Cash (Niveau 2 et 3)
         with st.form("form_rallonge_cash"):
             m_rev = st.selectbox("Collaborateur :", membres_inscrits)
-            m_cash = st.number_input("Montant de la rallonge (€) :", min_value=0.0, step=1000.0)
+            m_cash = st.number_input("Montant de la rallonge (" + "€" + ") :", min_value=0.0, step=1000.0)
             if st.form_submit_button("💰 APPLIQUER LA RALLONGE") and m_cash > 0:
                 db.ajouter_reinvestissement_membre(nom_coop_active, m_rev, m_cash)
-                st.cache_data.clear(); st.rerun()
+                st.cache_data.clear()
+                st.rerun()
 
-        # Commandes exclusives du Créateur (Niveau 3)
         if niveau_actuel >= 3:
             st.markdown("---")
             st.markdown("##### 👑 1. Attribution des Mots de Passe des Grades")
-            st.write("En tant que Créateur, définissez ici les mots de passe que vous donnerez à vos employés.")
-            
             with st.form("form_gestion_mots_de_passe_grades"):
                 nouveau_mdp_niv1 = st.text_input("Définir le mot de passe Ouvriers (Niveau 1) :", value=str(coop_snap.get("mdp_niveau1", "")))
                 nouveau_mdp_niv2 = st.text_input("Définir le mot de passe Membres Fiables (Niveau 2) :", value=str(coop_snap.get("mdp_niveau2", "")))
@@ -287,11 +207,11 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
                 
                 if st.form_submit_button("💾 VERROUILLER ET SAUVEGARDER LES CODES", width="stretch"):
                     db.db.collection("cooperatives").document(nom_coop_active).update({
-                        "mdp_niveau1": nouveau_mdp_niv1,
-                        "mdp_niveau2": nouveau_mdp_niv2,
+                        "mdp_niveau1": nouveau_mdp_niv1, 
+                        "mdp_niveau2": nouveau_mdp_niv2, 
                         "mdp_niveau3": nouveau_mdp_niv3
                     })
-                    st.success("🟢 Les mots de passe des grades ont été mis à jour avec succès ! Vous pouvez maintenant les distribuer.")
+                    st.success("🟢 Les mots de passe des grades ont été mis à jour avec succès !")
                     st.rerun()
 
             st.markdown("---")
@@ -305,40 +225,11 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
                         if m_retirer in membres_actuels:
                             membres_actuels.remove(m_retirer)
                             coop_doc_ref.update({"membres": membres_actuels})
-                            
-                            db.enregistrer_log(
-                                type_action="COOPERATIVE", 
-                                details=f"Le Créateur [{joueur_actif}] a retiré le membre [{m_retirer}] de la coopérative [{nom_coop_active}]."
-                            )
-                            
+                            db.enregistrer_log(type_action="COOPERATIVE", details=f"Le Créateur [{joueur_actif}] a banni [{m_retirer}].")
                             if m_retirer == joueur_actif: 
                                 st.session_state["auth_suivi_coop"] = None
-                                st.session_state["auth_suivi_joueur"] = None
-                                st.session_state["coop_privilege_level"] = 1
-                                
-                            st.success(f"🏃 {m_retirer} a été retiré avec succès !")
+                            st.success(f"🏃 {m_retirer} retiré !")
                             st.cache_data.clear()
                             st.rerun()
-                    except Exception as e:
-                        st.error(f"❌ Erreur lors du retrait : {e}")
-
-            # 3. RECRUTEMENT EN BLOC RÉSERVE AU NIVEAU 3
-            st.markdown("---")
-            slots_occupes = len(membres_inscrits)
-            if slots_occupes < 4:
-                st.markdown("##### ➕ 3. Recrutement de Collaborateurs en Bloc")
-                texte_bloc_membres = st.text_input("Saisissez les pseudos à inscrire (séparés par un espace) :", value="", placeholder="Ex: Adri1 Julo").strip()
-                if st.button("📝 ENREGISTRER L'ÉQUIPE EN BLOC", type="primary", width="stretch") and texte_bloc_membres:
-                    statut_ins, msg_ins = db.ajouter_membres_bloc_coop(nom_coop_active, texte_bloc_membres)
-                    if statut_ins:
-                        db.enregistrer_log(
-                            type_action="COOPERATIVE", 
-                            details=f"Le Créateur [{joueur_actif}] a ajouté de nouveaux membres en bloc dans [{nom_coop_active}]."
-                        )
-                        st.success(msg_ins)
-                        st.cache_data.clear()
-                        st.rerun()
-                    else:
-                        st.error(msg_ins)
-            else:
-                st.warning("🚫 Votre équipe est complète (4/4). Vous ne pouvez plus rajouter de joueurs.")
+                    except Exception as e: 
+                        st.error(f"❌ Erreur : {e}")
