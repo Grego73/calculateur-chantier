@@ -540,32 +540,100 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
         key="selectbox_audit_tables_nosql_direction_master"
     )
 
-    # --- TABLE 1 : LES MODÈLES DE CHANTIERS ---
+    # --- TABLE 1 : LES MODÈLES DE CHANTIERS AVEC EXPLORATEUR D'ÉTAPES (RH, MATS, ENGINS) ---
     if choix_table == "Modèles de Chantiers Pré-configurés":
         try:
+            # 1. Lecture complète de la collection sur Firebase
             modeles_stream = db.db.collection("modeles_chantiers").stream()
+            dict_modeles_complets = {}
             lignes_mod = []
+            
             for doc in modeles_stream:
                 d = doc.to_dict()
+                dict_modeles_complets[doc.id] = d  # On garde toutes les données en mémoire vive
                 lignes_mod.append({
                     "ID Document": doc.id,
                     "Nom du Modèle": doc.id,
                     "Chiffre d'Affaires": f"{d.get('revenus', 0):,.0f} €".replace(",", " ")
                 })
+                
             if lignes_mod:
                 df_mod = pd.DataFrame(lignes_mod)
                 df_mod["Supprimer ?"] = False
-                mod_edite = st.data_editor(df_mod, width="stretch", hide_index=True, key="editor_nettoyage_modeles_v4")
                 
-                if st.button("🔥 EFFACER LES MODÈLES SÉLECTIONNÉS", type="primary", width="stretch", key="btn_clear_mod_v4"):
+                # Tableau principal de nettoyage
+                mod_edite = st.data_editor(
+                    df_mod, width="stretch", hide_index=True, key="editor_nettoyage_modeles_v5",
+                    column_config={"ID Document": None}  # Masque l'ID brut doublon
+                )
+                
+                if st.button("🔥 EFFACER LES MODÈLES SÉLECTIONNÉS", type="primary", width="stretch", key="btn_clear_mod_v5"):
                     docs_a_supprimer = mod_edite[mod_edite["Supprimer ?"] == True]["ID Document"].tolist()
                     for doc_id in docs_a_supprimer:
                         db.db.collection("modeles_chantiers").document(doc_id).delete()
                     st.success(f"🟢 {len(docs_a_supprimer)} modèle(s) effacé(s) de Firebase.")
                     st.cache_data.clear(); st.rerun()
+                
+                # --- 🔍 LE NOUVEAU MOTEUR D'EXPLORATION DES ÉTAPES TECHNIQUES ---
+                st.markdown("---")
+                st.markdown("#### 🔍 Explorateur d'ÉTAPES (RH, Matériaux & Engins Requis)")
+                st.caption("Sélectionnez l'un de vos modèles ci-dessous pour déplier l'intégralité de sa structure NoSQL Cloud.")
+                
+                modele_a_inspecter = st.selectbox(
+                    "Choisir un modèle de chantier à inspecter en détail :",
+                    ["-- Sélectionner un modèle --"] + list(dict_modeles_complets.keys()),
+                    key="selectbox_inspecteur_details_modeles"
+                )
+                
+                if m_inspecter != "-- Sélectionner un modèle --":
+                    donnees_du_modele = dict_modeles_complets[m_inspecter]
+                    etapes_techniques = donnees_du_modele.get("etapes_techniques", [])
+                    
+                    st.info(f"📋 **Fiche technique du modèle :** {m_inspecter} | **Revenus :** {donnees_du_modele.get('revenus', 0):,} € | **Durée estimée :** {donnees_du_modele.get('jours_globaux', 0)} jours".replace(",", " "))
+                    
+                    if not etapes_techniques:
+                        st.warning("⚠️ Ce modèle ne contient aucune sous-étape technique configurée.")
+                    else:
+                        # Boucle d'affichage pour chaque étape du chantier
+                        for etape in sorted(etapes_techniques, key=lambda x: x.get("num_etape", 1)):
+                            num_e = etape.get("num_etape", 1)
+                            duree_e = etape.get("duree_jours", 1)
+                            
+                            with st.expander(f"⚙️ ÉTAPE N°{num_e} ({duree_e} jours)", expanded=True):
+                                c_rh, c_mat, c_eng = st.columns(3)
+                                
+                                # Colonne A : Main d'œuvre (RH)
+                                with c_rh:
+                                    st.markdown("**👥 Main-d'œuvre requise :**")
+                                    st.write(f"- 🕹️ Conducteurs : `{etape.get('jh_cond', 0)}` jh")
+                                    st.write(f"- 🧑‍💼 Chefs d'équipe : `{etape.get('jh_chef', 0)}` jh")
+                                    st.write(f"- 👷 Ouvriers : `{etape.get('jh_ouvrier', 0)}` jh")
+                                    
+                                # Colonne B : Matériaux de l'étape
+                                with c_mat:
+                                    st.markdown("**🧱 Matériaux à consommer :**")
+                                    dict_mats = etape.get("materiaux", {})
+                                    if dict_mats:
+                                        for mat_nom, qte in dict_mats.items():
+                                            if qte > 0:
+                                                st.write(f"- {mat_nom.capitalize()} : `{int(qte)}` u/t")
+                                    else:
+                                        st.caption("Aucun matériau requis à cette étape.")
+                                        
+                                # Colonne C : Engins requis à l'étape
+                                with c_eng:
+                                    st.markdown("**🚜 Engins de chantier requis :**")
+                                    liste_engins = etape.get("engins", [])
+                                    if liste_engins:
+                                        for engin in liste_engins:
+                                            st.write(f"- {engin.get('type', 'Engin')} (Niveau `{engin.get('niveau', 'N1')}`)")
+                                    else:
+                                        st.caption("Aucun engin lourd requis à cette étape.")
             else:
                 st.info("💡 Catalogue de modèles vide.")
-        except Exception as e: st.error(f"Erreur catalogue : {e}")
+        except Exception as e: 
+            st.error(f"❌ Erreur lors de l'extraction des sous-données : {e}")
+
 
     # --- TABLE 2 : TOUTES LES COLONNES DES CHANTIERS DE LA SEMAINE ---
     elif choix_table == "Chantiers Validés (Historique Général)":
