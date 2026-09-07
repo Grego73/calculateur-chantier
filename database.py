@@ -202,7 +202,15 @@ def verifier_et_inscrire_joueur(nom_coop, mdp_saisi, pseudo_joueur):
         if pseudo_joueur not in membres_actuels:
             membres_actuels.append(pseudo_joueur)
             coop_ref.update({"membres": membres_actuels})
+            
+        # --- AJUSTEMENT TRAÇABILITÉ DES CONNEXIONS ---
+        enregistrer_log(
+            type_action="CONNEXION", 
+            details=f"Le joueur [{pseudo_joueur}] s'est connecté à la coopérative [{nom_coop}] avec un privilège de Niveau {niveau_detecte}."
+        )
+        
         return True, f"👋 Connexion réussie.", niveau_detecte
+
         
     if len(membres_actuels) >= 4:
         return False, f"🚫 Accès refusé : La coopérative a atteint sa limite de 4 joueurs inscrits.", 1
