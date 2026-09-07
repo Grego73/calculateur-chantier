@@ -162,7 +162,7 @@ def lister_toutes_les_cooperatives():
 def verifier_et_inscrire_joueur(nom_coop, mdp_saisi, pseudo_joueur):
     """
     Vérifie le mot de passe saisi et attribue le niveau de privilège (1, 2 ou 3)
-    selon la configuration de la coopérative.
+    selon la configuration de la coopérative avec sécurité anti-case vide.
     """
     if not nom_coop or not mdp_saisi or not pseudo_joueur:
         return False, "⚠️ Veuillez remplir tous les champs.", 1
@@ -170,7 +170,7 @@ def verifier_et_inscrire_joueur(nom_coop, mdp_saisi, pseudo_joueur):
     coop_ref = db.collection("cooperatives").document(nom_coop)
     coop_doc = coop_ref.get()
     
-    # 1. SI LA COOP N'EXISTE PAS : On la crée. Le joueur devient automatiquement le Créateur (Niveau 3)
+    # 1. SI LA COOP N'EXISTE PAS : Création automatique (Niveau 3 Créateur)
     if not coop_doc.exists:
         coop_ref.set({
             "mdp_niveau3": mdp_saisi,
@@ -180,43 +180,58 @@ def verifier_et_inscrire_joueur(nom_coop, mdp_saisi, pseudo_joueur):
         })
         return True, f"🟢 Coopérative créée ! Vous êtes Niveau 3 (Créateur).", 3
     
-    # 2. SI LA COOP EXISTE : On vérifie quel mot de passe a été saisi
+    # 2. SI LA COOP EXISTE : Vérification stricte des 3 mots de passe
     coop_data = coop_doc.to_dict()
     
+    # Récupération sécurisée du pass Créateur
     mdp3 = coop_data.get("mdp_niveau3") or coop_data.get("mot_de_passe")
-    mdp2 = coop_data.get("mdp_niveau2", f"{mdp3}2")
-    mdp1 = coop_data.get("mdp_niveau1", f"{mdp3}1")
     
-    if mdp_saisi == mdp3:
+    # Sécurité anti-case vide : si le champ est absent ou vide, on applique le suffixe par défaut
+    mdp2 = coop_data.get("mdp_niveau2")
+    if not mdp2 or str(mdp2).strip() == "":
+        mdp2 = f"{mdp3}2"
+        
+    mdp1 = coop_data.get("mdp_niveau1")
+    if not mdp1 or str(mdp1).strip() == "":
+        mdp1 = f"{mdp3}1"
+    
+    # Comparaison des privilèges
+    if mdp_saisi == str(mdp3).strip():
         niveau_detecte = 3
-    elif mdp_saisi == mdp2:
+    elif mdp_saisi == str(mdp2).strip():
         niveau_detecte = 2
-    elif mdp_saisi == mdp1:
+    elif mdp_saisi == str(mdp1).strip():
         niveau_detecte = 1
     else:
         return False, "🔒 Mot de passe incorrect pour cette coopérative.", 1
         
     membres_actuels = coop_data.get("membres", [])
     
+    # Si c'est le gérant ou un joueur déjà enregistré, on valide
     if pseudo_joueur in membres_actuels or niveau_detecte == 3:
         if pseudo_joueur not in membres_actuels:
             membres_actuels.append(pseudo_joueur)
             coop_ref.update({"membres": membres_actuels})
             
-        # --- AJUSTEMENT TRAÇABILITÉ DES CONNEXIONS ---
+        # Log d'audit de connexion
         enregistrer_log(
             type_action="CONNEXION", 
             details=f"Le joueur [{pseudo_joueur}] s'est connecté à la coopérative [{nom_coop}] avec un privilège de Niveau {niveau_detecte}."
         )
-        
         return True, f"👋 Connexion réussie.", niveau_detecte
-
         
+    # Limite des 4 slots pour les nouveaux ouvriers
     if len(membres_actuels) >= 4:
         return False, f"🚫 Accès refusé : La coopérative a atteint sa limite de 4 joueurs inscrits.", 1
         
     membres_actuels.append(pseudo_joueur)
     coop_ref.update({"membres": membres_actuels})
+    
+    # Log d'audit de nouvelle inscription
+    enregistrer_log(
+        type_action="CONNEXION", 
+        details=f"Nouvelle inscription : [{pseudo_joueur}] a rejoint la coopérative [{nom_coop}] au Niveau {niveau_detecte}."
+    )
     return True, f"📝 Inscription réussie ! Membre enregistré.", niveau_detecte
 
 def ajouter_membres_bloc_coop(nom_coop, texte_membres_brut):
