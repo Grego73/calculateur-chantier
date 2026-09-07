@@ -246,3 +246,60 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
                         st.error(msg_ins)
             else:
                 st.warning("🚫 Votre équipe est complète (4/4). Vous ne pouvez plus rajouter de joueurs.")
+            # --- 3. RECRUTEMENT EN BLOC ---
+            st.markdown("---")
+            slots_occupes = len(membres_inscrits)
+            if slots_occupes < 4:
+                st.markdown("##### ➕ 3. Recrutement de Collaborateurs en Bloc")
+                texte_bloc_membres = st.text_input("Saisissez les pseudos à inscrire (séparés par un espace) :", value="", placeholder="Ex: Adri1 Julo").strip()
+                if st.button("📝 ENREGISTRER L'ÉQUIPE EN BLOC", type="primary", width="stretch") and texte_bloc_membres:
+                    statut_ins, msg_ins = db.ajouter_membres_bloc_coop(nom_coop_active, texte_bloc_membres)
+                    if statut_ins:
+                        db.enregistrer_log(type_action="COOPERATIVE", details=f"Le Créateur [{joueur_actif}] a recruté du personnel en bloc.")
+                        st.success(msg_ins)
+                        st.cache_data.clear(); st.rerun()
+                    else:
+                        st.error(msg_ins)
+            else:
+                st.warning("🚫 Votre équipe est complète (4/4). Vous ne pouvez plus rajouter de joueurs.")
+
+            # --- 📈 4. NOUVEAU BLOCK REVISÉ : STATISTIQUES D'UTILISATION & SUIVI CONNEXIONS ---
+            st.markdown("---")
+            st.markdown("##### 📈 4. Statistiques d'Utilisation & Activité de l'Équipe")
+            st.caption("Suivi des connexions et de l'utilisation du programme à partir du journal d'audit Cloud.")
+            
+            try:
+                # Lecture en temps réel des journaux d'actions sur Firebase
+                logs_stream = db.db.collection("journaux_actions").stream()
+                liste_logs_bruts = [doc.to_dict() for doc in logs_stream]
+                
+                if not liste_logs_bruts:
+                    st.info("💡 Aucun journal d'activité enregistré pour le moment.")
+                else:
+                    df_logs = pd.DataFrame(liste_logs_bruts)
+                    
+                    # Séparation thématique 1 : Journal des connexions de l'équipe
+                    df_connexions = df_logs[df_logs["type_action"] == "CONNEXION"].copy() if "type_action" in df_logs.columns else pd.DataFrame()
+                    
+                    if not df_connexions.empty:
+                        df_connexions = df_connexions.sort_values(by="timestamp", ascending=False).head(10)
+                        st.markdown("**⏱️ Dernières connexions enregistrées (Top 10) :**")
+                        st.dataframe(
+                            df_connexions[["timestamp", "details"]], 
+                            width="stretch", hide_index=True,
+                            column_config={
+                                "timestamp": st.column_config.TextColumn("📅 Date & Heure (Paris)"),
+                                "details": st.column_config.TextColumn("📝 Événement d'accès")
+                            }
+                        )
+                    else:
+                        st.caption("ℹ️ Aucun log de connexion récent détecté.")
+                        
+                    # Séparation thématique 2 : Graphique d'utilisation générale du programme
+                    if "type_action" in df_logs.columns:
+                        st.markdown("**📊 Répartition de l'utilisation des modules :**")
+                        compteur_actions = df_logs["type_action"].value_counts().reset_index()
+                        compteur_actions.columns = ["Module de l'Application", "Nombre d'actions posées"]
+                        st.bar_chart(compteur_actions.set_index("Module de l'Application"), color="#2563EB")
+            except Exception as e:
+                st.caption(f"ℹ️ Tableau de bord statistique momentanément indisponible ({e}).")
