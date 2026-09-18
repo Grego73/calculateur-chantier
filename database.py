@@ -9,14 +9,19 @@ from google.oauth2 import service_account
 # ==============================================================================
 # --- 1. INITIALISATION DE LA CONNEXION UNIQUE CLOUD FIRESTORE ---
 # ==============================================================================
-# Dans database.py (Lignes 10-15)
 if "text_key" in st.secrets:
     info_cles = json.loads(st.secrets["text_key"])
+    
+    # 🟢 FORCE LE NETTOYAGE ET LE FORMATAGE STRICT DE LA CLÉ PRIVÉE POUR PYTHON 3.14
+    if "private_key" in info_cles:
+        # Remplace les mauvaises barres obliques et reconstruit les vrais retours à la ligne requis par Google
+        cle_propre = info_cles["private_key"].replace("\\n", "\n")
+        info_cles["private_key"] = cle_propre
+
     creds = service_account.Credentials.from_service_account_info(info_cles)
     db = firestore.Client(project="calculateur-chantier-dc921", credentials=creds)
 else:
     db = firestore.Client(project="calculateur-chantier-dc921")
-
 
 
 # ==============================================================================
