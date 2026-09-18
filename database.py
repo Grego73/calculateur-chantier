@@ -11,13 +11,14 @@ from google.oauth2 import service_account
 # --- 1. INITIALISATION DE LA CONNEXION UNIQUE CLOUD FIRESTORE ---
 # ==============================================================================
 # Dans database.py (Remplacement des lignes d'initialisation de connexion)
+# Dans database.py (Remplacement des lignes 13 à 24)
 if "text_key" in st.secrets:
-    # On convertit le bloc TOML natif directement en dictionnaire propre pour Google
+    # 🟢 PLUS BESOIN DE json.loads ! Streamlit fournit déjà un dictionnaire parfait.
     info_cles = dict(st.secrets["text_key"])
     
     if "private_key" in info_cles:
         raw_key = info_cles["private_key"]
-        # Répare les échappements de texte et restaure la structure RSA 64 caractères
+        # Nettoie les antislashs pour restaurer la clé RSA de 64 caractères demandée par Google
         info_cles["private_key"] = raw_key.replace("\\n", "\n").replace("\n\n", "\n")
 
     creds = service_account.Credentials.from_service_account_info(info_cles)
