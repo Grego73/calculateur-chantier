@@ -9,13 +9,23 @@ from google.oauth2 import service_account
 # ==============================================================================
 # --- 1. INITIALISATION DE LA CONNEXION UNIQUE CLOUD FIRESTORE ---
 # ==============================================================================
+# ==============================================================================
+# --- 1. INITIALISATION DE LA CONNEXION UNIQUE CLOUD FIRESTORE ---
+# ==============================================================================
 if "text_key" in st.secrets:
-    # 🟢 SANS json.loads() ! On prend directement le dictionnaire TOML
     info_cles = dict(st.secrets["text_key"])
     
     if "private_key" in info_cles:
-        raw_key = info_cles["private_key"]
-        info_cles["private_key"] = raw_key.replace("\\n", "\n").replace("\n\n", "\n")
+        raw_key = str(info_cles["private_key"])
+        
+        # 🟢 CORRECTIF ULTIME PYTHON 3.14 : Nettoie tous les types d'échappements (simples ou doubles)
+        # pour s'assurer que Google reçoive de vrais sauts de ligne système
+        cleaned_key = raw_key.replace("\\n", "\n")
+        if "\n" not in cleaned_key and "\\n" not in raw_key:
+            # Sécurité si la clé a perdu ses séparateurs lors du transfert TOML
+            st.error("⚠️ Format de clé privée altéré dans les secrets.")
+            
+        info_cles["private_key"] = cleaned_key
 
     creds = service_account.Credentials.from_service_account_info(info_cles)
     db = firestore.Client(project="calculateur-chantier-dc921", credentials=creds)
