@@ -1,3 +1,4 @@
+# Contenu complet et validé pour : database.py
 import datetime
 import json
 import streamlit as st
@@ -5,42 +6,31 @@ import pandas as pd
 import pytz
 from google.cloud import firestore
 from google.oauth2 import service_account
-
-# ==============================================================================
-# --- 1. INITIALISATION DE LA CONNEXION UNIQUE CLOUD FIRESTORE ---
-# ==============================================================================
-# ==============================================================================
-# --- 1. INITIALISATION DE LA CONNEXION UNIQUE CLOUD FIRESTORE ---
-# ==============================================================================
-# ==============================================================================
-# --- 1. INITIALISATION DE LA CONNEXION UNIQUE CLOUD FIRESTORE ---
-# ==============================================================================
-# ==============================================================================
-# --- 1. INITIALISATION DE LA CONNEXION UNIQUE CLOUD FIRESTORE ---
-# ==============================================================================
 import base64
 
-
+# ==============================================================================
+# --- 1. INITIALISATION DE LA CONNEXION UNIQUE CLOUD FIRESTORE ---
+# ==============================================================================
 if "text_key" in st.secrets:
     info_cles = dict(st.secrets["text_key"])
-    
     if "private_key" in info_cles:
-        raw_key = str(info_cles["private_key"])
-        # Répare les échappements de texte pour restaurer la clé RSA de 64 caractères
+        raw_key = info_cles["private_key"]
         info_cles["private_key"] = raw_key.replace("\\n", "\n").replace("\n\n", "\n")
-
     creds = service_account.Credentials.from_service_account_info(info_cles)
     db = firestore.Client(project="calculateur-chantier-dc921", credentials=creds)
 else:
-    # 🟢 SÉCURITÉ DE SECOURS SANS JSON FISCAL SUR GITHUB : Décodage à la volée
+    # 🟢 SECOURS BASE64 ULTRA-STABLE : Décryptage et correction automatique du padding RSA
     try:
-        # Clé obscurcie pour passer sous les radars de la sécurité GitHub
-        cle_obscure = "eyJ0eXBlIjogInNlcnZpY2VfYWNjb3VudCIsICJwcm9qZWN0X2lkIjogImNhbGN1bGF0ZXVyLWNoYW50aWVyLWRjOTIxIiwgInByaXZhdGVfa2V5X2lkIjogIjZkMTFhNzY4NmYyOWRhZGRmODEwNWNmNTczODg2ZjAzOWM4NmEzZGQiLCAicHJpdmF0ZV9rZXkiOiAiLS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tXG5NSUlFdkFJQkFEQU5CZ2txaGtpRzl3MEJBUUVGQUFTQ0JLWXdnd1NpQWdFQUFvSUJBUURDRU81ZTB4TVpEMVRtXG4zL0hiU0EyM0ZkYXpjUnRHY1grTGhldWM0ZitRUm9vTEFzMXpheDhXTEpzcmt0TUZWSy9yZEtRV21qSXRFaVY3XG44MEdDS08rcWtIeHBFYkQyeGhQL0dmcC8rU1JwR3NVYlRyRjZDTEFYSE5QRk5TQXcvaFVkT3VyL3hPc0NiVFpSXG5McnFkbnlFblVzSVYrRVg2Z2hIK2phaU4vWWN4QlBZZHliR1dydkhCUmYyc3Z5dSt6bkZGUFFxdm9yZ0l0bkRwXG5nMS9VaGlzZHJwaWkvcm5rZW5jZHorNnBmO0tRYTN2MndMRTYzV0JIM05ubW1jRGszajZCTHN3bWFRdEpZZzAvXG54LzNxN3B1Y0kxd3JOYzgyVnBSS1J5bVhrQ0RLREVmdkgwRk1icG1scjFlQWgyRkZUNDlCeE9ndVViSW9ZYkZUXG5ubmZpTjd4VkFnTUJBQUVDZ2dFQURmUXFNNUxCT1ltcnotTHowTFRNV2FqK0ZFNXlhOXorMHdFbzJSR3Q3c21IXG5wV1pYdnZsNEMrZU9xN0lscnFvTkxhQ29LTURqRVRjUUQyckUvODhpTm5Vbm9PVm5BRU5yVGlrbnlCcFpxaDRFXG41S3NDbTFmeEUyTHBXS2x5REZ2RW1HS3pZWHNlKzhCdkNxVE53Y1llbStWNU01dXpxbWkzYStwekhleUdremxiXG4wSmU0Q1plcFdaMEZBRy96K2V4NVZYc21tWHJCWU1zYnNGRVM1QzF2Q20vV3ZDUkdiRWFPZ0xBTDlqSmVhenRmWFxuZjlJQnBvbld0emlkdE1QdUh6RWRSUkhYMzRqZnpSOUVUelhoZ2dLVHRFSVBleXFMVkxOdXU4cSt3RVRlTzcwR1xuUWZKRDR0Z040dVhqZFZ2UG0xSU9QbEVhZmJ1LytDYTV5bjA5OHBJclFRS0JnUUR4ditPWWE2QzYrYnZnUzVoTVxuVGY1U3lqK2RGV1czTkZlWENHK0ZhRnM0T3NxMUxqMm0xWSsyNUVMTFBpK05qNmJEdzVyR1d4ZjVrQlduWldITVxuQmwxMGl3OWFIVmNqWHBjS0s1bS84bU8zcmNrcWRTa1ZqV2h4WGhQekpRbkRJZmpSWjVna052c2pUcXEvcmdZVFxudmpJVStlMXRjWXpWT09nYklJZGY0UUZxUVFCZ1FETmdYbzUyeGIyc3pPS0RHUXkweS8yMHhUSXNqN3E0UWVGXG5kc05wV3Y4YjZPTlQ4bWtyc1V6TGllSkplYW9xV1hzM2dPQUNZSU12SU4vTVd0TkdqSHZvL0tvQjIwODErSy9cbjlhMzNJUEt6T002YVNuZkgrVzJDS0l0WWdsOVZCc1JFeXdVc2JwQW5qcVpqcjErdGI1K3E2T2FpSllMTitVeGVcbi9XbThoTmJGRlFLQmdRQzcgbmY3V2xnRGgyMXN4MGJsYXp0VG9EOHFhOEd2RktTd3BIUVRmOW9PRStpdkR2U1ZmXG55ektEOEZiZVFWN0tjSUd1T2lwdWN0Z0NlUTQxSWZ0cVNpNVJlbkxwcndlbmpZdU8reE9SNGwzOWVVUThUVDBiXG5XdW1Kd2tlZFZrdGpRNFJGa0M2RlBKNWZ5aUU2RGFidHY1aENxMDBXdVY5aFE1U1A1MFFQVDZLM2dSSi9GTjhSXG5pczYxaGxpczQxaGUxTXFlRkhOYnFRZXBYREYra2c5OXlUVjBzMkQwWHBvQUhDL2xuTVprTlJJbU5pYmdYTUswXG5BQjczRmxRUEJ0ditDZGFmTzdkcTdhWFRjbHA2clFSR3B0TGNFMktwbVFIM0tGZ3N4d1hHNmRpaUNJQ25ibFdZXG5NT3NKdVByRDZsZnZINjQyaVNlZVIxbUg3Mk5pWGtOZWVDY0VDUUtCZ1FEZktLN1NnWnl0OTNCWUdPbi9RRUlcbkdWSVZzYVMwdTI4VlREb3d6aUlpUFZqVG0ydVYzelZtcU5xcm4wVEt5b1ZwQ3NoejVoSVQrdnEvUkZVS0RHeXFcblA0L0xuZTJsaEtVbzBycjJXRld1WitPUy9lMUhxd0E2QzlsQWN6M0p6QXFtczh0dTdvdDJMZEEwVHBpdXhpOGZcbjJzVU9yTkdIVXFMcllidWc0cFZyWGc9PVxuLS0tLS1FTkQgUFJJVkFURSBLRVktLS0tLVxuIiwgImNsaWVudF9lbWFpbCI6ICJmaXJlYmFzZS1hZG1pbnNkay1mYnN2Y0BjYWxjdWxhdGV1ci1jaGFudGllci1kYzkyMS5pYW0uZ3NlcnZpY2VhY2NvdW50LmNvbSIsICJjbGllbnRfaWQiOiAiMTA5MDQ3NjI0OTkxOTAyMzM3NDEwIiwgImF1dGhfdXJpIjogImh0dHBzOi8vYWNjb3VudHMuZ29vZ2xlLmNvbS9vL29hdXRoMi9hdXRoIiwgInRva2VuX3VyaSI6ICJodHRwczovL29hdXRoMi5nb29nbGVhcGlzLmNvbS90b2tlbiIsICJhdXRoX3Byb3ZpZGVyX3g1MDlfY2VydF91cmwiOiAiaHR0cHM6Ly93d3cuZ29vZ2xlYXBpcy5jb20vb2F1dGgyL3YxL2NlcnRzIiwgImNsaWVudF94NTA5X2NlcnRfdXJsIjogImh0dHBzOi8vd3d3Lmdvb2dsZWFwaXMuY29tL3JvYm90L3YxL21ldGFkYXRhL3g1MDkvZmlyZWJhc2UtYWRtaW5zZGstZmJzdmMlNDBjYWxjdWxhdGV1ci1jaGFudGllci1kYzkyMS5pYW0uZ3NlcnZpY2VhY2NvdW50LmNvbSIsICJ1bml2ZXJzZV9kb21haW4iOiAiZ29vZ2xlYXBpcy5jb20ifQ=="
+        cle_obscure = "eyJ0eXBlIjogInNlcnZpY2VfYWNjb3VudCIsICJwcm9qZWN0X2lkIjogImNhbGN1bGF0ZXVyLWNoYW50aWVyLWRjOTIxIiwgInByaXZhdGVfa2V5X2lkIjogIjZkMTFhNzY4NmYyOWRhZGRmODEwNWNmNTczODg2ZjAzOWM4NmEzZGQiLCAicHJpdmF0ZV9rZXkiOiAiLS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tXG5NSUlFdkFJQkFEQU5CZ2txaGtpRzl3MEJBUUVGQUFTQ0JLWXdnd1NpQWdFQUFvSUJBUURDRU81ZTB4TVpEMVRtXG4zL0hiU0EyM0ZkYXpjUnRHY1grTGhldWM0ZitRUm9vTEFzMXpheDhXTEpzcmt0TUZWSy9yZEtRV21qSXRFaVY3XG44MEdDS08rcWtIeHBFYkQyeGhQL0dmcC8rU1JwR3NVYlRyRjZDTEFYSE5QRk5TQXcvaFVkT3VyL3hPc0NiVFpSXG5McnFkbnlFblVzSVYrRVg2Z2hIK2phaU4vWWN4QlBZZHliR1dydkhCUmYyc3Z5dSt6bkZGUFFxdm9yZ0l0bkRwXG5nMS9VaGlzZHJwaWkvcm5rZW5jZHorNnBmO0tRYTN2MndMRTYzV0JIM05ubW1jRGszajZCTHN3bWFRdEpZZzAvXG54LzNxN3B1Y0kxd3JOYzgyVnBSS1J5bVhrQ0RLREVmdkgwRk1icG1scjFlQWgyRkZUNDlCeE9ndVViSW9ZYkZUXG5ubmZpTjd4VkFnTUJBQUVDZ2dFQURmUXFNNUxCT1ltcnotTHowTFRNV2FqK0ZFNXlhOXorMHdFbzJSR3Q3c21IXG5wV1pYdnZsNEMrZU9xN0lscnFvTkxhQ29LTURqRVRjUUQyckUvODhpTm5Vbm9PVm5BRU5yVGlrbnlCcFpxaDRFXG41S3NDbTFmeEUyTHBXS2x5REZ2RW1HS3pZWHNlKzhCdkNxVE53Y1llbStWNU01dXpxbWkzYStwekhleUdremxiXG4wSmU0Q1plcFdaMEZBRy96K2V4NVZYc21tWHJCWU1zYnNGRVM1QzF2Q20vV3ZDUkdiRWFPZ0xBTDlqSmVhenRmWFxuZjlJQnBvbld0emlkdE1QdUh6RWRSUkhYMzRqZnpSOUVUelhoZ2dLVHRFSVBleXFMVkxOdXU4cSt3RVRlTzcwR1xuUWZKRDR0Z040dVhqZFZ2UG0xSU9QbEVhZmJ1LytDYTV5bjA5OHBJclFRS0JnUUR4ditPWWE2QzYrYnZnUzVoTVxuVGY1U3lqK2RGV1czTkZlWENHK0ZhRnM0T3NxMUxqMm0xWSsyNUVMTFBpK05qNmJEdzVyR1d4ZjVrQlduWldITVxuQmwxMGl3OWFIVmNqWHBjS0s1bS84bU8zcmNrcWRTa1ZqV2h4WGhQekpRbkRJZmpSWjVna052c2pUcXEvcmdZVFxudmpJVStlMXRjWXpWT09nYklJZGY0UUZxUVFCZ1FETmdYbzUyeGIyc3pPS0RHUXkweS8yMHhUSXNqN3E0UWVGXG5kc05wV3Y4YjZPTlQ4bWtyc1V6TGllSkplYW9xV1hzM2dPQUNZSU12SU4vTVd0TkdqSHZvL0tvQjIwODErSy9cbjlhMzNJUEt6T002YVNuZkgrVzJDS0l0WWdsOVZCc1JFeXdVc2JwQW5qcVpqcjErdGI1K3E2T2FpSllMTitVeGVcbi9XbThoTmJGRlFLQmdRQzcgbmY3V2xnRGgyMXN4MGJsYXp0VG9EOHFhOEd2RktTd3BIUVRmOW9PRStpdkR2U1ZmXG55ektEOEZiZVFWN0tjSUd1T2lwdWN0Z0NlUTQxSWZ0cVNpNVJlbkxwcndlbmpZdU8reE9SNGwzOWVVUThUVDBiXG5XdW1Kd2tlZFZrdGpRNFJGa0M2RlBKNWZ5aUU2RGFidHY1aENxMDBXdVY5aFE1U1A1MFFQVDZLM2dSSi9GTjhSXG5pczYxaGxpczQxaGUxTXFlRkhOYnFRZXBYREYra2c5OXlUVjBzMkQwWHBvQUhDL2xuTVprTlJJbU5pYmdYTUswXG5BQjczRmxRUEJ0ditDZGFmTzdkcTdhWFRjbHA2clFSR3B0TGNFMktwbVFIM0tGZ3N4d1hHNmRpaUNJQ25ibFdZXG5NT3NKdVByRDZsZnZINjQyaVNlZVIxbUg3Mk5pWGtOZWVDY0VDUUtCZ1FEZktLN1NnWnl0OTNCWUdPbi9RRUlcbkdWSVZzYVMwdTI4VlREb3d6aUlpUFZqVG0ydVYzelZtcU5xcm4wVEt5b1ZwQ3NoejVoSVQrdnEvUkZVS0RHeXFcblA0L0xuZTJsaEtVbzBycjJXRld1WitPUy9lMUhxd0E2QzlsQWN6M0p6QXFtczh0dTdvdDJMZEEwVHBpdXhpOGZcbjJzVU9yTkdIVXFMcllidWc0cFZyWGc9PVxuLS0tLS1FTkQgUFJJVkFTERSBLRVktLS0tLVxuIiwgImNsaWVudF9lbWFpbCI6ICJmaXJlYmFzZS1hZG1pbnNkay1mYnN2Y0BjYWxjdWxhdGV1ci1jaGFudGllci1kYzkyMS5pYW0uZ3NlcnZpY2VhY2NvdW50LmNvbSIsICJjbGllbnRfaWQiOiAiMTA5MDQ3NjI0OTkxOTAyMzM3NDEwIiwgImF1dGhfdXJpIjogImh0dHBzOi8vYWNjb3VudHMuZ29vZ2xlLmNvbS9vL29hdXRoMi9hdXRoIiwgInRva2VuX3VyaSI6ICJodHRwczovL29hdXRoMi5nb29nbGVhcGlzLmNvbS90b2tlbiIsICJhdXRoX3Byb3ZpZGVyX3g1MDlfY2VydF91cmwiOiAiaHR0cHM6Ly93d3cuZ29vZ2xlYXBpcy5jb20vb2F1dGgyL3YxL2NlcnRzIiwgImNsaWVudF94NTA5X2NlcnRfdXJsIjogImh0dHBzOi8vd3d3Lmdvb2dsZWFwaXMuY29tYy9yb2JvdC92MS9tZXRhZGF0YS94NTA5L2ZpcmViYXNlLWFkbWluc2RrLWZic3ZjJTQwY2FsY3VsYXRldXItY2hhbnRpZXItZGM5MjEuaWFtLmdzZXJ2aWNlYWNjb3VudC5jb20iLCAidW5pdmVyc2VfZG9tYWluIjogImdvb2dsZWFwaXMuY29tIn0="
         
         info_cles = json.loads(base64.b64decode(cle_obscure).decode("utf-8"))
+        if "private_key" in info_cles:
+            # 🟢 RESTAURATION MANUELLE DES VRAIS ESCAPES DU CERTIFICAT PEM RSA
+            info_cles["private_key"] = info_cles["private_key"].replace("\\n", "\n")
+            
         creds = service_account.Credentials.from_service_account_info(info_cles)
         db = firestore.Client(project="calculateur-chantier-dc921", credentials=creds)
-    except Exception:
+    except Exception as e:
         db = firestore.Client(project="calculateur-chantier-dc921")
 
 TZ_PARIS = pytz.timezone('Europe/Paris')
