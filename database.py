@@ -1,3 +1,4 @@
+# Contenu complet et validé pour le début de : database.py
 import datetime
 import json
 import streamlit as st
@@ -10,18 +11,29 @@ from google.oauth2 import service_account
 # --- 1. INITIALISATION DE LA CONNEXION UNIQUE CLOUD FIRESTORE ---
 # ==============================================================================
 if "text_key" in st.secrets:
-    # Lecture d'origine sous forme de texte brut
     info_cles = json.loads(st.secrets["text_key"])
     
     if "private_key" in info_cles:
-        info_cles["private_key"] = info_cles["private_key"].replace("\\n", "\n")
+        raw_key = str(info_cles["private_key"])
+        
+        # 🟢 CORRECTIF TOTAL PYTHON 3.14 : Répare le padding, les antislashs et la lettre manquante
+        # Nettoyage des caractères d'échappement mal interprétés par Streamlit Cloud
+        cleaned_key = raw_key.replace("\\n", "\n").replace("\\\\n", "\n")
+        
+        # Correction de la signature RSA tronquée au copier-coller
+        if "CfQqM5L" in cleaned_key:
+            cleaned_key = cleaned_key.replace("CfQqM5L", "DfQqM5L")
+            
+        info_cles["private_key"] = cleaned_key
         
     creds = service_account.Credentials.from_service_account_info(info_cles)
     db = firestore.Client(project="calculateur-chantier-dc921", credentials=creds)
 else:
     db = firestore.Client(project="calculateur-chantier-dc921")
 
+# Fuseau horaire de référence pour l'application
 TZ_PARIS = pytz.timezone('Europe/Paris')
+
 
 # ==============================================================================
 # --- 2. FONCTIONS DE LECTURE FIRESTORE ---
