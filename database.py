@@ -1,9 +1,10 @@
 # Contenu complet et validé pour : database.py
 import datetime
-import streamlit as st
-import pandas as pd
-from google.cloud import firestore
 import json
+import streamlit as st  # 🟢 CORRECTION : 'st' doit impérativement être en minuscules !
+import pandas as pd
+import pytz
+from google.cloud import firestore
 from google.oauth2 import service_account
 
 # ==============================================================================
@@ -12,17 +13,20 @@ from google.oauth2 import service_account
 if "text_key" in st.secrets:
     info_cles = json.loads(st.secrets["text_key"])
     
-    # 🟢 FORCE LE NETTOYAGE ET LE FORMATAGE STRICT DE LA CLÉ PRIVÉE POUR PYTHON 3.14
+    # 🟢 SÉCURITÉ ANTI-BUG PYTHON 3.14 : Rétablit et nettoie le format RSA PEM requis par Google
     if "private_key" in info_cles:
-        # Remplace les mauvaises barres obliques et reconstruit les vrais retours à la ligne requis par Google
-        cle_propre = info_cles["private_key"].replace("\\n", "\n")
-        info_cles["private_key"] = cle_propre
+        raw_key = info_cles["private_key"]
+        # Répare les doubles antislashs éventuels et force les vrais retours à la ligne
+        cleaned_key = raw_key.replace("\\n", "\n").replace("\n\n", "\n")
+        info_cles["private_key"] = cleaned_key
 
     creds = service_account.Credentials.from_service_account_info(info_cles)
     db = firestore.Client(project="calculateur-chantier-dc921", credentials=creds)
 else:
     db = firestore.Client(project="calculateur-chantier-dc921")
 
+# Fuseau horaire pour l'application
+TZ_PARIS = pytz.timezone('Europe/Paris')
 
 # ==============================================================================
 # --- 2. FONCTIONS DE LECTURE FIRESTORE ---
