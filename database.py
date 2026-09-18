@@ -12,21 +12,22 @@ from google.oauth2 import service_account
 # ==============================================================================
 # --- 1. INITIALISATION DE LA CONNEXION UNIQUE CLOUD FIRESTORE ---
 # ==============================================================================
-if "text_key" in st.secrets:
-    info_cles = dict(st.secrets["text_key"])
-    
-    if "private_key" in info_cles:
-        raw_key = str(info_cles["private_key"])
-        
-        # 🟢 CORRECTIF ULTIME PYTHON 3.14 : Nettoie tous les types d'échappements (simples ou doubles)
-        # pour s'assurer que Google reçoive de vrais sauts de ligne système
-        cleaned_key = raw_key.replace("\\n", "\n")
-        if "\n" not in cleaned_key and "\\n" not in raw_key:
-            # Sécurité si la clé a perdu ses séparateurs lors du transfert TOML
-            st.error("⚠️ Format de clé privée altéré dans les secrets.")
-            
-        info_cles["private_key"] = cleaned_key
+# ==============================================================================
+# --- 1. INITIALISATION DE LA CONNEXION UNIQUE CLOUD FIRESTORE ---
+# ==============================================================================
+import os
 
+# Chemin absolu vers votre fichier JSON local
+chemin_cle_local = os.path.join(os.path.dirname(os.path.abspath(__file__)), "firebase_key.json")
+
+if os.path.exists(chemin_cle_local):
+    # 🟢 SÉCURITÉ ABSOLUE : Google charge le fichier physique directement sans aucune altération de texte
+    creds = service_account.Credentials.from_service_account_file(chemin_cle_local)
+    db = firestore.Client(project="calculateur-chantier-dc921", credentials=creds)
+elif "text_key" in st.secrets:
+    info_cles = dict(st.secrets["text_key"])
+    if "private_key" in info_cles:
+        info_cles["private_key"] = info_cles["private_key"].replace("\\n", "\n")
     creds = service_account.Credentials.from_service_account_info(info_cles)
     db = firestore.Client(project="calculateur-chantier-dc921", credentials=creds)
 else:
