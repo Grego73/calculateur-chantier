@@ -12,9 +12,6 @@ from onglets.test_brut import afficher_onglet_test_brut
 
 from onglets.ajouter_chantier import afficher_onglet_ajouter
 from onglets.historique import afficher_onglet_historique
-# 🟢 NOUVELLE LIGNE PROPRE :
-# Ligne 16 corrigée dans app.py
-from onglets.suivi_interne import afficher_onglet_suivi_interne
 
 st.set_page_config(page_title="Gestion des Chantiers", page_icon="🏗️", layout="wide")
 st.title("Gestion et Rentabilité des Chantiers")
