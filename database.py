@@ -1,7 +1,6 @@
-# Contenu complet et validé pour : database.py
 import datetime
 import json
-import streamlit as st  # 🟢 CORRECTION : 'st' doit impérativement être en minuscules !
+import streamlit as st
 import pandas as pd
 import pytz
 from google.cloud import firestore
@@ -10,15 +9,12 @@ from google.oauth2 import service_account
 # ==============================================================================
 # --- 1. INITIALISATION DE LA CONNEXION UNIQUE CLOUD FIRESTORE ---
 # ==============================================================================
-# Dans database.py (Remplacement des lignes d'initialisation de connexion)
-# Dans database.py (Remplacement des lignes 13 à 24)
 if "text_key" in st.secrets:
-    # 🟢 PLUS BESOIN DE json.loads ! Streamlit fournit déjà un dictionnaire parfait.
+    # 🟢 SANS json.loads() ! On prend directement le dictionnaire TOML
     info_cles = dict(st.secrets["text_key"])
     
     if "private_key" in info_cles:
         raw_key = info_cles["private_key"]
-        # Nettoie les antislashs pour restaurer la clé RSA de 64 caractères demandée par Google
         info_cles["private_key"] = raw_key.replace("\\n", "\n").replace("\n\n", "\n")
 
     creds = service_account.Credentials.from_service_account_info(info_cles)
@@ -26,7 +22,6 @@ if "text_key" in st.secrets:
 else:
     db = firestore.Client(project="calculateur-chantier-dc921")
 
-# Fuseau horaire pour l'application
 TZ_PARIS = pytz.timezone('Europe/Paris')
 
 # ==============================================================================
