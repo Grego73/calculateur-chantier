@@ -9,7 +9,7 @@ import database as db
 # Par le nouvel import du dossier segmenté :
 from onglets.direction_admin import afficher_onglet_direction
 from onglets.test_brut import afficher_onglet_test_brut
-
+from onglets.suivie_interne import afficher_onglet_suivi_interne
 from onglets.ajouter_chantier import afficher_onglet_ajouter
 from onglets.historique import afficher_onglet_historique
 
