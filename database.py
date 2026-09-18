@@ -10,15 +10,15 @@ from google.oauth2 import service_account
 # ==============================================================================
 # --- 1. INITIALISATION DE LA CONNEXION UNIQUE CLOUD FIRESTORE ---
 # ==============================================================================
+# Dans database.py (Remplacement des lignes d'initialisation de connexion)
 if "text_key" in st.secrets:
-    info_cles = json.loads(st.secrets["text_key"])
+    # On convertit le bloc TOML natif directement en dictionnaire propre pour Google
+    info_cles = dict(st.secrets["text_key"])
     
-    # 🟢 SÉCURITÉ ANTI-BUG PYTHON 3.14 : Rétablit et nettoie le format RSA PEM requis par Google
     if "private_key" in info_cles:
         raw_key = info_cles["private_key"]
-        # Répare les doubles antislashs éventuels et force les vrais retours à la ligne
-        cleaned_key = raw_key.replace("\\n", "\n").replace("\n\n", "\n")
-        info_cles["private_key"] = cleaned_key
+        # Répare les échappements de texte et restaure la structure RSA 64 caractères
+        info_cles["private_key"] = raw_key.replace("\\n", "\n").replace("\n\n", "\n")
 
     creds = service_account.Credentials.from_service_account_info(info_cles)
     db = firestore.Client(project="calculateur-chantier-dc921", credentials=creds)
