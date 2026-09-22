@@ -10,20 +10,13 @@ from google.oauth2 import service_account
 # ==============================================================================
 # --- 1. INITIALISATION DE LA CONNEXION UNIQUE CLOUD FIRESTORE ---
 # ==============================================================================
-# Dans database.py (Lignes 10-15)
 if "text_key" in st.secrets:
-    info_cles = json.loads(st.secrets["text_key"])
-    
-    # 🔴 CORRECTION DU CRASH : Rétablir les sauts de ligne requis par Google Auth
-    if "private_key" in info_cles:
-        info_cles["private_key"] = info_cles["private_key"].replace("\\n", "\n")
-        
+    # Streamlit convertit le bloc TOML directement en dictionnaire Python
+    info_cles = dict(st.secrets["text_key"])
     creds = service_account.Credentials.from_service_account_info(info_cles)
     db = firestore.Client(project="calculateur-chantier-dc921", credentials=creds)
 else:
     db = firestore.Client(project="calculateur-chantier-dc921")
-
-
 # Fuseau horaire de référence pour l'application
 TZ_PARIS = pytz.timezone('Europe/Paris')
 
