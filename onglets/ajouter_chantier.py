@@ -309,7 +309,10 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         raw_engins_state = st.session_state.get("cache_df_engins", df_besoins_init)
 
         engins_necessaires = st.data_editor(
-            raw_engins_state, num_rows="dynamic", width="stretch", key=f"editor_engins_data_{idx_refresh}", 
+            raw_engins_state, 
+            num_rows="dynamic", 
+            width="stretch", 
+            key=f"editor_engins_data_{idx_refresh}", 
             column_config={
                 "N° Étape": st.column_config.NumberColumn("N° Étape", min_value=1, step=1, required=True, width="small"),
                 "Durée Étape (jours)": st.column_config.NumberColumn("Durée Réelle (j)", min_value=1, step=1, required=True, disabled=True),
