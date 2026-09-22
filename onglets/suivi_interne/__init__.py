@@ -7,6 +7,7 @@ from .tab_distribution import afficher_tab_distribution
 from onglets.suivi_interne.tab_marche import afficher_tab_marche
 from onglets.suivi_interne.tab_parseur import afficher_tab_parseur
 from onglets.suivi_interne.tab_gestion import afficher_tab_gestion
+from .tab_diagnostic import afficher_tab_diagnostic  # <-- NOUVEL IMPORT
 
 def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
     if "auth_suivi_coop" not in st.session_state:
@@ -54,19 +55,23 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
 
     st.markdown("---")
     
-    # Déclaration des 4 Onglets visuels
-    tab1, tab2, tab3, tab4 = st.tabs([
+    # Construction dynamique de la liste des onglets selon le grade
+    titres_onglets = [
         "🏆 1. Parts & Bénéfices de la Coop", 
         "🌍 2. Marché Global", 
         "📥 Déposer l'Historique du Jeu", 
         "⚙️ Gérer les Droits & Associés"
-    ])
+    ]
+    # Si le joueur est Niveau 3, on rajoute l'onglet diagnostic secret
+    if niveau_actuel >= 3:
+        titres_onglets.append("🚨 Centre de Nettoyage NoSQL")
+
+    liste_onglets_st = st.tabs(titres_onglets)
 
     # Chargement des structures et flux depuis la base NoSQL
     liste_flux_bruts = db.charger_flux_coop_cache(nom_coop_active)
     coop_snap = db.db.collection("cooperatives").document(nom_coop_active).get().to_dict() or {}
     membres_inscrits = coop_snap.get("membres", [joueur_actif])
-    dict_capitaux = {doc.to_dict().get("joueur"): doc.to_dict().get("montant", 0.0) for doc in db.db.collection("cooperatives").document(nom_coop_active).collection("capital_initial").stream()}
 
     # SÉCURITÉ ANTI-CRASH : Configuration d'une valeur temporelle par défaut dans la session
     if "point_reprise_date_compta" not in st.session_state:
@@ -101,15 +106,20 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
     except Exception:
         liste_flux = liste_flux_bruts
 
-    # --- ROUTAGE ET DISTRIBUTION VERS LES SOUS-FICHIERS ---
-    with tab1:
+    # --- ROUTAGE VERS LES CONTENUS D'ONGLETS ---
+    with liste_onglets_st[0]:
         afficher_tab_distribution(nom_coop_active, joueur_actif, niveau_actuel, liste_flux_bruts)
         
-    with tab2:
+    with liste_onglets_st[1]:
         afficher_tab_marche(liste_flux, membres_inscrits)
         
-    with tab3:
+    with liste_onglets_st[2]:
         afficher_tab_parseur(nom_coop_active, membres_inscrits, joueur_actif, liste_flux)
         
-    with tab4:
+    with liste_onglets_st[3]:
         afficher_tab_gestion(nom_coop_active, joueur_actif, niveau_actuel, membres_inscrits, coop_snap)
+
+    # Si le joueur est Niveau 3, on peuple le 5ème onglet
+    if niveau_actuel >= 3:
+        with liste_onglets_st[4]:
+            afficher_tab_diagnostic(nom_coop_active, liste_flux_bruts)
