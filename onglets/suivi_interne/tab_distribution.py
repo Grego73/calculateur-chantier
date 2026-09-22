@@ -1,17 +1,17 @@
-# Contenu de : onglets/suivi_interne/tab_distribution.py
+# Contenu complet et corrigé de : onglets/suivi_interne/tab_distribution.py
 import streamlit as st
 import pandas as pd
 import database as db
 from datetime import datetime
 import pytz
 
-# Importations sécurisées depuis ton dossier coops d'origine
+# Importations sécurisées depuis votre dossier coops d'origine
 from coops.calculs import compiler_compta_membres, appliquer_parts_et_primes, generer_excel_distribution_paye, envoyer_releve_sur_discord
 
 def afficher_tab_distribution(nom_coop_active, joueur_actif, niveau_actuel, liste_flux_bruts):
     
-    # Nettoyage préventif du pseudo du joueur actif
-    joueur_actif = str(joueur_actif).strip()
+    # Normalisation de sécurité du joueur connecté
+    joueur_actif = str(joueur_actif).strip().capitalize()
 
     # ==================================================================
     # --- 1. INITIALISATION ET DÉTECTION DE LA DATE DE REPÈRE ---
@@ -22,7 +22,7 @@ def afficher_tab_distribution(nom_coop_active, joueur_actif, niveau_actuel, list
         
         if liste_flux_bruts:
             try:
-                # 🎯 Tentative 1 : Trouver le dernier versement de bénéfice
+                # 🎯 Tentative 1 : Trouver le dernier versement de bénéfice historique
                 versements = [f for f in liste_flux_bruts if str(f.get("type")).strip() == "VERS BENEF"]
                 if versements:
                     versements_tries = sorted(
@@ -35,7 +35,7 @@ def afficher_tab_distribution(nom_coop_active, joueur_actif, niveau_actuel, list
                         date_detectee = dernier_doc.get("date_jeu")
                         heure_detectee = dernier_doc.get("heure_jeu")
                 
-                # 🎯 Tentative 2 : S'il n'y a JAMAIS eu de versement, on prend la TOUT PREMIÈRE entrée historique
+                # 🎯 Tentative 2 : Si aucun versement, on remonte à la TOUT PREMIÈRE entrée historique de la base
                 if not date_detectee:
                     flux_anciens = sorted(
                         liste_flux_bruts, 
@@ -48,7 +48,7 @@ def afficher_tab_distribution(nom_coop_active, joueur_actif, niveau_actuel, list
             except Exception:
                 pass
                 
-        # Sécurité ultime si la base est totalement vide
+        # Sécurité si la base de données est totalement vierge
         if not date_detectee:
             date_detectee = "17/09/2026"
             heure_detectee = "00:00"
@@ -59,14 +59,13 @@ def afficher_tab_distribution(nom_coop_active, joueur_actif, niveau_actuel, list
 
     coop_snap = db.db.collection("cooperatives").document(nom_coop_active).get().to_dict() or {}
     
-    # 🎯 Correction Doublons : Nettoyage des espaces pour la liste des membres inscrits
-    membres_inscrits = [str(m).strip() for m in coop_snap.get("membres", [joueur_actif])]
+    # Nettoyage et capitalisation uniforme des listes système de Firebase
+    membres_inscrits = [str(m).strip().capitalize() for m in coop_snap.get("membres", [joueur_actif])]
     
-    # 🎯 Correction Doublons : Nettoyage des espaces pour le dictionnaire des capitaux
     dict_capitaux = {}
     for doc in db.db.collection("cooperatives").document(nom_coop_active).collection("capital_initial").stream():
         d_cap = doc.to_dict()
-        j_nom = str(d_cap.get("joueur", "")).strip()
+        j_nom = str(d_cap.get("joueur", "")).strip().capitalize()
         if j_nom:
             dict_capitaux[j_nom] = float(d_cap.get("montant", 0.0))
 
@@ -92,12 +91,6 @@ def afficher_tab_distribution(nom_coop_active, joueur_actif, niveau_actuel, list
 
     if liste_flux_bruts:
         for fl in liste_flux_bruts:
-            # 🎯 Correction Doublons : On nettoie le nom du joueur de la ligne en cours
-            if "joueur" in fl:
-                fl["joueur"] = str(fl["joueur"]).strip()
-            if "acteur" in fl:
-                fl["acteur"] = str(fl["acteur"]).strip()
-                
             t_mouv = str(fl.get("type", "")).strip()
             d_txt = str(fl.get("date_jeu", "01/01/2000")).strip()
             
@@ -108,7 +101,7 @@ def afficher_tab_distribution(nom_coop_active, joueur_actif, niveau_actuel, list
                     total_deja_verse += float(mats_dict.get("argent_total", mats_dict.get("argent", 0.0)))
                 continue 
 
-            # Dédoublonnage structurel Firestore
+            # Dédoublonnage structurel technique Firestore
             doc_id = fl.get("ID_Document_Firestore", "")
             id_normalise = doc_id.replace("['", "").replace("']", "").strip() if doc_id else ""
             if id_normalise in ids_traites and id_normalise: 
@@ -133,7 +126,12 @@ def afficher_tab_distribution(nom_coop_active, joueur_actif, niveau_actuel, list
                             periode_ventes += 1
                             periode_quantite += volume_ligne
                             periode_benefices_bruts_periode += (volume_ligne * 1.0)
-                            liste_flux.append(fl)
+                            
+                            # Copie locale propre pour éviter les mutations de casse
+                            fl_copie = fl.copy()
+                            if "joueur" in fl_copie: fl_copie["joueur"] = str(fl_copie["joueur"]).strip().capitalize()
+                            if "acteur" in fl_copie: fl_copie["acteur"] = str(fl_copie["acteur"]).strip().capitalize()
+                            liste_flux.append(fl_copie)
                     except Exception:
                         liste_flux.append(fl)
             else:
@@ -146,20 +144,18 @@ def afficher_tab_distribution(nom_coop_active, joueur_actif, niveau_actuel, list
     compta_brute = compiler_compta_membres(liste_flux, dict_capitaux, membres_inscrits)
     
     if compta_brute:
-        # 🎯 FORCE LA FUSION DES DOUBLONS DE PSEUDOS (casse et espaces invisibles)
+        # 🎯 MOTEUR DE FUSION STRICTE POUR ÉLIMINER LES DOUBLONS DE CASSE (Grego73 / grego73)
         compta_nettoyee = {}
-        for pseudo, donnees in compta_brute.items():
-            # On nettoie et on capitalise (ex: "grego73 ", "Grego73" -> "Grego73")
-            pseudo_unique = str(pseudo).strip().capitalize()
+        for pseudo_brut, donnees in compta_brute.items():
+            pseudo_unique = str(pseudo_brut).strip().capitalize()
             
             if pseudo_unique in compta_nettoyee:
-                # Si le joueur existe déjà dans le tableau, on additionne ses valeurs pour fusionner les lignes
-                for cle_valeur, valeur in donnees.items():
+                for sous_cle, valeur in donnees.items():
                     if isinstance(valeur, (int, float)):
-                        compta_nettoyee[pseudo_unique][cle_valeur] = compta_nettoyee[pseudo_unique].get(cle_valeur, 0.0) + valeur
+                        compta_nettoyee[pseudo_unique][sous_cle] = compta_nettoyee[pseudo_unique].get(sous_cle, 0.0) + valeur
             else:
                 compta_nettoyee[pseudo_unique] = donnees.copy()
-            
+                
         df_coop = pd.DataFrame.from_dict(compta_nettoyee, orient='index')
         df_coop, id_log = appliquer_parts_et_primes(df_coop)
         df_coop.index.name = "Pseudo Membre"
@@ -171,7 +167,7 @@ def afficher_tab_distribution(nom_coop_active, joueur_actif, niveau_actuel, list
             column_config={"Distribution Bénéfice (%)": st.column_config.NumberColumn("Distribution Bénéfice (%)", format="%.2f %%")}
         )
         if id_log: 
-            st.success(f"👑 **Responsable Logistique de la semaine :** [{str(id_log).strip()}]")
+            st.success(f"👑 **Responsable Logistique de la semaine :** [{str(id_log).strip().capitalize()}]")
 
         # ==================================================================
         # --- 4. POSITIONNEMENT DE LA LIGNE 2 (SOUS LE TABLEAU 1) ---
@@ -204,11 +200,14 @@ def afficher_tab_distribution(nom_coop_active, joueur_actif, niveau_actuel, list
                         if a_des_parts:
                             for cle, valeur in mats_dict.items():
                                 if cle.startswith("part_"):
-                                    p_nom = str(cle.replace("part_", "")).strip()
+                                    p_nom = str(cle.replace("part_", "")).strip().capitalize()
                                     primes_totales_joueurs[p_nom] = primes_totales_joueurs.get(p_nom, 0.0) + float(valeur)
                         else:
                             if membres_inscrits:
                                 for m in membres_inscrits:
+                                    montant_t = float(mats_dict.get("argent_total", mats_dict.get("argent", 0.0)))
+                                    primes_totales_joueurs[m] = primes_totales_joueurs.get(m, 0.0) + (montant_t / len(membres_inscrits))
+
         lignes_activite_globale = []
         for m in membres_inscrits:
             cumul_reappro = 0.0
@@ -216,7 +215,7 @@ def afficher_tab_distribution(nom_coop_active, joueur_actif, niveau_actuel, list
             
             if liste_flux_bruts:
                 for fl_brut in liste_flux_bruts:
-                    user_brut = str(fl_brut.get("joueur", fl_brut.get("acteur", ""))).strip()
+                    user_brut = str(fl_brut.get("joueur", fl_brut.get("acteur", ""))).strip().capitalize()
                     t_mouv_brut = str(fl_brut.get("type")).strip()
                     mats_brut_dict = fl_brut.get("materiaux", {})
                     qte_brut = float(sum(mats_brut_dict.values())) if isinstance(mats_brut_dict, dict) else 0.0
@@ -239,7 +238,6 @@ def afficher_tab_distribution(nom_coop_active, joueur_actif, niveau_actuel, list
             })
             
         df_activite_globale = pd.DataFrame(lignes_activite_globale)
-        # Regroupement par membre au cas où un doublon persisterait
         df_activite_globale = df_activite_globale.groupby("Membre", as_index=False).sum()
         df_activite_globale = df_activite_globale.sort_values(by="Primes Touchées (€)", ascending=False)
         
@@ -291,7 +289,7 @@ def afficher_tab_distribution(nom_coop_active, joueur_actif, niveau_actuel, list
                     maintenant = datetime.now(tz_paris)
                     parts_membres_dict = {"argent_total": float(caisse_saisie)}
                     for _, row in df_coop.iterrows():
-                        pseudo_m = str(row["Pseudo Membre"]).strip()
+                        pseudo_m = str(row["Pseudo Membre"]).strip().capitalize()
                         pourcentage = float(row["Distribution Bénéfice (%)"])
                         parts_membres_dict[f"part_{pseudo_m}"] = round((float(caisse_saisie) * pourcentage) / 100.0, 2)
                     
@@ -323,7 +321,7 @@ def afficher_tab_distribution(nom_coop_active, joueur_actif, niveau_actuel, list
                         if a_des_parts_nominatives:
                             for cle, valeur in mats_dict.items():
                                 if cle.startswith("part_") and valeur:
-                                    pseudo_extrait = str(cle.replace("part_", "")).strip()
+                                    pseudo_extrait = str(cle.replace("part_", "")).strip().capitalize()
                                     cumul_versements_joueurs[pseudo_extrait] = cumul_versements_joueurs.get(pseudo_extrait, 0.0) + float(valeur)
                         else:
                             if membres_inscrits:
