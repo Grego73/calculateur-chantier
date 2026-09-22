@@ -296,7 +296,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         tableau_employes_etapes = st.data_editor(
             raw_rh_state, num_rows="dynamic", width="stretch", key=f"editor_rh_data_{idx_refresh}",
             column_config={
-                "N° Étape": st.column_config.NumberColumn("N°", min_value=1, step=1, required=True, width="small"),
+                "N° Étape": st.column_config.NumberColumn("N° Étape", min_value=1, step=1, required=True, width="small"),
                 "Durée Étape (jours)": st.column_config.NumberColumn("Durée Réelle (j)", min_value=1, step=1, required=True, width="small"),
                 "🕹️ Conducteurs": st.column_config.NumberColumn(f"Cond ({px_cond:.0f}€)", min_value=0, step=1, default=1, width="small"),
                 "🧑‍💼 Chefs": st.column_config.NumberColumn(f"Chef ({px_chef:.0f}€)", min_value=0, step=1, default=0, width="small"),
@@ -311,7 +311,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         engins_necessaires = st.data_editor(
             raw_engins_state, num_rows="dynamic", width="stretch", key=f"editor_engins_data_{idx_refresh}", 
             column_config={
-                "N° Étape": st.column_config.NumberColumn("N°", min_value=1, step=1, required=True, width="small"),
+                "N° Étape": st.column_config.NumberColumn("N° Étape", min_value=1, step=1, required=True, width="small"),
                 "Durée Étape (jours)": st.column_config.NumberColumn("Durée Réelle (j)", min_value=1, step=1, required=True, disabled=True),
                 "Type d'engin requis": st.column_config.TextColumn("Type d'engin requis", disabled=False),
                 "Niveau requis": st.column_config.SelectboxColumn("Niveau requis", options=["N1", "N2", "N3", "N4"], required=True),
