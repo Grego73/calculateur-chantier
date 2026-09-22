@@ -10,13 +10,17 @@ from google.oauth2 import service_account
 # ==============================================================================
 # --- 1. INITIALISATION DE LA CONNEXION UNIQUE CLOUD FIRESTORE ---
 # ==============================================================================
+# ==============================================================================
+# --- 1. INITIALISATION DE LA CONNEXION UNIQUE CLOUD FIRESTORE ---
+# ==============================================================================
 if "text_key" in st.secrets:
-    # Streamlit convertit le bloc TOML directement en dictionnaire Python
-    info_cles = dict(st.secrets["text_key"])
+    import json
+    info_cles = json.loads(st.secrets["text_key"])
     creds = service_account.Credentials.from_service_account_info(info_cles)
     db = firestore.Client(project="calculateur-chantier-dc921", credentials=creds)
 else:
     db = firestore.Client(project="calculateur-chantier-dc921")
+
 # Fuseau horaire de référence pour l'application
 TZ_PARIS = pytz.timezone('Europe/Paris')
 
