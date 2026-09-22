@@ -8,7 +8,7 @@ def afficher_onglet_salaires(SALAIRES_DB):
     st.markdown("### 📊 Observatoire & Grille Salariale active")
     
     # ==========================================================================
-    # 🎯 1. COMPILATION ET RENDU DE LA TABLE DE SYNTHÈSE (DEPUIS FIREBASE)
+    # 🎯 1. RENDU DE LA TABLE DE SYNTHÈSE DIRECTEMENT AU TARIF JOURNALIER
     # ==========================================================================
     try:
         synthese_stream = db.db.collection("synthese_grille_tarifaire").stream()
@@ -20,16 +20,15 @@ def afficher_onglet_salaires(SALAIRES_DB):
                 "ID Document": doc.id,
                 "🛠️ Métier": d.get("poste"),
                 "📇 Type de Contrat": d.get("contrat"),
-                "📉 Prix Mini": float(d.get("prix_minimal", 0.0)),
-                "📈 Prix Maxi": float(d.get("prix_maximal", 0.0)),
-                "📊 Moyenne Brut": float(d.get("prix_moyen_mensuel", 0.0)),
-                "⏳ Moyenne / Jour Réel": float(d.get("prix_moyen_journalier_7", 0.0))
+                "📉 Prix Mini (/j)": float(d.get("prix_minimal", 0.0)),
+                "📈 Prix Maxi (/j)": float(d.get("prix_maximal", 0.0)),
+                "📊 Moyenne Journalière": float(d.get("prix_moyen_mensuel", 0.0)) # Stocké directement en jour
             })
             
         if lignes_synthese:
             df_synthese = pd.DataFrame(lignes_synthese)
             
-            st.markdown("#### 📋 Synthèse Générale du Marché du Travail (Enregistrée)")
+            st.markdown("#### 📋 Synthèse Générale du Marché du Travail (Tarifs Journaliers)")
             
             # Case globale Tout Sélectionner
             cocher_tout = st.checkbox("🔄 Tout sélectionner pour suppression", value=False, key="check_tout_synthese")
@@ -37,13 +36,12 @@ def afficher_onglet_salaires(SALAIRES_DB):
             
             # Rendu du tableau d'édition interactif
             synthese_editee = st.data_editor(
-                df_synthese, use_container_width=True, hide_index=True, key="editeur_synthese_salaires_v20",
+                df_synthese, use_container_width=True, hide_index=True, key="editeur_synthese_salaires_v21",
                 column_config={
                     "ID Document": None,  # Reste caché en arrière-plan
-                    "📉 Prix Mini": st.column_config.NumberColumn(format="%.0f €"),
-                    "📈 Prix Maxi": st.column_config.NumberColumn(format="%.0f €"),
-                    "📊 Moyenne Brut": st.column_config.NumberColumn(format="%.2f €"),
-                    "⏳ Moyenne / Jour Réel": st.column_config.NumberColumn(format="%.2f €/j"),
+                    "📉 Prix Mini (/j)": st.column_config.NumberColumn(format="%.2f €/j"),
+                    "📈 Prix Maxi (/j)": st.column_config.NumberColumn(format="%.2f €/j"),
+                    "📊 Moyenne Journalière": st.column_config.NumberColumn(format="%.2f €/j"),
                     "Supprimer ?": st.column_config.CheckboxColumn("🗑️ Supprimer ?", default=False)
                 }
             )
@@ -66,7 +64,7 @@ def afficher_onglet_salaires(SALAIRES_DB):
         st.error(f"⚠️ Erreur d'affichage de l'observatoire : {e}")
 
     # ==========================================================================
-    # ⚙️ 2. FORMULAIRE DE CALCUL EN MÉMOIRE ET UNIQUE ENREGISTREMENT
+    # ⚙️ 2. FORMULAIRE DE CONVERSION ET ENREGISTREMENT JOURNALIER DIRECT
     # ==========================================================================
     st.markdown("#### ➕ Calculer et Enregistrer une Synthèse")
     c_admin_poste, c_admin_contrat = st.columns(2)
@@ -78,10 +76,10 @@ def afficher_onglet_salaires(SALAIRES_DB):
     with st.form("form_grille_salariale_cloud_direct"):
         texte_brut = st.text_area("Collez le tableau des recrues ici (Format brut Sim-TP) :", height=150)
         
-        if st.form_submit_button("💾 ENREGISTRER DIRECTEMENT LES STATS (MIN, MAX, MOYENNE)", type="primary", use_container_width=True):
+        if st.form_submit_button("💾 CALCULER ET PROPULSER LES TARIFS JOURNALIERS CUMULÉS", type="primary", use_container_width=True):
             if texte_brut.strip():
                 lignes = texte_brut.strip().split("\n")
-                liste_salaires_extraits = []
+                liste_salaires_journaliers = []
                 
                 for ligne in lignes:
                     l_clean = ligne.strip()
@@ -90,37 +88,37 @@ def afficher_onglet_salaires(SALAIRES_DB):
                     
                     match_salaire = re.search(r"([\d\s]+)\s*€", l_clean)
                     if match_salaire:
-                        prix_val = float(match_salaire.group(1).replace(" ", ""))
-                        liste_salaires_extraits.append(prix_val)
+                        prix_brut = float(match_salaire.group(1).replace(" ", ""))
+                        
+                        # 🎯 CONVERSION IMMÉDIATE LORS DE LA SAISIE
+                        if "cdi" in type_contrat_cible.lower():
+                            # C'est un CDI mensuel, on le ramène tout de suite au jour réel
+                            liste_salaires_journaliers.append(prix_brut / 7.0)
+                        else:
+                            # C'est un CDD, c'est déjà un tarif journalier
+                            liste_salaires_journaliers.append(prix_brut)
                 
-                if liste_salaires_extraits:
-                    p_min = float(min(liste_salaires_extraits))
-                    p_max = float(max(liste_salaires_extraits))
-                    p_moyen = float(sum(liste_salaires_extraits) / len(liste_salaires_extraits))
+                if liste_salaires_journaliers:
+                    # Les statistiques minimales, maximales et moyennes sont désormais 100% journalières
+                    p_min_j = float(min(liste_salaires_journaliers))
+                    p_max_j = float(max(liste_salaires_journaliers))
+                    p_moyen_j = float(sum(liste_salaires_journaliers) / len(liste_salaires_extraits if 'liste_salaires_extraits' in locals() else liste_salaires_journaliers))
                     
-                    # 🎯 LOGIQUE RECTIFIÉE :
-                    # Si c'est un CDI (mensuel), on divise par 7 pour obtenir le prix/jour de la semaine
-                    if "cdi" in type_contrat_cible.lower():
-                        p_moyen_jour_reel = p_moyen / 7.0
-                    # Si c'est un CDD (tarif jour), on le garde tel quel
-                    else:
-                        p_moyen_jour_reel = p_moyen
-                    
-                    # UNIQUE ÉCRITURE SUR FIREBASE
+                    # 💾 ENREGISTREMENT DES COMPOSANTES JOURNALIÈRES DIRECTES SUR FIREBASE
                     cle_synthese_coop = f"{metier_cible}_{type_contrat_cible}"
                     db.db.collection("synthese_grille_tarifaire").document(cle_synthese_coop).set({
                         "poste": metier_cible,
                         "contrat": type_contrat_cible,
-                        "prix_minimal": p_min,
-                        "prix_maximal": p_max,
-                        "prix_moyen_mensuel": p_moyen,
-                        "prix_moyen_journalier_7": p_moyen_jour_reel
+                        "prix_minimal": p_min_j,
+                        "prix_maximal": p_max_j,
+                        "prix_moyen_mensuel": p_moyen_j,  # Écrit en tarif jour
+                        "prix_moyen_journalier_7": p_moyen_j
                     })
                     
-                    st.success(f"🎰 Agrégats sauvegardés pour {metier_cible} ! Min: {p_min:.0f}€ | Max: {p_max:.0f}€ | Coût Jour Réel: {p_moyen_jour_reel:.2f}€/j")
+                    st.success(f"🎰 Synthèse Journalière sauvegardée pour {metier_cible} ! Min: {p_min_j:.2f}€/j | Max: {p_max_j:.2f}€/j | Moyenne: {p_moyen_j:.2f}€/j")
                     st.cache_data.clear()
                     st.rerun()
                 else:
-                    st.error("❌ Aucun salaire valide trouvé dans le texte fourni.")
+                    st.error("❌ Aucun salaire valide détecté.")
             else:
                 st.error("⚠️ La zone de texte est vide.")
