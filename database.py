@@ -14,17 +14,26 @@ if "text_key" in st.secrets:
     import json
     secret_raw = st.secrets["text_key"]
     
-    # Si le secret est une chaîne de caractères (texte), on utilise json.loads
+    # 1. Extraction propre du dictionnaire
     if isinstance(secret_raw, str):
         info_cles = json.loads(secret_raw)
-    # Si Streamlit l'a déjà converti en dictionnaire/objet, on le convertit proprement
     else:
         info_cles = dict(secret_raw)
+    
+    # 2. NETTOYAGE CRUCIAL DE LA CLÉ PRIVÉE (Répare les problèmes de copier-coller)
+    if "private_key" in info_cles:
+        info_cles["private_key"] = info_cles["private_key"].replace("\\n", "\n")
         
-    creds = service_account.Credentials.from_service_account_info(info_cles)
-    db = firestore.Client(project="calculateur-chantier-dc921", credentials=creds)
+    try:
+        creds = service_account.Credentials.from_service_account_info(info_cles)
+        # 3. Ajout d'un timeout pour éviter le chargement infini
+        db = firestore.Client(project="calculateur-chantier-dc921", credentials=creds, client_options={"timeout": 10.0})
+    except Exception as e:
+        st.error(f"❌ Erreur d'initialisation des identifiants Firebase : {e}")
+        db = None
 else:
     db = firestore.Client(project="calculateur-chantier-dc921")
+
 
 
 # Fuseau horaire de référence pour l'application
