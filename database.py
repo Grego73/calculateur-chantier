@@ -16,23 +16,27 @@ if "text_key" in st.secrets:
     
     secret_raw = st.secrets["text_key"]
     
+    # Détection automatique du type de secret
     if isinstance(secret_raw, str):
         info_cles = json.loads(secret_raw)
     else:
         info_cles = dict(secret_raw)
     
+    # Nettoyage indispensable des sauts de ligne de la clé
     if "private_key" in info_cles:
         info_cles["private_key"] = info_cles["private_key"].replace("\\n", "\n")
         
     try:
-        # Utilisation explicite de from_service_account_info pour contourner le bug de métadonnées 503
         creds = service_account.Credentials.from_service_account_info(info_cles)
-        db = firestore.Client(project=info_cles.get("project_id", "calculateur-chantier-dc921"), credentials=creds)
+        db = firestore.Client(project="calculateur-chantier-dc921", credentials=creds)
     except Exception as e:
         st.error(f"❌ Erreur lors de l'application des identifiants : {e}")
         db = None
 else:
     db = firestore.Client(project="calculateur-chantier-dc921")
+
+# On s'assure de nettoyer l'ancien cache pour charger la nouvelle clé
+st.cache_data.clear()
 
 
 
