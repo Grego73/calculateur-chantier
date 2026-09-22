@@ -12,22 +12,22 @@ from google.oauth2 import service_account
 # ==============================================================================
 if "text_key" in st.secrets:
     import json
+    from google.oauth2 import service_account
+    
     secret_raw = st.secrets["text_key"]
     
-    # 1. Extraction du dictionnaire selon la structure du secret
     if isinstance(secret_raw, str):
         info_cles = json.loads(secret_raw)
     else:
         info_cles = dict(secret_raw)
     
-    # 2. Nettoyage des antislashs pour la clé privée
     if "private_key" in info_cles:
         info_cles["private_key"] = info_cles["private_key"].replace("\\n", "\n")
         
     try:
+        # Utilisation explicite de from_service_account_info pour contourner le bug de métadonnées 503
         creds = service_account.Credentials.from_service_account_info(info_cles)
-        # Initialisation propre sans l'argument 'timeout' invalide
-        db = firestore.Client(project="calculateur-chantier-dc921", credentials=creds)
+        db = firestore.Client(project=info_cles.get("project_id", "calculateur-chantier-dc921"), credentials=creds)
     except Exception as e:
         st.error(f"❌ Erreur lors de l'application des identifiants : {e}")
         db = None
