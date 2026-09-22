@@ -146,8 +146,20 @@ def afficher_tab_distribution(nom_coop_active, joueur_actif, niveau_actuel, list
     compta_brute = compiler_compta_membres(liste_flux, dict_capitaux, membres_inscrits)
     
     if compta_brute:
-        # Nettoyage des index du dictionnaire compta pour éviter les doublons au rendu
-        compta_nettoyee = {str(k).strip(): v for k, v in compta_brute.items()}
+        # 🎯 FORCE LA FUSION DES DOUBLONS DE PSEUDOS (casse et espaces invisibles)
+        compta_nettoyee = {}
+        for pseudo, donnees in compta_brute.items():
+            # On nettoie et on capitalise (ex: "grego73 ", "Grego73" -> "Grego73")
+            pseudo_unique = str(pseudo).strip().capitalize()
+            
+            if pseudo_unique in compta_nettoyee:
+                # Si le joueur existe déjà dans le tableau, on additionne ses valeurs pour fusionner les lignes
+                for cle_valeur, valeur in donnees.items():
+                    if isinstance(valeur, (int, float)):
+                        compta_nettoyee[pseudo_unique][cle_valeur] = compta_nettoyee[pseudo_unique].get(cle_valeur, 0.0) + valeur
+            else:
+                compta_nettoyee[pseudo_unique] = donnees.copy()
+            
         df_coop = pd.DataFrame.from_dict(compta_nettoyee, orient='index')
         df_coop, id_log = appliquer_parts_et_primes(df_coop)
         df_coop.index.name = "Pseudo Membre"
