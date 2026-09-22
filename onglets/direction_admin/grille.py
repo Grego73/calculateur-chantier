@@ -1,4 +1,4 @@
-# Fichier complet : onglets/direction_admin/grille.py
+# Fichier complet et certifié : onglets/direction_admin/grille.py
 import streamlit as st
 import pandas as pd
 import database as db
@@ -8,211 +8,114 @@ def afficher_onglet_salaires(SALAIRES_DB):
     st.markdown("### 📊 Observatoire & Grille Salariale active")
     
     # ==========================================================================
-    # 🎯 1. COMPILATION ET AFFICHAGE DES STATISTIQUES GLOBALES EN TEMPS RÉEL
+    # 🎯 1. COMPILATION ET RENDU DE LA TABLE DE SYNTHÈSE (DEPUIS FIREBASE)
     # ==========================================================================
     try:
-        salaires_stream = db.db.collection("configuration_salaires").stream()
-        toutes_les_recrues = []
+        synthese_stream = db.db.collection("synthese_grille_tarifaire").stream()
+        lignes_synthese = []
         
-        for doc in salaires_stream:
-            toutes_les_recrues.append(doc.to_dict())
+        for doc in synthese_stream:
+            d = doc.to_dict()
+            lignes_synthese.append({
+                "ID Document": doc.id,
+                "🛠️ Métier": d.get("poste"),
+                "📇 Type de Contrat": d.get("contrat"),
+                "📉 Prix Mini": float(d.get("prix_minimal", 0.0)),
+                "📈 Prix Maxi": float(d.get("prix_maximal", 0.0)),
+                "📊 Moyenne Brut": float(d.get("prix_moyen_mensuel", 0.0)),
+                "⏳ Moyenne / Jour Réel": float(d.get("prix_moyen_journalier_7", 0.0))
+            })
             
-        if toutes_les_recrues:
-            df_global_stats = pd.DataFrame(toutes_les_recrues)
+        if lignes_synthese:
+            df_synthese = pd.DataFrame(lignes_synthese)
             
-            # Unification de sécurité des chaînes de caractères
-            df_global_stats["poste"] = df_global_stats["poste"].str.strip()
-            df_global_stats["contrat"] = df_global_stats["contrat"].str.strip()
-            df_global_stats["tarif_unitaire"] = df_global_stats["tarif_unitaire"].astype(float)
+            st.markdown("#### 📋 Synthèse Générale du Marché du Travail (Enregistrée)")
             
-            # Calcul du groupement statistique NoSQL par Poste et par Contrat
-            df_synthese = df_global_stats.groupby(["poste", "contrat"]).agg(
-                Prix_Min=("tarif_unitaire", "min"),
-                Prix_Max=("tarif_unitaire", "max"),
-                Prix_Moyen_Mensuel=("tarif_unitaire", "mean")
-            ).reset_index()
+            # 🎯 BOUTON TOUT SÉLECTIONNER POUR SUPPRESSION
+            cocher_tout = st.checkbox("🔄 Tout sélectionner pour suppression", value=False, key="check_tout_synthese")
+            df_synthese["Supprimer ?"] = cocher_tout
             
-            # Calcul de l'équivalence par jour réel (Division par 7)
-            df_synthese["Prix_Moyen_Jour_Reel"] = df_synthese["Prix_Moyen_Mensuel"] / 7.0
-            
-            # Renommer les colonnes pour l'affichage Streamlit
-            df_synthese.columns = [
-                "🛠️ Métier", "📇 Type de Contrat", 
-                "📉 Prix Mini", "📈 Prix Maxi", 
-                "📊 Moyenne Brut", "⏳ Moyenne / Jour Réel"
-            ]
-            
-            st.markdown("#### 📋 Synthèse Générale du Marché du Travail")
-            st.dataframe(
-                df_synthese, 
-                use_container_width=True, 
-                hide_index=True,
+            # Rendu du tableau d'édition
+            synthese_editee = st.data_editor(
+                df_synthese, use_container_width=True, hide_index=True, key="editeur_synthese_salaires_v20",
                 column_config={
+                    "ID Document": None,  # Caché
                     "📉 Prix Mini": st.column_config.NumberColumn(format="%.0f €"),
                     "📈 Prix Maxi": st.column_config.NumberColumn(format="%.0f €"),
                     "📊 Moyenne Brut": st.column_config.NumberColumn(format="%.2f €"),
-                    "⏳ Moyenne / Jour Réel": st.column_config.NumberColumn(format="%.2f €/j")
+                    "⏳ Moyenne / Jour Réel": st.column_config.NumberColumn(format="%.2f €/j"),
+                    "Supprimer ?": st.column_config.CheckboxColumn("🗑️ Supprimer ?", default=False)
                 }
             )
+            
+            lignes_visees = synthese_editee[synthese_editee["Supprimer ?"] == True]
+            nb_a_suppr = len(lignes_visees)
+            
+            if st.button(f"🔥 SUPPRIMER LES {nb_a_suppr} SYNTHÈSES SÉLECTIONNÉES", type="secondary", use_container_width=True, disabled=(nb_a_suppr == 0)):
+                for doc_id in lignes_visees["ID Document"].tolist():
+                    db.db.collection("synthese_grille_tarifaire").document(doc_id).delete()
+                st.success("💥 Synthèse(s) effacée(s) de Firebase.")
+                st.cache_data.clear()
+                st.rerun()
+                
             st.markdown("---")
         else:
-            st.info("💡 Aucun profil salarial enregistré en base de données. Remplissez le formulaire ci-dessous pour générer les statistiques.")
+            st.info("💡 Aucune synthèse enregistrée sur Firebase. Collez un tableau ci-dessous.")
             
     except Exception as e:
-        st.error(f"⚠️ Erreur lors du calcul de l'observatoire : {e}")
+        st.error(f"⚠️ Erreur d'affichage de l'observatoire : {e}")
 
     # ==========================================================================
-    # ⚙️ 2. FORMULAIRE DE SAISIE, PARSTAGE ET ENREGISTREMENT DES AGRÉGATS
+    # ⚙️ 2. FORMULAIRE DE CALCUL EN MÉMOIRE ET UNIQUE ENREGISTREMENT
     # ==========================================================================
-    st.markdown("#### ➕ Ajouter de nouveaux candidats")
+    st.markdown("#### ➕ Calculer et Enregistrer une Synthèse")
     c_admin_poste, c_admin_contrat = st.columns(2)
     with c_admin_poste: 
         metier_cible = st.selectbox("Poste à analyser :", ["Conducteur", "Chef", "Ouvrier"])
     with c_admin_contrat: 
         type_contrat_cible = st.selectbox("Type de contrat :", ["CDI (Salaire mensuel)", "CDD (Salaire par jour)"])
     
-    with st.form("form_grille_salariale_cloud"):
+    with st.form("form_grille_salariale_cloud_direct"):
         texte_brut = st.text_area("Collez le tableau des recrues ici (Format brut Sim-TP) :", height=150)
         
-        if st.form_submit_button("💾 ENREGISTRER DANS LA BASE ET CALCULER LES AGRÉGATS", type="primary", use_container_width=True):
+        if st.form_submit_button("💾 ENREGISTRER DIRECTEMENT LES STATS (MIN, MAX, MOYENNE)", type="primary", use_container_width=True):
             if texte_brut.strip():
                 lignes = texte_brut.split("\n")
-                compteur_recrues = 0
+                liste_salaires_extraits = []
                 
-                with st.spinner("Analyse et synchronisation NoSQL en cours..."):
-                    for idx, ligne in enumerate(lignes):
-                        l_clean = ligne.strip()
-                        
-                        # On ignore les lignes vides et la ligne d'en-tête du tableau
-                        if not l_clean or l_clean.lower().startswith("prénom") or "salaire" in l_clean.lower():
-                            continue
-                        
-                        mots = l_clean.split()
-                        if len(mots) >= 2:
-                            # 1. Extraction propre du prénom (premier élément de la ligne)
-                            pseudo_brut = str(mots[0]).strip().capitalize()
-                            
-                            # Sécurité anti-doublon pour Grego73
-                            if pseudo_brut in ["Grgo73", "Grrgo73", "Grego", "grego73"]:
-                                pseudo_brut = "Grego73"
-                                
-                            # 🎯 LA REGEX INFAILLIBLE ANTI-BUG D'ÂGE :
-                            # Elle attrape uniquement la chaîne numérique (avec ou sans espaces) placée juste devant le symbole €
-                            match_salaire_strict = re.search(r"([\d\s]+)\s*€", l_clean)
-                            
-                            if match_salaire_strict:
-                                # On supprime les espaces internes (ex: "1 712" -> "1712")
-                                prix_txt = "".join(c for c in match_salaire_strict.group(1) if c.isdigit())
-                                prix_val = float(prix_txt)
-                            else:
-                                continue # Si on ne trouve pas de prix en euros, on passe à la ligne suivante
-                            
-                            # 2. Écriture de la recrue individuelle sur Firebase
-                            cle_document_nosql = f"{pseudo_brut} ({metier_cible})"
-                            db.db.collection("configuration_salaires").document(cle_document_nosql).set({
-                                "nom_recrue": pseudo_brut,
-                                "poste": metier_cible,
-                                "contrat": type_contrat_cible,
-                                "tarif_unitaire": float(prix_val)
-                            })
-                            compteur_recrues += 1
-
-                # ==================================================================
-                # 🎯 3. MOTEUR D'ÉCRITURE DES AGRÉGATS (MIN, MAX, MOYENNE) DANS FIREBASE
-                # ==================================================================
-                try:
-                    # On recharge la collection pour intégrer les nouvelles recrues dans le calcul
-                    flux_nouveau = db.db.collection("configuration_salaires").stream()
-                    recrues_regroupees = [d.to_dict() for d in flux_nouveau]
+                for ligne in lignes:
+                    l_clean = ligne.strip()
+                    if not l_clean or l_clean.lower().startswith("prénom") or "salaire" in l_clean.lower():
+                        continue
                     
-                    df_calcul = pd.DataFrame(recrues_regroupees)
-                    df_filtre = df_calcul[
-                        (df_calcul["poste"].str.strip() == metier_cible) & 
-                        (df_calcul["contrat"].str.strip() == type_contrat_cible)
-                    ]
+                    # 🎯 REGEX INFAILLIBLE : Capture le prix juste avant le symbole € (ignore l'âge et le prénom)
+                    match_salaire = re.search(r"([\d\s]+)\s*€", l_clean)
+                    if match_salaire:
+                        prix_val = float(match_salaire.group(1).replace(" ", ""))
+                        liste_salaires_extraits.append(prix_val)
+                
+                # S'il y a des salaires valides, on fait le calcul direct
+                if liste_salaires_extraits:
+                    p_min = float(min(liste_salaires_extraits))
+                    p_max = float(max(liste_salaires_extraits))
+                    p_moyen = float(sum(liste_salaires_extraits) / len(liste_salaires_extraits))
+                    p_moyen_jour_reel = p_moyen / 7.0
                     
-                    if not df_filtre.empty:
-                        tarifs = df_filtre["tarif_unitaire"].astype(float)
-                        p_min = float(tarifs.min())
-                        p_max = float(tarifs.max())
-                        p_moyen = float(tarifs.mean())
-                        p_moyen_jour_reel = p_moyen / 7.0
-                        
-                        # Écriture du document de synthèse dans la collection dédiée
-                        cle_synthese_coop = f"{metier_cible}_{type_contrat_cible}"
-                        db.db.collection("synthese_grille_tarifaire").document(cle_synthese_coop).set({
-                            "poste": metier_cible,
-                            "contrat": type_contrat_cible,
-                            "prix_minimal": p_min,
-                            "prix_maximal": p_max,
-                            "prix_moyen_mensuel": p_moyen,
-                            "prix_moyen_journalier_7": p_moyen_jour_reel,
-                            "derniere_mise_a_jour": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M")
-                        })
-                        st.write(f"💾 **Agrégats Firebase synchronisés** (`{cle_synthese_coop}`) ➡️ Min: {p_min:.0f}€ | Max: {p_max:.0f}€ | Moy/7: {p_moyen_jour_reel:.2f}€")
-                except Exception as ex_stats:
-                    st.error(f"Impossible de générer le document de synthèse NoSQL : {ex_stats}")
-
-                if compteur_recrues > 0:
-                    st.success(f"🚀 Succès ! {compteur_recrues} recrues enregistrées proprement (sans l'âge) et indicateurs sauvegardés sur Firebase !")
+                    # 💾 UNIQUE ÉCRITURE SUR FIREBASE (Pas de liste de recrues individuelles !)
+                    cle_synthese_coop = f"{metier_cible}_{type_contrat_cible}"
+                    db.db.collection("synthese_grille_tarifaire").document(cle_synthese_coop).set({
+                        "poste": metier_cible,
+                        "contrat": type_contrat_cible,
+                        "prix_minimal": p_min,
+                        "prix_maximal": p_max,
+                        "prix_moyen_mensuel": p_moyen,
+                        "prix_moyen_journalier_7": p_moyen_jour_reel
+                    })
+                    
+                    st.success(f"🎰 Agrégats sauvegardés pour {metier_cible} ! Min: {p_min:.0f}€ | Max: {p_max:.0f}€ | Moy/7: {p_moyen_jour_reel:.2f}€")
                     st.cache_data.clear()
                     st.rerun()
+                else:
+                    st.error("❌ Aucun salaire valide trouvé dans le texte fourni.")
             else:
-                st.error("⚠️ La zone de texte est vide. Veuillez coller vos données.")
-
-    # ==========================================================================
-    # 🗑️ 4. INTERFACE DE SUPPRESSION ET DE CONTRÔLE DES PROFILS
-    # ==========================================================================
-    st.markdown("---")
-    st.markdown(f"#### 📜 Liste des Profils Enregistrés pour le poste : `[{metier_cible}]`")
-    
-    try:
-        lignes_grille = []
-        if toutes_les_recrues:
-            for d in toutes_les_recrues:
-                if str(d.get("poste")).strip().lower() == metier_cible.strip().lower():
-                    lignes_grille.append({
-                        "ID Document": f"{d.get('nom_recrue')} ({d.get('poste')})",
-                        "👤 Collaborateur": d.get("nom_recrue"),
-                        "🛠️ Poste": d.get("poste"),
-                        "📇 Contrat": d.get("contrat"),
-                        "💰 Salaire Brut": f"{d.get('tarif_unitaire', 0.0):,.0f} €".replace(",", " ")
-                    })
-            
-        if lignes_grille:
-            df_salaires = pd.DataFrame(lignes_grille)
-            
-            # 🎯 ACTION : Création de la case "Tout sélectionner"
-            cocher_tout = st.checkbox("🔄 Tout sélectionner pour suppression", value=False, key="check_tout_salaires")
-            
-            # Si la case globale est cochée, on force toutes les lignes à True, sinon à False
-            df_salaires["Supprimer ?"] = cocher_tout
-            
-            # Affichage de l'éditeur de données
-            salaires_edites = st.data_editor(
-                df_salaires, use_container_width=True, hide_index=True, key="editeur_salaires_bruts_v18",
-                column_config={
-                    "ID Document": None,  # Reste masqué en arrière-plan
-                    "Supprimer ?": st.column_config.CheckboxColumn("🗑️ Supprimer ?", default=False)
-                }
-            )
-            
-            # Décompte des lignes cochées pour dynamiser le bouton
-            lignes_visées = salaires_edites[salaires_edites["Supprimer ?"] == True]
-            nb_a_suppr = len(lignes_visées)
-            
-            texte_bouton = f"🔥 SUPPRIMER LES {nb_a_suppr} TARIFS SÉLECTIONNÉS" if nb_a_suppr > 0 else "🔥 SUPPRIMER LES TARIFS SÉLECTIONNÉS"
-            
-            if st.button(texte_bouton, type="secondary", use_container_width=True, disabled=(nb_a_suppr == 0)):
-                ids_a_supprimer = lignes_visées["ID Document"].tolist()
-                
-                with st.spinner("Purge des profils sur Firebase..."):
-                    for doc_id in ids_a_supprimer:
-                        db.db.collection("configuration_salaires").document(doc_id).delete()
-                        
-                st.success(f"💥 {len(ids_a_supprimer)} ligne(s) effacée(s) avec succès de Firestore !")
-                st.cache_data.clear()
-                st.rerun()
-    except Exception as e:
-        st.error(f"Erreur d'affichage de la table : {e}")
-
+                st.error("⚠️ La zone de texte est vide.")
