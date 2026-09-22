@@ -178,25 +178,41 @@ def afficher_onglet_salaires(SALAIRES_DB):
                         "📇 Contrat": d.get("contrat"),
                         "💰 Salaire Brut": f"{d.get('tarif_unitaire', 0.0):,.0f} €".replace(",", " ")
                     })
+            
         if lignes_grille:
             df_salaires = pd.DataFrame(lignes_grille)
-            df_salaires["Supprimer ?"] = False
             
+            # 🎯 ACTION : Création de la case "Tout sélectionner"
+            cocher_tout = st.checkbox("🔄 Tout sélectionner pour suppression", value=False, key="check_tout_salaires")
+            
+            # Si la case globale est cochée, on force toutes les lignes à True, sinon à False
+            df_salaires["Supprimer ?"] = cocher_tout
+            
+            # Affichage de l'éditeur de données
             salaires_edites = st.data_editor(
                 df_salaires, use_container_width=True, hide_index=True, key="editeur_salaires_bruts_v18",
                 column_config={
-                    "ID Document": None,
-                    "Supprimer ?": st.column_config.CheckboxColumn(default=False)
+                    "ID Document": None,  # Reste masqué en arrière-plan
+                    "Supprimer ?": st.column_config.CheckboxColumn("🗑️ Supprimer ?", default=False)
                 }
             )
             
-            if st.button("🔥 SUPPRIMER LES TARIFS SÉLECTIONNÉS", type="secondary", use_container_width=True):
-                ids_a_supprimer = salaires_edites[salaires_edites["Supprimer ?"] == True]["ID Document"].tolist()
-                if ids_a_supprimer:
+            # Décompte des lignes cochées pour dynamiser le bouton
+            lignes_visées = salaires_edites[salaires_edites["Supprimer ?"] == True]
+            nb_a_suppr = len(lignes_visées)
+            
+            texte_bouton = f"🔥 SUPPRIMER LES {nb_a_suppr} TARIFS SÉLECTIONNÉS" if nb_a_suppr > 0 else "🔥 SUPPRIMER LES TARIFS SÉLECTIONNÉS"
+            
+            if st.button(texte_bouton, type="secondary", use_container_width=True, disabled=(nb_a_suppr == 0)):
+                ids_a_supprimer = lignes_visées["ID Document"].tolist()
+                
+                with st.spinner("Purge des profils sur Firebase..."):
                     for doc_id in ids_a_supprimer:
                         db.db.collection("configuration_salaires").document(doc_id).delete()
-                    st.success(f"💥 {len(ids_a_supprimer)} ligne(s) effacée(s).")
-                    st.cache_data.clear()
-                    st.rerun()
+                        
+                st.success(f"💥 {len(ids_a_supprimer)} ligne(s) effacée(s) avec succès de Firestore !")
+                st.cache_data.clear()
+                st.rerun()
     except Exception as e:
         st.error(f"Erreur d'affichage de la table : {e}")
+
