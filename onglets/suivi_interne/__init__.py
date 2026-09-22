@@ -122,4 +122,4 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
     # Si le joueur est Niveau 3, on peuple le 5ème onglet
     if niveau_actuel >= 3:
         with liste_onglets_st[4]:
-            afficher_tab_diagnostic(nom_coop_active, liste_flux_bruts)
+            afficher_tab_diagnostic(nom_coop_active)
