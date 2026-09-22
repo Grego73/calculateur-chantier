@@ -8,7 +8,6 @@ import database as db
 
 # Par le nouvel import du dossier segmenté :
 from onglets.direction_admin import afficher_onglet_direction
-from onglets.test_brut import afficher_onglet_test_brut
 from onglets.suivi_interne import afficher_onglet_suivi_interne
 from onglets.ajouter_chantier import afficher_onglet_ajouter
 from onglets.historique import afficher_onglet_historique
@@ -23,12 +22,11 @@ types_engins = db.charger_types_engins_bruts()
 catalogue_chantiers = db.charger_catalogue_chantiers()
 
 # 2. AJOUTER "👥 Suivi Interne" DANS LA LISTE DES TABS :
-onglet1, onglet2, onglet3, onglet4, onglet5 = st.tabs([
+onglet1, onglet2, onglet3, onglet4 = st.tabs([
     "➕ Ajouter un Chantier", 
     "📊 Historique & Classement", 
     "👥 Suivi Interne Coop",
     "🔒 Espace Direction",
-    "🚨 DIAGNOSTIC BRUT" # <-- AJOUT DE CET ONGLET
 ])
 
 with onglet1:
@@ -43,6 +41,3 @@ with onglet3:
 
 with onglet4:
     afficher_onglet_direction(config_salaires, config_materiaux)
-
-with onglet5:
-    afficher_onglet_test_brut() 
