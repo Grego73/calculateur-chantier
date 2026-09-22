@@ -59,9 +59,17 @@ def afficher_tab_distribution(nom_coop_active, joueur_actif, niveau_actuel, list
 
     coop_snap = db.db.collection("cooperatives").document(nom_coop_active).get().to_dict() or {}
     
-    # Nettoyage et capitalisation uniforme des listes système de Firebase
-    membres_inscrits = [str(m).strip().capitalize() for m in coop_snap.get("membres", [joueur_actif])]
-    
+    # 🎯 FILTRAGE ET CORRECTION DES MEMBRES INSCRITS
+    membres_bruts = coop_snap.get("membres", [joueur_actif])
+    membres_inscrits = []
+    for m in membres_bruts:
+        m_clean = str(m).strip().capitalize()
+        # Si la faute de frappe est détectée dans la liste de l'équipe, on l'ignore ou la corrige
+        if m_clean in ["Grgo73", "Grrgo73"]:
+            continue  # On l'empêche de créer une ligne de tableau fantôme
+        if m_clean not in membres_inscrits:
+            membres_inscrits.append(m_clean)
+            
     dict_capitaux = {}
     for doc in db.db.collection("cooperatives").document(nom_coop_active).collection("capital_initial").stream():
         d_cap = doc.to_dict()
