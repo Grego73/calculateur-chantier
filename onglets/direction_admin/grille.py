@@ -3,6 +3,7 @@ import streamlit as st
 import pandas as pd
 import database as db
 import math
+import re
 
 def afficher_onglet_salaires(SALAIRES_DB):
     st.markdown("### 👥 Calculateur de Grille Salariale active")
@@ -12,7 +13,7 @@ def afficher_onglet_salaires(SALAIRES_DB):
     with c_admin_poste: 
         metier_cible = st.selectbox("Poste à analyser :", ["Conducteur", "Chef", "Ouvrier"])
     with c_admin_contrat: 
-        type_contrat_cible = st.selectbox("Type de contrat :", ["CDI (Salaire mensuel)", "CDD (Salary par jour)"])
+        type_contrat_cible = st.selectbox("Type de contrat :", ["CDI (Salaire mensuel)", "CDD (Salaire par jour)"])
     
     # 2. Formulaire d'injection et sauvegarde automatique
     with st.form("form_grille_salariale_cloud"):
@@ -30,36 +31,39 @@ def afficher_onglet_salaires(SALAIRES_DB):
                         if not l_clean:
                             continue
                         
-                        # Découpage basique de la ligne (Ex: Mathilde 44 ans 1 716 € Engager)
-                        # Extraction du nom (premier mot) et du tarif (les chiffres avant le €)
-                        mots = l_clean.split()
-                        if len(mots) >= 3:
-                            pseudo_brut = mots[0].strip().capitalize()
-                            
-                            # 🎯 SÉCURITÉ ANTI-DOUBLON : Nettoyage des fautes d'orthographe à la volée
-                            if pseudo_brut in ["Grgo73", "Grrgo73", "Grego"]:
-                                pseudo_brut = "Grego73"
-                                
-                            # Extraction du tarif numérique
-                            chiffres_prix = "".join(c for c in l_clean if c.isdigit() and c not in mots[1]) # évite l'âge
-                            # Extraction secondaire si l'âge pollue la chaîne
-                            try:
-                                prix_txt = [m for m in mots if "€" in m or m.isdigit()][-2 if "€" in mots[-1] else -1]
-                                prix_val = float("".join(c for c in prix_txt if c.isdigit()))
-                            except Exception:
-                                prix_val = 1716.0 # Valeur par défaut constatée sur votre capture
-                            
-                            # Clé technique NoSQL pour la table des configurations salariales
-                            cle_document_nosql = f"{pseudo_brut} ({metier_cible})"
-                            
-                            # Écriture directe dans Firebase Firestore
-                            db.db.collection("configuration_salaires").document(cle_document_nosql).set({
-                                "nom_recrue": pseudo_brut,
-                                "poste": metier_cible,
-                                "contrat": type_contrat_cible,
-                                "tarif_unitaire": float(prix_val)
-                            })
-                            compteur_recrues += 1
+                        # 🎯 EXTRACTION SÉCURISÉE PAR REGEX (Gère les espaces et le symbole €)
+                        # Capture le premier mot pour le prénom, ignore l'âge et capture le salaire
+                        match_recrue = re.search(r"^([a-zA-Z0-9_\-]+)\s+\d+\s+ans\s+([\d\s]+)\s*€", l_clean, re.IGNORECASE)
+                        
+                        if match_recrue:
+                            pseudo_brut = str(match_recrue.group(1)).strip().capitalize()
+                            prix_txt = "".join(c for c in match_recrue.group(2) if c.isdigit())
+                            prix_val = float(prix_txt) if prix_txt else 1716.0
+                        else:
+                            # Découpage de secours si le format est différent (ex: sans l'âge)
+                            mots = l_clean.split()
+                            if len(mots) >= 2:
+                                pseudo_brut = str(mots[0]).strip().capitalize()
+                                chiffres_prix = "".join(c for c in l_clean if c.isdigit())
+                                prix_val = float(chiffres_prix) if chiffres_prix else 1716.0
+                            else:
+                                continue
+                        
+                        # 🎯 SÉCURITÉ ANTI-DOUBLON : Nettoyage des fautes d'orthographe à la volée
+                        if pseudo_brut in ["Grgo73", "Grrgo73", "Grego"]:
+                            pseudo_brut = "Grego73"
+                        
+                        # Clé technique NoSQL pour la table des configurations salariales
+                        cle_document_nosql = f"{pseudo_brut} ({metier_cible})"
+                        
+                        # Écriture directe dans Firebase Firestore
+                        db.db.collection("configuration_salaires").document(cle_document_nosql).set({
+                            "nom_recrue": pseudo_brut,
+                            "poste": metier_cible,
+                            "contrat": type_contrat_cible,
+                            "tarif_unitaire": float(prix_val)
+                        })
+                        compteur_recrues += 1
                 
                 st.cache_data.clear()
                 st.success(f"🟢 Configuration validée ! {compteur_recrues} recrue(s) synchronisée(s) sur Firebase.")
@@ -110,7 +114,6 @@ def afficher_onglet_salaires(SALAIRES_DB):
             st.info("💡 Aucun profil salarial personnalisé n'est enregistré dans Firestore.")
             
     except Exception as e:
-        # Rétrocompatibilité avec votre ancien dictionnaire si Firestore est indisponible
         if SALAIRES_DB:
             lignes_secours = [{"Clé technique NoSQL": k, "Tarif (€/j)": v} for k, v in SALAIRES_DB.items()]
             st.dataframe(pd.DataFrame(lignes_secours), use_container_width=True, hide_index=True)
@@ -133,4 +136,3 @@ def afficher_onglet_materiaux(MATERIAUX_DB):
     if st.button("✅ RE-SYNCHRONISER LES PRIX MATÉRIAUX", type="primary", width="stretch"):
         db.db.collection("configuration_materiaux").document("catalogue").set(form_mats)
         st.cache_data.clear(); st.toast("🧱 Prix synchronisés !"); st.rerun()
-
