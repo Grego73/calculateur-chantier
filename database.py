@@ -10,16 +10,22 @@ from google.oauth2 import service_account
 # ==============================================================================
 # --- 1. INITIALISATION DE LA CONNEXION UNIQUE CLOUD FIRESTORE ---
 # ==============================================================================
-# ==============================================================================
-# --- 1. INITIALISATION DE LA CONNEXION UNIQUE CLOUD FIRESTORE ---
-# ==============================================================================
 if "text_key" in st.secrets:
     import json
-    info_cles = json.loads(st.secrets["text_key"])
+    secret_raw = st.secrets["text_key"]
+    
+    # Si le secret est une chaîne de caractères (texte), on utilise json.loads
+    if isinstance(secret_raw, str):
+        info_cles = json.loads(secret_raw)
+    # Si Streamlit l'a déjà converti en dictionnaire/objet, on le convertit proprement
+    else:
+        info_cles = dict(secret_raw)
+        
     creds = service_account.Credentials.from_service_account_info(info_cles)
     db = firestore.Client(project="calculateur-chantier-dc921", credentials=creds)
 else:
     db = firestore.Client(project="calculateur-chantier-dc921")
+
 
 # Fuseau horaire de référence pour l'application
 TZ_PARIS = pytz.timezone('Europe/Paris')
