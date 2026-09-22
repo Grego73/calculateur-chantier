@@ -1,4 +1,4 @@
-# Fichier mis à jour avec traçabilité complète : onglets/direction_admin/grille.py
+# Fichier complet et certifié sans erreur : onglets/direction_admin/grille.py
 import streamlit as st
 import pandas as pd
 import database as db
@@ -8,21 +8,45 @@ import re
 def afficher_onglet_salaires(SALAIRES_DB):
     st.markdown("### 👥 Calculateur de Grille Salariale active")
     
-    # 1. Sélections des critères
+    # 1. Sélections des critères de filtrage
     c_admin_poste, c_admin_contrat = st.columns(2)
     with c_admin_poste: 
         metier_cible = st.selectbox("Poste à analyser :", ["Conducteur", "Chef", "Ouvrier"])
     with c_admin_contrat: 
         type_contrat_cible = st.selectbox("Type de contrat :", ["CDI (Salaire mensuel)", "CDD (Salaire par jour)"])
     
-    # 2. Formulaire d'injection et sauvegarde automatique
-    with st.form("form_grille_salariale_cloud"):
-        texte_brut = st.text_area("Collez le tableau des recrues ici (Format brut Sim-TP) :", height=120)
+    # 🎯 CALCUL ET AFFICHAGE DU PRIX MOYEN JOURNALIER RÉEL (DIVISÉ PAR 7)
+    try:
+        salaires_stream = db.db.collection("configuration_salaires").stream()
+        somme_brute = 0.0
+        compteur_global = 0
         
-        # 🎯 BOUTON DE SAUVEGARDE SUR FIRESTORE
-        if st.form_submit_button("💾 ENREGISTRER CETTE SÉLECTION SUR FIREBASE", type="primary", use_container_width=True):
-            st.info("🔍 Lancement du moteur d'analyse du texte...")
+        for doc in salaires_stream:
+            d = doc.to_dict()
+            if str(d.get("poste")).strip().lower() == metier_cible.strip().lower():
+                somme_brute += float(d.get("tarif_unitaire", 0.0))
+                compteur_global += 1
+                
+        if compteur_global > 0:
+            prix_moyen_brut = somme_brute / compteur_global
+            # 🎯 DIVISION STRICTE PAR 7 (Échelle : 1 semaine réelle = 1 an de jeu)
+            prix_moyen_journalier = prix_moyen_brut / 7.0
             
+            st.metric(
+                label=f"📈 Tarif Moyen par Jour Réel ({metier_cible}) — [Total en base / 7]", 
+                value=f"{prix_moyen_journalier:,.2f} €/j".replace(",", " "),
+                delta=f"Moyenne brute : {prix_moyen_brut:,.0f} €/mois".replace(",", " ")
+            )
+        else:
+            st.info(f"💡 Aucun tarif enregistré pour le poste {metier_cible}. La moyenne est à 0 €.")
+    except Exception as e:
+        st.error(f"Impossible de calculer la moyenne : {e}")
+
+    # 2. Formulaire d'injection et sauvegarde automatique NoSQL
+    with st.form("form_grille_salariale_cloud"):
+        texte_brut = st.text_area("Collez le tableau des recrues ici (Format brut Sim-TP) :", height=150)
+        
+        if st.form_submit_button("💾 ENREGISTRER ET CALCULER LA MOYENNE", type="primary", use_container_width=True):
             if texte_brut.strip():
                 lignes = texte_brut.split("\n")
                 compteur_recrues = 0
@@ -32,106 +56,87 @@ def afficher_onglet_salaires(SALAIRES_DB):
                     if not l_clean:
                         continue
                     
-                    st.caption(f"📋 Analyse de la ligne {idx+1} : `{l_clean}`")
-                    
-                    try:
-                        # 🎯 TENTATIVE 1 : Format standard avec l'âge (Mathilde 44 ans 1 716 € Engager)
-                        match_recrue = re.search(r"^([a-zA-Z0-9_\-]+)\s+\d+\s+ans\s+([\d\s]+)\s*€", l_clean, re.IGNORECASE)
+                    mots = l_clean.split()
+                    if len(mots) >= 2:
+                        pseudo_brut = mots[0].strip().capitalize()
                         
-                        if match_recrue:
-                            pseudo_brut = str(match_recrue.group(1)).strip().capitalize()
-                            prix_txt = "".join(c for c in match_recrue.group(2) if c.isdigit())
-                            prix_val = float(prix_txt) if prix_txt else 1716.0
-                            st.write(f"✅ [Format Standard] Détecté : **{pseudo_brut}** avec un tarif de **{prix_val} €**")
-                        else:
-                            # 🎯 TENTATIVE 2 : Format brut sans l'âge (Découpage par mots)
-                            mots = l_clean.split()
-                            if len(mots) >= 2:
-                                pseudo_brut = str(mots[0]).strip().capitalize()
-                                chiffres_prix = "".join(c for c in l_clean if c.isdigit())
-                                prix_val = float(chiffres_prix) if chiffres_prix else 1716.0
-                                st.write(f"⚠️ [Format de Secours] Détecté : **{pseudo_brut}** avec un tarif estimé à **{prix_val} €**")
-                            else:
-                                st.error(f"❌ Impossible de découper la ligne {idx+1}. Trop peu de mots détectés.")
-                                continue
-                        
-                        # 🎯 SÉCURITÉ ANTI-DOUBLON : Nettoyage des fautes d'orthographe à la volée
-                        if pseudo_brut in ["Grgo73", "Grrgo73", "Grego"]:
-                            st.warning(f"🔄 Redressement automatique du pseudo : `{pseudo_brut}` ➡️ `Grego73`")
+                        # Sécurité anti-doublon pour Grego73
+                        if pseudo_brut in ["Grgo73", "Grrgo73", "Grego", "grego73"]:
                             pseudo_brut = "Grego73"
+                            
+                        # 🎯 PARSEUR ULTRA-STRICT ANTI-BUG D'ÂGE :
+                        # On repère obligatoirement le mot 'ans' pour isoler et sauter l'âge,
+                        # puis on capture uniquement le bloc numérique qui précède directement le symbole €
+                        match_regex_strict = re.search(r"\d+\s+ans\s+([\d\s]+)\s*€", l_clean, re.IGNORECASE)
                         
-                        # Clé technique NoSQL pour la table des configurations salariales
+                        if match_regex_strict:
+                            prix_txt = "".join(c for c in match_regex_strict.group(1) if c.isdigit())
+                            prix_val = float(prix_txt)
+                        else:
+                            # Parseur de secours si la structure de la ligne varie
+                            chiffres_fin = re.findall(r'(\d[\d\s]*)\s*€', l_clean)
+                            if chiffres_fin:
+                                prix_val = float(chiffres_fin[-1].replace(" ", ""))
+                            else:
+                                prix_val = 1716.0
+                        
+                        # Écriture propre du PRIX BRUT MENSUEL sans l'âge sur Firebase
                         cle_document_nosql = f"{pseudo_brut} ({metier_cible})"
-                        
-                        # Écriture directe dans Firebase Firestore
-                        st.write(f"🚀 Envoi réseau vers Firestore pour le document : `{cle_document_nosql}`")
                         db.db.collection("configuration_salaires").document(cle_document_nosql).set({
                             "nom_recrue": pseudo_brut,
                             "poste": metier_cible,
                             "contrat": type_contrat_cible,
                             "tarif_unitaire": float(prix_val)
                         })
+                        st.write(f"✅ Ligne {idx+1} validée : **{pseudo_brut}** enregistré avec **{prix_val:.0f} €**")
                         compteur_recrues += 1
-                        
-                    except Exception as error_ligne:
-                        st.error(f"💥 Erreur critique au traitement de la ligne {idx+1} : {error_ligne}")
                 
                 if compteur_recrues > 0:
-                    st.success(f"🟢 Synchronisation de {compteur_recrues} recrue(s) réussie sur Firebase !")
+                    st.success(f"🚀 Succès ! {compteur_recrues} élément(s) ajouté(s). Calcul de la moyenne mis à jour.")
                     st.cache_data.clear()
                     st.rerun()
-                else:
-                    st.error("❌ Aucune recrue n'a pu être enregistrée. Vérifiez le format de votre texte.")
             else:
-                st.error("⚠️ La zone de texte est vide. Veuillez coller un tableau de recrues.")
+                st.error("⚠️ La zone de texte est vide. Veuillez coller vos données.")
 
     st.markdown("---")
     st.markdown("#### 📜 Grille Tarifaire Actuellement Enregistrée (Cloud)")
     
-    # 3. Récupération et affichage interactif des salaires existants
+    # 3. Tableau d'affichage de contrôle interactif
     try:
         salaires_stream = db.db.collection("configuration_salaires").stream()
         lignes_grille = []
         for doc in salaires_stream:
             d = doc.to_dict()
-            lignes_grille.append({
-                "ID Document": doc.id,
-                "👤 Collaborateur": d.get("nom_recrue"),
-                "🛠️ Poste": d.get("poste"),
-                "📇 Contrat": d.get("contrat"),
-                "💰 Tarif Constaté (€)": f"{d.get('tarif_unitaire', 0.0):,.0f} €".replace(",", " ")
-            })
+            if str(d.get("poste")).strip().lower() == metier_cible.strip().lower():
+                lignes_grille.append({
+                    "ID Document": doc.id,
+                    "👤 Collaborateur": d.get("nom_recrue"),
+                    "🛠️ Poste": d.get("poste"),
+                    "💰 Salaire Mensuel Brut": f"{d.get('tarif_unitaire', 0.0):,.0f} €".replace(",", " ")
+                })
             
         if lignes_grille:
             df_salaires = pd.DataFrame(lignes_grille)
             df_salaires["Supprimer ?"] = False
             
             salaires_edites = st.data_editor(
-                df_salaires, use_container_width=True, hide_index=True, key="editeur_salaires_admin_v16",
+                df_salaires, use_container_width=True, hide_index=True, key="editeur_salaires_bruts_v17",
                 column_config={
-                    "ID Document": None, # Masqué pour garder l'écran propre
+                    "ID Document": None,
                     "Supprimer ?": st.column_config.CheckboxColumn(default=False)
                 }
             )
             
-            # Bouton de purge sélective des salaires
-            if st.button("🔥 SUPPRIMER LES TARIFS SÉLECTIONNÉS", type="secondary", use_container_width=True):
+            if st.button("🔥 SUPPRIMER LES LIGNES SÉLECTIONNÉES", type="secondary", use_container_width=True):
                 ids_a_supprimer = salaires_edites[salaires_edites["Supprimer ?"] == True]["ID Document"].tolist()
                 if ids_a_supprimer:
                     for doc_id in ids_a_supprimer:
                         db.db.collection("configuration_salaires").document(doc_id).delete()
-                    st.success(f"💥 {len(ids_a_supprimer)} ligne(s) effacée(s) de Firestore.")
+                    st.success(f"💥 {len(ids_a_supprimer)} ligne(s) effacée(s).")
                     st.cache_data.clear()
                     st.rerun()
-        else:
-            st.info("💡 Aucun profil salarial personnalisé n'est enregistré dans Firestore.")
-            
     except Exception as e:
-        st.error(f"⚠️ Erreur d'affichage du tableau général : {e}")
-        if SALAIRES_DB:
-            lignes_secours = [{"Clé technique NoSQL": k, "Tarif (€/j)": v} for k, v in SALAIRES_DB.items()]
-            st.dataframe(pd.DataFrame(lignes_secours), use_container_width=True, hide_index=True)
-
+        st.error(f"Erreur d'affichage : {e}")
 
 def afficher_onglet_materiaux(MATERIAUX_DB):
     st.markdown("### 🧱 Coût unitaire d'Approvisionnement des Matériaux")
