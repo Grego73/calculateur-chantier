@@ -1,15 +1,14 @@
-# Fichier complet et certifié sans erreur : onglets/direction_admin/grille.py
+# Fichier 100% RH épuré : onglets/direction_admin/grille.py
 import streamlit as st
 import pandas as pd
 import database as db
-import math
 import re
 
 def afficher_onglet_salaires(SALAIRES_DB):
     st.markdown("### 📊 Observatoire & Grille Salariale active")
     
     # ==========================================================================
-    # 🎯 1. COMPILATION GLOBAL EN TEMPS RÉEL (MIN, MAX, MOYENNE)
+    # 🎯 1. COMPILATION GLOBALE EN TEMPS RÉEL (MIN, MAX, MOYENNE)
     # ==========================================================================
     try:
         salaires_stream = db.db.collection("configuration_salaires").stream()
@@ -85,30 +84,25 @@ def afficher_onglet_salaires(SALAIRES_DB):
                     if not l_clean:
                         continue
                     
-                    # Parseur : Extrait le prénom (premier mot)
                     mots = l_clean.split()
                     if len(mots) >= 2:
                         pseudo_brut = mots[0].strip().capitalize()
                         
-                        # Sécurité anti-doublon pour Grego73
                         if pseudo_brut in ["Grgo73", "Grrgo73", "Grego", "grego73"]:
                             pseudo_brut = "Grego73"
                             
-                        # Parseur Regex strict anti-bug d'âge
                         match_regex_strict = re.search(r"\d+\s+ans\s+([\d\s]+)\s*€", l_clean, re.IGNORECASE)
                         
                         if match_regex_strict:
                             prix_txt = "".join(c for c in match_regex_strict.group(1) if c.isdigit())
                             prix_val = float(prix_txt)
                         else:
-                            # Système de secours
                             chiffres_fin = re.findall(r'(\d[\d\s]*)\s*€', l_clean)
                             if chiffres_fin:
                                 prix_val = float(chiffres_fin[-1].replace(" ", ""))
                             else:
                                 prix_val = 1716.0
                         
-                        # Écriture propre du PRIX BRUT MENSUEL sans l'âge sur Firebase
                         cle_document_nosql = f"{pseudo_brut} ({metier_cible})"
                         db.db.collection("configuration_salaires").document(cle_document_nosql).set({
                             "nom_recrue": pseudo_brut,
@@ -152,7 +146,7 @@ def afficher_onglet_salaires(SALAIRES_DB):
             salaires_edites = st.data_editor(
                 df_salaires, use_container_width=True, hide_index=True, key="editeur_salaires_bruts_v18",
                 column_config={
-                    "ID Document": None,  # Masqué
+                    "ID Document": None,
                     "Supprimer ?": st.column_config.CheckboxColumn(default=False)
                 }
             )
@@ -167,21 +161,3 @@ def afficher_onglet_salaires(SALAIRES_DB):
                     st.rerun()
     except Exception as e:
         st.error(f"Erreur d'affichage de la table : {e}")
-
-def afficher_onglet_materiaux(MATERIAUX_DB):
-    st.markdown("### 🧱 Coût unitaire d'Approvisionnement des Matériaux")
-    form_mats = dict(MATERIAUX_DB)
-    col_m1, col_m2 = st.columns(2)
-    liste_cles = list(form_mats.keys())
-    milieu = math.ceil(len(liste_cles) / 2)
-    
-    with col_m1:
-        for m_k in liste_cles[:milieu]:
-            form_mats[m_k] = st.number_input(f"Prix {m_k} (€) :", value=float(form_mats[m_k]), step=1.0)
-    with col_m2:
-        for m_k in liste_cles[milieu:]:
-            form_mats[m_k] = st.number_input(f"Prix {m_k} (€) :", value=float(form_mats[m_k]), step=1.0)
-            
-    if st.button("✅ RE-SYNCHRONISER LES PRIX MATÉRIAUX", type="primary", width="stretch"):
-        db.db.collection("configuration_materiaux").document("catalogue").set(form_mats)
-        st.cache_data.clear(); st.toast("🧱 Prix synchronisés !"); st.rerun()
