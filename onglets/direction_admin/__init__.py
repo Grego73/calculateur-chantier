@@ -7,7 +7,7 @@ from .materiaux import afficher_onglet_materiaux  # <-- IMPORT CORRIGÉ ICI
 from .flotte import afficher_onglet_flotte
 from .tables import afficher_centre_controle
 from .outils import afficher_comparateur, afficher_quotas, afficher_journaux
-
+from .engins_jeu import afficher_onglet_catalogue_engins_total
 
 def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
     st.subheader("🔑 Connexion Administrateur Direction")
