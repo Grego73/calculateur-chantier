@@ -3,7 +3,7 @@ import streamlit as st
 import database as db
 
 # 🟢 CONFIGURATION DE TOUTES LES IMPORTATIONS INTERNES SÉPARÉES
-from onglets.suivi_interne.tab_distribution import afficher_tab_distribution
+from .tab_distribution import afficher_tab_distribution
 from onglets.suivi_interne.tab_marche import afficher_tab_marche
 from onglets.suivi_interne.tab_parseur import afficher_tab_parseur
 from onglets.suivi_interne.tab_gestion import afficher_tab_gestion
