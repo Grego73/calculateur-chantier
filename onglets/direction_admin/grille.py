@@ -1,4 +1,4 @@
-# Fichier mis à jour et persistant : onglets/direction_admin/grille.py
+# Fichier mis à jour avec traçabilité complète : onglets/direction_admin/grille.py
 import streamlit as st
 import pandas as pd
 import database as db
@@ -21,42 +21,50 @@ def afficher_onglet_salaires(SALAIRES_DB):
         
         # 🎯 BOUTON DE SAUVEGARDE SUR FIRESTORE
         if st.form_submit_button("💾 ENREGISTRER CETTE SÉLECTION SUR FIREBASE", type="primary", use_container_width=True):
+            st.info("🔍 Lancement du moteur d'analyse du texte...")
+            
             if texte_brut.strip():
                 lignes = texte_brut.split("\n")
                 compteur_recrues = 0
                 
-                with st.spinner("Enregistrement des tarifs RH sur le Cloud..."):
-                    for ligne in lignes:
-                        l_clean = ligne.strip()
-                        if not l_clean:
-                            continue
-                        
-                        # 🎯 EXTRACTION SÉCURISÉE PAR REGEX (Gère les espaces et le symbole €)
-                        # Capture le premier mot pour le prénom, ignore l'âge et capture le salaire
+                for idx, ligne in enumerate(lignes):
+                    l_clean = ligne.strip()
+                    if not l_clean:
+                        continue
+                    
+                    st.caption(f"📋 Analyse de la ligne {idx+1} : `{l_clean}`")
+                    
+                    try:
+                        # 🎯 TENTATIVE 1 : Format standard avec l'âge (Mathilde 44 ans 1 716 € Engager)
                         match_recrue = re.search(r"^([a-zA-Z0-9_\-]+)\s+\d+\s+ans\s+([\d\s]+)\s*€", l_clean, re.IGNORECASE)
                         
                         if match_recrue:
                             pseudo_brut = str(match_recrue.group(1)).strip().capitalize()
                             prix_txt = "".join(c for c in match_recrue.group(2) if c.isdigit())
                             prix_val = float(prix_txt) if prix_txt else 1716.0
+                            st.write(f"✅ [Format Standard] Détecté : **{pseudo_brut}** avec un tarif de **{prix_val} €**")
                         else:
-                            # Découpage de secours si le format est différent (ex: sans l'âge)
+                            # 🎯 TENTATIVE 2 : Format brut sans l'âge (Découpage par mots)
                             mots = l_clean.split()
                             if len(mots) >= 2:
                                 pseudo_brut = str(mots[0]).strip().capitalize()
                                 chiffres_prix = "".join(c for c in l_clean if c.isdigit())
                                 prix_val = float(chiffres_prix) if chiffres_prix else 1716.0
+                                st.write(f"⚠️ [Format de Secours] Détecté : **{pseudo_brut}** avec un tarif estimé à **{prix_val} €**")
                             else:
+                                st.error(f"❌ Impossible de découper la ligne {idx+1}. Trop peu de mots détectés.")
                                 continue
                         
                         # 🎯 SÉCURITÉ ANTI-DOUBLON : Nettoyage des fautes d'orthographe à la volée
                         if pseudo_brut in ["Grgo73", "Grrgo73", "Grego"]:
+                            st.warning(f"🔄 Redressement automatique du pseudo : `{pseudo_brut}` ➡️ `Grego73`")
                             pseudo_brut = "Grego73"
                         
                         # Clé technique NoSQL pour la table des configurations salariales
                         cle_document_nosql = f"{pseudo_brut} ({metier_cible})"
                         
                         # Écriture directe dans Firebase Firestore
+                        st.write(f"🚀 Envoi réseau vers Firestore pour le document : `{cle_document_nosql}`")
                         db.db.collection("configuration_salaires").document(cle_document_nosql).set({
                             "nom_recrue": pseudo_brut,
                             "poste": metier_cible,
@@ -64,11 +72,16 @@ def afficher_onglet_salaires(SALAIRES_DB):
                             "tarif_unitaire": float(prix_val)
                         })
                         compteur_recrues += 1
+                        
+                    except Exception as error_ligne:
+                        st.error(f"💥 Erreur critique au traitement de la ligne {idx+1} : {error_ligne}")
                 
-                st.cache_data.clear()
-                st.success(f"🟢 Configuration validée ! {compteur_recrues} recrue(s) synchronisée(s) sur Firebase.")
-                st.balloons()
-                st.rerun()
+                if compteur_recrues > 0:
+                    st.success(f"🟢 Synchronisation de {compteur_recrues} recrue(s) réussie sur Firebase !")
+                    st.cache_data.clear()
+                    st.rerun()
+                else:
+                    st.error("❌ Aucune recrue n'a pu être enregistrée. Vérifiez le format de votre texte.")
             else:
                 st.error("⚠️ La zone de texte est vide. Veuillez coller un tableau de recrues.")
 
@@ -114,6 +127,7 @@ def afficher_onglet_salaires(SALAIRES_DB):
             st.info("💡 Aucun profil salarial personnalisé n'est enregistré dans Firestore.")
             
     except Exception as e:
+        st.error(f"⚠️ Erreur d'affichage du tableau général : {e}")
         if SALAIRES_DB:
             lignes_secours = [{"Clé technique NoSQL": k, "Tarif (€/j)": v} for k, v in SALAIRES_DB.items()]
             st.dataframe(pd.DataFrame(lignes_secours), use_container_width=True, hide_index=True)
