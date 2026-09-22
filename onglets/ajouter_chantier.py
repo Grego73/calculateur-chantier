@@ -259,11 +259,35 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         with c_rh_ch: type_contrat_chef = st.selectbox("Contrat Chefs :", ["CDI", "CDD"], key="type_contrat_chef")
         with c_rh_ou: type_contrat_ouv = st.selectbox("Contrat Ouvriers :", ["CDI", "CDD"], key="type_contrat_ouv")
         
-        px_cond = float(SALAIRES_DB.get(f"Conducteur_{type_contrat_cond}_Moyen") or SALAIRES_DB.get(f"Conducteur_{type_contrat_cond}") or SALAIRES_DB.get("Conducteur") or 230.0)
-        px_chef = float(SALAIRES_DB.get(f"Chef_{type_contrat_chef}_Moyen") or SALAIRES_DB.get(f"Chef_{type_contrat_chef}") or SALAIRES_DB.get("Chef") or 230.0)
-        px_ouvrier = float(SALAIRES_DB.get(f"Ouvrier_{type_contrat_ouv}_Moyen") or SALAIRES_DB.get(f"Ouvrier_{type_contrat_ouv}") or SALAIRES_DB.get("Ouvrier") or 230.0)
+        # ==============================================================================
+        # 🎯 APPORT CORRECTIF : LIAISON DYNAMIQUE AVEC LA GRILLE DE SYNTHÈSE FIREBASE
+        # ==============================================================================
+        def extraire_tarif_jour_firebase(poste, contrat_affiche):
+            # Normalisation du nom pour correspondre aux clés Firebase : "CDI" -> "CDI (Salaire mensuel)"
+            type_contrat_nosql = "CDI (Salaire mensuel)" if contrat_affiche == "CDI" else "CDD (Salaire par jour)"
+            doc_id_synthese = f"{poste}_{type_contrat_nosql}"
+            
+            try:
+                # Lecture brute instantanée de l'agrégat sur Firebase
+                doc_snap = db.db.collection("synthese_grille_tarifaire").document(doc_id_synthese).get()
+                if doc_snap.exists:
+                    d_data = doc_snap.to_dict()
+                    # On extrait la valeur moyenne déjà convertie à la journée
+                    return float(d_data.get("prix_moyen_journalier_7", d_data.get("prix_moyen_mensuel", 230.0)))
+            except Exception:
+                pass
+            
+            # Valeurs de secours si la base est vide
+            secours = {"Conducteur": 250.0, "Chef": 300.0, "Ouvrier": 210.0}
+            return secours.get(poste, 200.0)
 
-        st.info(f"💰 Tarifs : 🕹️ Cond : {px_cond:.0f}€/j | 🧑‍💼 Chef : {px_chef:.0f}€/j | 👷 Ouv : {px_ouvrier:.0f}€/j")
+        # Extraction en temps réel selon les sélections des 3 menus déroulants
+        px_cond = extraire_tarif_jour_firebase("Conducteur", type_contrat_cond)
+        px_chef = extraire_tarif_jour_firebase("Chef", type_contrat_chef)
+        px_ouvrier = extraire_tarif_jour_firebase("Ouvrier", type_contrat_ouv)
+
+        st.info(f"💰 Tarifs : 🕹️ Cond : {px_cond:.2f}€/j | 🧑‍💼 Chef : {px_chef:.2f}€/j | 👷 Ouv : {px_ouvrier:.2f}€/j")
+
 
         st.markdown("**👥 Planification de la Durée Réelle (Par Étape) :**")
         df_rh_init = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "🕹️ Conducteurs", "🧑‍💼 Chefs", "👷 Ouvriers"])
