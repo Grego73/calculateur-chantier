@@ -14,22 +14,22 @@ if "text_key" in st.secrets:
     import json
     secret_raw = st.secrets["text_key"]
     
-    # 1. Extraction propre du dictionnaire
+    # 1. Extraction du dictionnaire selon la structure du secret
     if isinstance(secret_raw, str):
         info_cles = json.loads(secret_raw)
     else:
         info_cles = dict(secret_raw)
     
-    # 2. NETTOYAGE CRUCIAL DE LA CLÉ PRIVÉE (Répare les problèmes de copier-coller)
+    # 2. Nettoyage des antislashs pour la clé privée
     if "private_key" in info_cles:
         info_cles["private_key"] = info_cles["private_key"].replace("\\n", "\n")
         
     try:
         creds = service_account.Credentials.from_service_account_info(info_cles)
-        # 3. Ajout d'un timeout pour éviter le chargement infini
-        db = firestore.Client(project="calculateur-chantier-dc921", credentials=creds, client_options={"timeout": 10.0})
+        # Initialisation propre sans l'argument 'timeout' invalide
+        db = firestore.Client(project="calculateur-chantier-dc921", credentials=creds)
     except Exception as e:
-        st.error(f"❌ Erreur d'initialisation des identifiants Firebase : {e}")
+        st.error(f"❌ Erreur lors de l'application des identifiants : {e}")
         db = None
 else:
     db = firestore.Client(project="calculateur-chantier-dc921")
