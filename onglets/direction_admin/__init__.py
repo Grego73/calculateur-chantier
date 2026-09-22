@@ -1,11 +1,13 @@
-# Fichier complet et corrigé : onglets/direction_admin/__init__.py
+# À modifier en haut de onglets/direction_admin/__init__.py
 import streamlit as st
 import database as db
 from .blocs import afficher_onglet_blocs, afficher_onglet_doublons
-from .grille import afficher_onglet_salaires, afficher_onglet_materiaux
+from .grille import afficher_onglet_salaires
+from .materiaux import afficher_onglet_materiaux  # <-- IMPORT CORRIGÉ ICI
 from .flotte import afficher_onglet_flotte
 from .tables import afficher_centre_controle
 from .outils import afficher_comparateur, afficher_quotas, afficher_journaux
+
 
 def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
     st.subheader("🔑 Connexion Administrateur Direction")
