@@ -31,15 +31,15 @@ def afficher_onglet_salaires(SALAIRES_DB):
             
             st.markdown("#### 📋 Synthèse Générale du Marché du Travail (Enregistrée)")
             
-            # 🎯 BOUTON TOUT SÉLECTIONNER POUR SUPPRESSION
+            # Case globale Tout Sélectionner
             cocher_tout = st.checkbox("🔄 Tout sélectionner pour suppression", value=False, key="check_tout_synthese")
             df_synthese["Supprimer ?"] = cocher_tout
             
-            # Rendu du tableau d'édition
+            # Rendu du tableau d'édition interactif
             synthese_editee = st.data_editor(
                 df_synthese, use_container_width=True, hide_index=True, key="editeur_synthese_salaires_v20",
                 column_config={
-                    "ID Document": None,  # Caché
+                    "ID Document": None,  # Reste caché en arrière-plan
                     "📉 Prix Mini": st.column_config.NumberColumn(format="%.0f €"),
                     "📈 Prix Maxi": st.column_config.NumberColumn(format="%.0f €"),
                     "📊 Moyenne Brut": st.column_config.NumberColumn(format="%.2f €"),
@@ -80,7 +80,7 @@ def afficher_onglet_salaires(SALAIRES_DB):
         
         if st.form_submit_button("💾 ENREGISTRER DIRECTEMENT LES STATS (MIN, MAX, MOYENNE)", type="primary", use_container_width=True):
             if texte_brut.strip():
-                lignes = texte_brut.split("\n")
+                lignes = texte_brut.strip().split("\n")
                 liste_salaires_extraits = []
                 
                 for ligne in lignes:
@@ -88,20 +88,25 @@ def afficher_onglet_salaires(SALAIRES_DB):
                     if not l_clean or l_clean.lower().startswith("prénom") or "salaire" in l_clean.lower():
                         continue
                     
-                    # 🎯 REGEX INFAILLIBLE : Capture le prix juste avant le symbole € (ignore l'âge et le prénom)
                     match_salaire = re.search(r"([\d\s]+)\s*€", l_clean)
                     if match_salaire:
                         prix_val = float(match_salaire.group(1).replace(" ", ""))
                         liste_salaires_extraits.append(prix_val)
                 
-                # S'il y a des salaires valides, on fait le calcul direct
                 if liste_salaires_extraits:
                     p_min = float(min(liste_salaires_extraits))
                     p_max = float(max(liste_salaires_extraits))
                     p_moyen = float(sum(liste_salaires_extraits) / len(liste_salaires_extraits))
-                    p_moyen_jour_reel = p_moyen / 7.0
                     
-                    # 💾 UNIQUE ÉCRITURE SUR FIREBASE (Pas de liste de recrues individuelles !)
+                    # 🎯 LOGIQUE RECTIFIÉE :
+                    # Si c'est un CDI (mensuel), on divise par 7 pour obtenir le prix/jour de la semaine
+                    if "cdi" in type_contrat_cible.lower():
+                        p_moyen_jour_reel = p_moyen / 7.0
+                    # Si c'est un CDD (tarif jour), on le garde tel quel
+                    else:
+                        p_moyen_jour_reel = p_moyen
+                    
+                    # UNIQUE ÉCRITURE SUR FIREBASE
                     cle_synthese_coop = f"{metier_cible}_{type_contrat_cible}"
                     db.db.collection("synthese_grille_tarifaire").document(cle_synthese_coop).set({
                         "poste": metier_cible,
@@ -112,7 +117,7 @@ def afficher_onglet_salaires(SALAIRES_DB):
                         "prix_moyen_journalier_7": p_moyen_jour_reel
                     })
                     
-                    st.success(f"🎰 Agrégats sauvegardés pour {metier_cible} ! Min: {p_min:.0f}€ | Max: {p_max:.0f}€ | Moy/7: {p_moyen_jour_reel:.2f}€")
+                    st.success(f"🎰 Agrégats sauvegardés pour {metier_cible} ! Min: {p_min:.0f}€ | Max: {p_max:.0f}€ | Coût Jour Réel: {p_moyen_jour_reel:.2f}€/j")
                     st.cache_data.clear()
                     st.rerun()
                 else:
