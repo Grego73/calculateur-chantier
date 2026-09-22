@@ -305,24 +305,59 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         )
 
         st.markdown("### --- FLOTTE D'ENGINS PAR ÉTAPE ---")
-        df_besoins_init = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "Type d'engin requis", "Niveau requis", "À louer ?"])
+        df_besoins_init = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "Type d'engin requis", "Niveau requis", "À louer ?", "❌ Supprimer la ligne"])
         raw_engins_state = st.session_state.get("cache_df_engins", df_besoins_init)
 
-        engins_necessaires = st.data_editor(
-            raw_engins_state, 
-            num_rows="dynamic", 
-            width="stretch", 
-            key=f"editor_engins_data_{idx_refresh}", 
+        # Extraction dynamique et triée de tous les types d'engins uniques enregistrés dans votre catalogue Firebase
+        liste_engins_dropdown = []
+        if CATALOGUE_ENGINS:
+            # On nettoie les clés du catalogue pour extraire uniquement la catégorie brute (ex: "Pelle N1" -> "Pelle")
+            for k in CATALOGUE_ENGINS.keys():
+                engin_propre = str(k).split("(")[0].strip()
+                # Optionnel : si vos clés contiennent des niveaux à la fin
+                for lvl in ["n1", "n2", "n3", "n4", "N1", "N2", "N3", "N4"]:
+                    engin_propre = engin_propre.replace(lvl, "").strip()
+                if engin_propre and engin_propre not in liste_engins_dropdown:
+                    liste_engins_dropdown.append(engin_propre)
+        
+        # Secours si le catalogue est momentanément inaccessible
+        if not liste_engins_dropdown:
+            liste_engins_dropdown = ["Dumper", "Camion", "Pelle", "Bulldozer", "Grue", "Niveleuse", "Compacteur"]
+        liste_engins_dropdown = sorted(list(set(liste_engins_dropdown)))
+
+        # S'assurer que la colonne de suppression existe dans le DataFrame chargé en cache
+        if "❌ Supprimer la ligne" not in raw_engins_state.columns:
+            raw_engins_state["❌ Supprimer la ligne"] = False
+
+        # Affichage de l'éditeur avec menu déroulant et colonne de suppression personnalisée
+        engins_necessaires_editeur = st.data_editor(
+            raw_engins_state, num_rows="dynamic", width="stretch", key=f"editor_engins_data_{idx_refresh}", 
             column_config={
                 "N° Étape": st.column_config.NumberColumn("N° Étape", min_value=1, step=1, required=True, width="small"),
                 "Durée Étape (jours)": st.column_config.NumberColumn("Durée Réelle (j)", min_value=1, step=1, required=True, disabled=True),
-                "Type d'engin requis": st.column_config.TextColumn("Type d'engin requis", disabled=False),
+                # 🎯 1. PASSAGE EN MENU DÉROULANT DES ENGINS DE LA BASE
+                "Type d'engin requis": st.column_config.SelectboxColumn("Type d'engin requis", options=liste_engins_dropdown, required=True),
                 "Niveau requis": st.column_config.SelectboxColumn("Niveau requis", options=["N1", "N2", "N3", "N4"], required=True),
-                "À louer ?": st.column_config.CheckboxColumn("À louer ?", default=False)
+                "À louer ?": st.column_config.CheckboxColumn("À louer ?", default=False),
+                # 🎯 2. AJOUT DE LA CASE À COCHER DE SUPPRESSION SUR MESURE
+                "❌ Supprimer la ligne": st.column_config.CheckboxColumn("❌ Supprimer la ligne", default=False)
             }
         )
 
+        # 🎯 3. FILTRAGE ET SUPPRESSION AUTOMATIQUE DES LIGNES COCHÉES
+        engins_necessaires = pd.DataFrame(columns=df_besoins_init.columns)
+        if engins_necessaires_editeur is not None and not engins_necessaires_editeur.empty:
+            # On ne garde que les lignes où la case de suppression n'est PAS cochée
+            engins_necessaires = engins_necessaires_editeur[engins_necessaires_editeur["❌ Supprimer la ligne"] != True].copy()
+            
+            # Si des lignes ont été supprimées par l'utilisateur via la coche, on met à jour le cache de session
+            if len(engins_necessaires) != len(engins_necessaires_editeur):
+                st.session_state["cache_df_engins"] = engins_necessaires.reset_index(drop=True)
+                st.rerun()
+
+        # Suite de la logique pour la constitution de la liste des engins transférés...
         engins_transferes_list = []
+        
         if engins_necessaires is not None and not engins_necessaires.empty and "À louer ?" in engins_necessaires.columns:
             df_coches = engins_necessaires[engins_necessaires["À louer ?"] == True].dropna(subset=["Type d'engin requis"])
             for _, row in df_coches.iterrows():
