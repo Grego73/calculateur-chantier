@@ -308,7 +308,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         df_besoins_init = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "Type d'engin requis", "Niveau requis", "À louer ?", "❌ Supprimer la ligne"])
         raw_engins_state = st.session_state.get("cache_df_engins", df_besoins_init)
 
-        # 🎯 1. EXTRACTION DE LA LISTE DÉROULANTE DEPUIS LA NOUVELLE BASE DE DONNÉES
+        # 🎯 1. EXTRACTION STRICTE DE LA LISTE DE LA BASE DE DONNÉES (POUR LE MENU DÉROULANT)
         liste_engins_dropdown = []
         dict_prix_location_direct = {}
         try:
@@ -317,7 +317,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                 d = doc.to_dict()
                 nom_brut = str(d.get("nom_brut")).strip()
                 liste_engins_dropdown.append(nom_brut)
-                # On stocke le prix lié au couple Engin + Niveau
+                # Utilisation du séparateur "_" pour correspondre scrupuleusement au catalogue
                 dict_prix_location_direct[f"{nom_brut}_{d.get('niveau')}"] = float(d.get("prix_location_jour", 380.0))
         except Exception:
             pass
@@ -326,13 +326,13 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
             liste_engins_dropdown = ["Camion", "Pelle", "Dumper", "Bulldozer"]
         liste_engins_dropdown = sorted(list(set(liste_engins_dropdown)))
 
-        # 🎯 2. RECALCUL AUTOMATIQUE DE LA DURÉE RÉELLE POUR ÉVITER LE BUG "NONE"
+        # 🎯 2. RECUPÉRATION AUTOMATIQUE ET CALCUL DE LA DURÉE RÉELLE
         if tableau_employes_etapes is not None and not tableau_employes_etapes.empty:
             df_rh_mapping = tableau_employes_etapes.dropna(subset=["N° Étape"])
-            # Création d'un dictionnaire de correspondance : N° Étape -> Durée Étape
+            # Mapping dynamique : Numéro Étape -> Durée Étape (jours)
             map_durees = dict(zip(df_rh_mapping["N° Étape"].astype(int), df_rh_mapping["Durée Étape (jours)"].astype(float)))
             
-            # On applique dynamiquement la durée de l'étape correspondante dans le tableau des engins
+            # Injection de la durée correspondante dans le tableau de la flotte
             if not raw_engins_state.empty:
                 for idx_row, row_eng in raw_engins_state.iterrows():
                     try:
@@ -345,7 +345,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         if "❌ Supprimer la ligne" not in raw_engins_state.columns:
             raw_engins_state["❌ Supprimer la ligne"] = False
 
-        # Affichage de l'éditeur interactif
+        # Affichage de l'éditeur d'engins par étape
         engins_necessaires_editeur = st.data_editor(
             raw_engins_state, num_rows="dynamic", width="stretch", key=f"editor_engins_data_{idx_refresh}", 
             column_config={
@@ -358,7 +358,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
             }
         )
 
-        # Filtrage de la suppression sélective par case à cocher
+        # Filtrage et suppression automatique par case à cocher
         engins_necessaires = pd.DataFrame(columns=df_besoins_init.columns)
         if engins_necessaires_editeur is not None and not engins_necessaires_editeur.empty:
             engins_necessaires = engins_necessaires_editeur[engins_necessaires_editeur["❌ Supprimer la ligne"] != True].copy()
@@ -366,24 +366,20 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                 st.session_state["cache_df_engins"] = engins_necessaires.reset_index(drop=True)
                 st.rerun()
 
-
         # ==============================================================================
-        # 🎯 SÉCURISATION DÉFINITIVE : RELEVÉ STRICT LIÉ AU MENU DÉROULANT NO-BUG
+        # 🎯 3. RELEVÉ STRICT VERROUILLÉ ET LIÉ AU CATALOGUE SANS FAUTE DE FRAPPE
         # ==============================================================================
         engins_transferes_list = []
         if engins_necessaires_editeur is not None and not engins_necessaires_editeur.empty and "À louer ?" in engins_necessaires_editeur.columns:
-            # Filtrage des engins cochés "À louer ?" par l'utilisateur
             df_loues = engins_necessaires_editeur[engins_necessaires_editeur["À louer ?"] == True].dropna(subset=["Type d'engin requis"])
             
             for _, row in df_loues.iterrows():
                 engin_nom = str(row["Type d'engin requis"]).strip()
                 engin_niveau = str(row["Niveau requis"]).strip()
-                duree_location = float(row["Durée Étape (jours)"])
+                duree_location = float(row["Durée Étape (jours)"]) if not pd.isna(row["Durée Étape (jours)"]) else 1.0
                 
-                # Comme l'utilisateur utilise le menu déroulant, cette clé est TOUJOURS 100% identique au catalogue
+                # Clé unifiée avec le séparateur "_" pour une liaison à 100% avec le dictionnaire
                 cle_recherche_catalogue = f"{engin_nom}_{engin_niveau}"
-                
-                # Récupération immédiate du tarif fixé en base par l'admin (Secours à 380€ si non trouvé)
                 prix_journalier_base = dict_prix_location_direct.get(cle_recherche_catalogue, 380.0)
                 
                 engins_transferes_list.append({
@@ -398,7 +394,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         if len(engins_transferes_list) > 0: 
             df_engins_init = pd.DataFrame(engins_transferes_list)
         
-        # Rendu du tableau logistique totalement verrouillé contre les fautes de frappe
+        # Rendu du tableau logistique final sécurisé
         engins_edites = st.data_editor(
             df_engins_init, num_rows="dynamic", width="stretch", key=f"table_engins_a_louer_{idx_refresh}",
             column_config={
