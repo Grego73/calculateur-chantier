@@ -308,29 +308,29 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         df_besoins_init = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "Type d'engin requis", "Niveau requis", "À louer ?", "❌ Supprimer la ligne"])
         raw_engins_state = st.session_state.get("cache_df_engins", df_besoins_init)
 
-        # 🎯 1. EXTRACTION ET NETTOYAGE STRICT DE LA LISTE DEPUIS FIREBASE
+        # 🎯 EXTRACTION SÉCURISÉE DE TOUS LES ENGINS ENREGISTRÉS DANS LE CATALOGUE
         liste_engins_dropdown = []
         dict_prix_location_direct = {}
         try:
             engins_base = db.db.collection("configuration_engins").stream()
             for doc in engins_base:
                 d = doc.to_dict()
-                nom_brut = str(d.get("nom_brut", "")).strip()
+                
+                # 🎯 MODIFICATION ICI : On utilise directement l'ID du document ou le "nom_brut" s'il contient le pluriel
+                nom_brut = str(d.get("nom_brut", doc.id)).strip()
                 niveau_brut = str(d.get("niveau", "N1")).strip()
                 
-                # On n'ajoute que les noms valides et non vides
                 if nom_brut and nom_brut != "None":
                     liste_engins_dropdown.append(nom_brut)
                     dict_prix_location_direct[f"{nom_brut}_{niveau_brut}"] = float(d.get("prix_location_jour", 380.0))
         except Exception:
             pass
 
-        # Sécurité : Si Firebase ne renvoie rien, on met des valeurs propres par défaut
         if not liste_engins_dropdown:
-            liste_engins_dropdown = ["Camion", "Pelle", "Dumper", "Bulldozer", "Chargeur"]
+            liste_engins_dropdown = ["Camions Benne", "Pelleteuses", "Camion Béton Malaxeur", "Chargeur Télescopique"]
             
-        # Tri et suppression définitive des doublons ou valeurs corrompues
         liste_engins_dropdown = sorted(list(set([str(x) for x in liste_engins_dropdown if x])))
+
 
         # 🎯 2. SÉCURISATION DU DATAFRAME POUR L'ÉDITEUR (ÉVITE LES CELLULES BLANCHES)
         if "Type d'engin requis" in raw_engins_state.columns:
