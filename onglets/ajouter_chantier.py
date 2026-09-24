@@ -376,6 +376,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                 # 🎯 Recherche intelligente sur le niveau sans toucher au texte
                 paliers = ["N1", "N2", "N3", "N4"]
                 prix_journalier_cloud = 380.0
+                niveau_final_applique = engin_niveau
                 
                 try:
                     idx_depart = paliers.index(engin_niveau)
@@ -391,17 +392,24 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                         doc_snap = db.db.collection("engins").document(id_doc_firebase).get()
                         if doc_snap.exists:
                             prix_journalier_cloud = float(doc_snap.to_dict().get("tarif_location_jour", 380.0))
+                            niveau_final_applique = niveau_test
                             break # On a trouvé le premier niveau disponible au-dessus, on s'arrête
                     except Exception:
                         pass
-
+                
+                # 🎯 TEXTE D'ALERTE DYNAMIQUE : Si le niveau appliqué est supérieur au niveau requis
+                if niveau_final_applique != engin_niveau:
+                    label_affichage = f"🚜 {engin_nom} ({engin_niveau}) ⚠️ Indisponible ➡️ {niveau_final_applique} tarifé"
+                else:
+                    label_affichage = f"🚜 {engin_nom} ({engin_niveau})"
                 
                 engins_transferes_list.append({
-                    "engin_modele": f"🚜 {engin_nom} ({engin_niveau})", 
+                    "engin_modele": label_affichage, 
                     "Quantité": 1, 
                     "Prix Location (€/jour)": prix_journalier_cloud, 
                     "Jours de Location (Réels)": duree_location
                 })
+
                 
         st.markdown("### --- RELEVÉ LOGISTIQUE DES ENGINS À LOUER ---")
         df_engins_init = pd.DataFrame(columns=["engin_modele", "Quantité", "Prix Location (€/jour)", "Jours de Location (Réels)"])
