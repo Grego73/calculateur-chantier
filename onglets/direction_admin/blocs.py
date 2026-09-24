@@ -178,7 +178,7 @@ def afficher_onglet_blocs():
                     continue
 
                 # 🎯 6. EXTRACTION CORRIGÉE ET SÉCURISÉE AU SINGULIER AVEC MAJUSCULE EN PREMIER
-                if "requis" in l_clean.lower() or "necessite" in db_module.normaliser_texte(l_clean):
+                if "requis" in l_clean.lower() or "necessite" in l_clean.lower().replace("é", "e"):
                     ligne_brute_clean = l_clean.lower().replace("é", "e").replace("è", "e").replace("à", "a")
                     cat_engin = None
                     
