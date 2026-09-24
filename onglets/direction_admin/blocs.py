@@ -177,22 +177,22 @@ def afficher_onglet_blocs():
                                     target_etape["materiaux"][mat_nom] = qte_val
                     continue
 
-                # Extraction automatique des Engins demandés
+                # 🎯 6. EXTRACTION ET FORMATAGE STRICT AU SINGULIER ET PREMIÈRE LETTRE EN MAJUSCULE
                 if "requis :" in l_clean.lower() or "necessite :" in l_clean.lower():
                     ligne_brute_clean = l_clean.lower().replace("é", "e").replace("è", "e").replace("à", "a")
                     cat_engin = None
                     
-                    if "camion benne" in ligne_brute_clean: cat_engin = "Camions Benne"
+                    if "camion benne" in ligne_brute_clean: cat_engin = "Camion benne"
                     elif "niveleuse" in ligne_brute_clean: cat_engin = "Niveleuse"
                     elif "finisseur" in ligne_brute_clean: cat_engin = "Finisseur"
-                    elif "compacteur pour enrobe" in ligne_brute_clean: cat_engin = "Compacteur pour enrobé"
-                    elif "compacteur de sol" in ligne_brute_clean or "compacteur" in ligne_brute_clean: cat_engin = "Compacteurs de Sol"
+                    elif "compacteur pour enrobe" in ligne_brute_clean: cat_engin = "Compacteur d'enrobé"
+                    elif "compacteur de sol" in ligne_brute_clean or "compacteur" in ligne_brute_clean: cat_engin = "Compacteur de sol"
                     elif "fraiseuse" in ligne_brute_clean: cat_engin = "Fraiseuse"
-                    elif "chargeuse compacte" in ligne_brute_clean: cat_engin = "Chargeuse Compacte"
+                    elif "chargeuse compacte" in ligne_brute_clean: cat_engin = "Chargeuse compacte"
                     elif "chargeuse" in ligne_brute_clean: cat_engin = "Chargeuse"
-                    elif "pelleteuse" in ligne_brute_clean or "pelle" in ligne_brute_clean: cat_engin = "Pelleteuses"
-                    elif "malaxeur" in ligne_brute_clean or "camion beton" in ligne_brute_clean: cat_engin = "Camion Béton Malaxeur"
-                    elif "telescopique" in ligne_brute_clean: cat_engin = "Chargeur Téléscopique"
+                    elif "pelleteuse" in ligne_brute_clean or "pelle" in ligne_brute_clean: cat_engin = "Pelleteuse"
+                    elif "malaxeur" in ligne_brute_clean or "camion beton" in ligne_brute_clean: cat_engin = "Camion malaxeur"
+                    elif "telescopique" in ligne_brute_clean: cat_engin = "Chargeur téléscopique"
 
                     if cat_engin:
                         match_niv = re.search(r'niveau\s*(\d+)', ligne_brute_clean)
@@ -207,11 +207,9 @@ def afficher_onglet_blocs():
             st.markdown("### 📊 Rapport de Planification & Consolidation NoSQL en Bloc")
             
             for k_ch, data in chantiers_detectes.items():
-                # Calculateur de consolidation financière basé sur le temps réel de chaque étape
                 somme_jours_etapes = sum([int(et['duree_jours']) for et in data['etapes_techniques'].values()])
                 jours_en_tete = int(data['jours'])
                 
-                # Simulation financière brute pour calculer le bénéfice et le ROI requis
                 cout_rh_estime = 0.0
                 cout_loc_estime = 0.0
                 for et_data in data['etapes_techniques'].values():
@@ -226,19 +224,16 @@ def afficher_onglet_blocs():
                 
                 st.markdown(f"#### 🏗️ Ouvrage Détecté : **{data['nom_affiche_propre']}**")
                 
-                # Affichage des 3 métriques prioritaires exigées
                 c_k1, c_k2, c_k3 = st.columns(3)
                 with c_k1: st.metric(label="💰 Montant du Chantier", value=f"{int(data['revenus']):,.0f}".replace(",", " ") + " €")
                 with c_k2: st.metric(label="📈 Bénéfice Estimé", value=f"{int(benefice_net):,.0f}".replace(",", " ") + " €")
                 with c_k3: st.metric(label="📊 ROI Global / ROI Jour", value=f"{roi_global:.2f} %", delta=f"{roi_par_jour:.2f} %/j", delta_color="normal")
                 
-                # Affichage du comparatif de temps réintégré
                 if jours_en_tete != somme_jours_etapes:
                     st.warning(f"⚠️ **Écart détecté :** L'en-tête annonce `{jours_en_tete} jours`, mais la somme de vos étapes fait `{somme_jours_etapes} jours` réels.")
                 else:
                     st.success(f"✅ **Durée Synchrone :** L'en-tête et le cumul des étapes concordent parfaitement (`{somme_jours_etapes} jours`).")
                 
-                # Rendu visuel condensé du détail logistique de chaque étape
                 for n_e, e_data in data['etapes_techniques'].items():
                     desc_mats = f"🧱 Matériaux : {e_data['materiaux']}" if e_data['materiaux'] else "🧱 Matériaux : Aucun"
                     desc_engins = f"🚜 Engins : {len(e_data['engins'])} requis" if e_data['engins'] else "🚜 Engins : Aucun"
@@ -246,7 +241,6 @@ def afficher_onglet_blocs():
 
             st.markdown("<br>", unsafe_allow_html=True)
             
-            # UNIQUE BOUTON DE VALIDATION CLOUD SÉCURISÉ POUR TOUT PROPULSER
             if st.button("✅ VALIDER ET INJECTER TOUT DANS L'HISTORIQUE CLOUD", type="primary", width="stretch", key="btn_native_save_btp_v12_direct"):
                 with st.spinner("Écriture réseau en cours vers Firestore (2 tables)..."):
                     enregistrer_chantiers_cloud(chantiers_detectes)
@@ -277,4 +271,3 @@ def afficher_onglet_doublons():
         
     df_verif = pd.DataFrame(lignes_verif)
     st.dataframe(df_verif, width="stretch", hide_index=True)
-
