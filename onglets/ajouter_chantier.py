@@ -402,14 +402,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                 st.session_state["cache_df_engins"] = engins_necessaires.reset_index(drop=True)
                 st.rerun()
 
-        # ==============================================================================
-        # 🎯 APPORT CORRECTIF : LIAISON DYNAMIQUE AVEC configuration_engins_officiels
-        # ==============================================================================
-        engins_transferes_list = []
-        if engins_necessaires_editeur is not None and not engins_necessaires_editeur.empty and "À louer ?" in engins_necessaires_editeur.columns:
-            # Filtrage des lignes cochées "À louer ?" par l'utilisateur
-            df_loues = engins_necessaires_editeur[engins_necessaires_editeur["À louer ?"] == True].dropna(subset=["Type d'engin requis"])
-            
+
         # ==============================================================================
         # 🎯 APPORT CORRECTIF : LIAISON AVEC LA COLLECTION "engins"
         # ==============================================================================
@@ -418,17 +411,18 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
             # Filtrage des lignes cochées "À louer ?" par l'utilisateur
             df_loues = engins_necessaires_editeur[engins_necessaires_editeur["À louer ?"] == True].dropna(subset=["Type d'engin requis"])
             
+            # Code de lecture fluide basé sur le singulier strict unifié
             for _, row in df_loues.iterrows():
-                engin_nom = str(row["Type d'engin requis"]).strip() # Ex: "Pelleteuses"
-                engin_niveau = str(row["Niveau requis"]).strip()       # Ex: "N2"
+                engin_nom = str(row["Type d'engin requis"]).strip() # L'étape est au singulier ("Pelleteuse")
+                engin_niveau = str(row["Niveau requis"]).strip()       # Le niveau ("N2")
                 duree_location = float(row["Durée Étape (jours)"]) if not pd.isna(row["Durée Étape (jours)"]) else 1.0
                 
-                # 🎯 LIAISON TEXTE STRICTE AVEC LA COLLECTION DE LA BASE : "Pelleteuses (N2)"
+                # Liaison texte directe et propre : "Pelleteuse (N2)"
                 id_doc_firebase = f"{engin_nom} ({engin_niveau})"
                 prix_journalier_cloud = 380.0 
                 
                 try:
-                    # 💾 REQUÊTE EN DIRECT DANS LA COLLECTION UNIQUE "engins"
+                    # Lecture directe dans la collection racine "engins"
                     doc_snap = db.db.collection("engins").document(id_doc_firebase).get()
                     if doc_snap.exists:
                         prix_journalier_cloud = float(doc_snap.to_dict().get("tarif_location_jour", 380.0))
@@ -441,7 +435,6 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                     "Prix Location (€/jour)": prix_journalier_cloud, 
                     "Jours de Location (Réels)": duree_location
                 })
-
 
 
                 
