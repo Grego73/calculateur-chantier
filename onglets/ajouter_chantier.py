@@ -373,17 +373,27 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                 engin_niveau = str(row["Niveau requis"]).strip()
                 duree_location = float(row["Durée Étape (jours)"]) if not pd.isna(row["Durée Étape (jours)"]) else 1.0
                 
-                # Liaison texte directe et propre au singulier : "Pelleteuse (N2)"
-                # Liaison texte directe et propre au singulier : "Pelleteuse (N2)"
-                id_doc_firebase = f"{engin_nom} ({engin_niveau})"
-                prix_journalier_cloud = 380.0 
+                # 🎯 Recherche intelligente sur le niveau sans toucher au texte
+                paliers = ["N1", "N2", "N3", "N4"]
+                prix_journalier_cloud = 380.0
                 
                 try:
-                    doc_snap = db.db.collection("engins").document(id_doc_firebase).get()
-                    if doc_snap.exists:
-                        prix_journalier_cloud = float(doc_snap.to_dict().get("tarif_location_jour", 380.0))
-                except Exception:
-                    pass
+                    idx_depart = paliers.index(engin_niveau)
+                except ValueError:
+                    idx_depart = 0
+                
+                # On teste le niveau demandé, puis les niveaux au-dessus si absent
+                for i in range(idx_depart, len(paliers)):
+                    niveau_test = paliers[i]
+                    id_doc_firebase = f"{engin_nom} ({niveau_test})"
+                    
+                    try:
+                        doc_snap = db.db.collection("engins").document(id_doc_firebase).get()
+                        if doc_snap.exists:
+                            prix_journalier_cloud = float(doc_snap.to_dict().get("tarif_location_jour", 380.0))
+                            break # On a trouvé le premier niveau disponible au-dessus, on s'arrête
+                    except Exception:
+                        pass
 
                 
                 engins_transferes_list.append({
