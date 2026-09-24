@@ -367,41 +367,30 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                 st.rerun()
 
 
-        # Suite de la logique pour la constitution de la liste des engins transférés...
+        # ==============================================================================
+        # 🎯 SÉCURISATION DÉFINITIVE : RELEVÉ STRICT LIÉ AU MENU DÉROULANT NO-BUG
+        # ==============================================================================
         engins_transferes_list = []
-        
-        if engins_necessaires is not None and not engins_necessaires.empty and "À louer ?" in engins_necessaires.columns:
-            df_coches = engins_necessaires[engins_necessaires["À louer ?"] == True].dropna(subset=["Type d'engin requis"])
-            for _, row in df_coches.iterrows():
-                type_demande = str(row["Type d'engin requis"]).strip()
-                level_demande = str(row["Niveau requis"]).strip().lower()
-                duree_etape_eng = float(row["Durée Étape (jours)"])
+        if engins_necessaires_editeur is not None and not engins_necessaires_editeur.empty and "À louer ?" in engins_necessaires_editeur.columns:
+            # Filtrage des engins cochés "À louer ?" par l'utilisateur
+            df_loues = engins_necessaires_editeur[engins_necessaires_editeur["À louer ?"] == True].dropna(subset=["Type d'engin requis"])
+            
+            for _, row in df_loues.iterrows():
+                engin_nom = str(row["Type d'engin requis"]).strip()
+                engin_niveau = str(row["Niveau requis"]).strip()
+                duree_location = float(row["Durée Étape (jours)"])
                 
-                def nettoyer_mots(texte):
-                    texte = texte.lower().replace("é", "e").replace("è", "e").replace("ê", "e").replace("à", "a")
-                    for char in ["'", "-", "/", "’"]: texte = texte.replace(char, " ")
-                    return [m for m in texte.split() if m not in ["pour", "de", "d", "un", "une", "le", "la", "les", "sur"]]
-
-                mots_cles_recherche = nettoyer_mots(type_demande)
-                modele_trouve, prix_trouve = None, 380.0
-                for engin_nom, prix in CATALOGUE_ENGINS.items():
-                    if level_demande in engin_nom.lower() and all(mot in nettoyer_mots(engin_nom) for mot in mots_cles_recherche):
-                        modele_trouve, prix_trouve = engin_nom, prix
-                        break
-                if not modele_trouve:
-                    for engin_nom, prix in CATALOGUE_ENGINS.items():
-                        if all(mot in nettoyer_mots(engin_nom) for mot in mots_cles_recherche):
-                            modele_trouve, prix_trouve = engin_nom, prix
-                            break
-                if not modele_trouve:
-                    modele_trouve = f"{type_demande} ({level_demande.upper()})"
-                    prix_trouve = 380.0
-                    
+                # Comme l'utilisateur utilise le menu déroulant, cette clé est TOUJOURS 100% identique au catalogue
+                cle_recherche_catalogue = f"{engin_nom}_{engin_niveau}"
+                
+                # Récupération immédiate du tarif fixé en base par l'admin (Secours à 380€ si non trouvé)
+                prix_journalier_base = dict_prix_location_direct.get(cle_recherche_catalogue, 380.0)
+                
                 engins_transferes_list.append({
-                    "engin_modele": modele_trouve, 
+                    "engin_modele": f"🚜 {engin_nom} ({engin_niveau})", 
                     "Quantité": 1, 
-                    "Prix Location (€/jour)": prix_trouve, 
-                    "Jours de Location (Réels)": duree_etape_eng
+                    "Prix Location (€/jour)": prix_journalier_base, 
+                    "Jours de Location (Réels)": duree_location
                 })
                 
         st.markdown("### --- RELEVÉ LOGISTIQUE DES ENGINS À LOUER ---")
@@ -409,15 +398,17 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         if len(engins_transferes_list) > 0: 
             df_engins_init = pd.DataFrame(engins_transferes_list)
         
+        # Rendu du tableau logistique totalement verrouillé contre les fautes de frappe
         engins_edites = st.data_editor(
             df_engins_init, num_rows="dynamic", width="stretch", key=f"table_engins_a_louer_{idx_refresh}",
             column_config={
                 "engin_modele": st.column_config.TextColumn("Engin & Modèle", disabled=True),
                 "Quantité": st.column_config.NumberColumn("Quantité", min_value=1, default=1, step=1),
-                "Prix Location (€/jour)": st.column_config.NumberColumn("Prix/j", min_value=0, step=10),
-                "Jours de Location (Réels)": st.column_config.NumberColumn("Durée Réelle (j)", format="%.2f j", disabled=True)
+                "Prix Location (€/jour)": st.column_config.NumberColumn("Prix/j (Catalogue)", min_value=0, step=10, format="%d €", disabled=True),
+                "Jours de Location (Réels)": st.column_config.NumberColumn("Durée Réelle (j)", format="%.1f j", disabled=True)
             }
         )
+
 
     # ==============================================================================
     # --- 3. CONSOLIDATION FINANCIÈRE PAR ÉTAPE (TOUTE JOURNÉE ENTAMÉE EST DUE) ---
