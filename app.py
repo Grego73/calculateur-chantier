@@ -41,3 +41,6 @@ with onglet3:
 
 with onglet4:
     afficher_onglet_direction(config_salaires, config_materiaux)
+
+from onglets.direction_admin.outils import afficher_barre_diagnostic_globale
+    afficher_barre_diagnostic_globale()
