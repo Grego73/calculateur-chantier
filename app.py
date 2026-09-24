@@ -4,7 +4,9 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import streamlit as st
 import database as db
 
-# 1. IMPORTATIONS DES ONGLETS DEPUIS VOTRE ARCHITECTURE
+# 1. BIEN VÉRIFIER QUE L'IMPORT DE LA NOUVELLE PAGE EST PRÉSENT ICI :
+
+# Par le nouvel import du dossier segmenté :
 from onglets.direction_admin import afficher_onglet_direction
 from onglets.suivi_interne import afficher_onglet_suivi_interne
 from onglets.ajouter_chantier import afficher_onglet_ajouter
@@ -13,36 +15,31 @@ from onglets.historique import afficher_onglet_historique
 st.set_page_config(page_title="Gestion des Chantiers", page_icon="🏗️", layout="wide")
 st.title("Gestion et Rentabilité des Chantiers")
 
-# Chargement des configurations de votre base NoSQL Firebase
 config_salaires = db.charger_salaires_config()
 config_materiaux = db.charger_materiaux_config()
 catalogue_engins = db.charger_catalogue_engins()
 types_engins = db.charger_types_engins_bruts()
 catalogue_chantiers = db.charger_catalogue_chantiers()
 
-# 2. DÉCLARATION CENTRALISÉE DE VOTRE COMPOSANT D'ONGLETS
-onglets_principaux = st.tabs([
+# 2. AJOUTER "👥 Suivi Interne" DANS LA LISTE DES TABS :
+onglet1, onglet2, onglet3, onglet4 = st.tabs([
     "➕ Ajouter un Chantier", 
     "📊 Historique & Classement", 
     "👥 Suivi Interne Coop",
     "🔒 Espace Direction",
 ])
 
-# ==============================================================================
-# 📋 ROUTAGE SECURISE ET ALIGNÉ DES ONGLETS PRINCIPAUX
-# ==============================================================================
-with onglets_principaux[0]:
-    # Remplacement de catalogue_engins par types_engins
-    afficher_onglet_ajouter(config_salaires, types_engins, config_materiaux)
+with onglet1:
+    afficher_onglet_ajouter(config_salaires, config_materiaux, catalogue_engins, types_engins, catalogue_chantiers)
 
-
-with onglets_principaux[1]:
+with onglet2:
     afficher_onglet_historique()
 
-with onglets_principaux[2]:
+with onglet3:
+    # 3. L'APPEL DE LA FONCTION POUR CONSTRUIRE LA PAGE :
     afficher_onglet_suivi_interne(config_salaires, catalogue_engins, config_materiaux)
 
-with onglets_principaux[3]:
+with onglet4:
     afficher_onglet_direction(config_salaires, config_materiaux)
 
 
