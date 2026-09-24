@@ -312,7 +312,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         liste_engins_dropdown = []
         dict_prix_location_direct = {}
         
-        # Récupération de la vraie clé identifiée dans le dictionnaire de diagnostic
+        # Récupération de la clé identifiée dans le dictionnaire de diagnostic
         chantier_actif_nom = st.session_state.get("select_modele_chantier_dynamique", "") 
         
         if chantier_actif_nom:
@@ -323,26 +323,35 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                 for etape_doc in etapes_stream:
                     etape_data = etape_doc.to_dict()
                     
-                    # Lecture de la liste de maps (0: {...}, 1: {...}) visible sur vos captures
-                    liste_engins_map = etape_data.get("engins", [])
+                    # 🎯 CORRECTIF : On extrait le type d'engin directement depuis le champ du document d'étape
+                    # Si vos étapes contiennent des champs comme "engin_requis" ou "type_engin"
+                    type_engin = etape_data.get("type_engin", etape_data.get("engin", etape_data.get("type", "")))
+                    nv_engin = str(etape_data.get("niveau", "N1")).strip()
                     
-                    if isinstance(liste_engins_map, list):
+                    # Si vos données sont stockées dans une liste "engins" à l'intérieur de l'étape
+                    liste_engins_map = etape_data.get("engins", [])
+                    if isinstance(liste_engins_map, list) and liste_engins_map:
                         for engin_map in liste_engins_map:
                             if isinstance(engin_map, dict):
-                                type_engin = str(engin_map.get("type", "")).strip()
-                                nv_engin = str(engin_map.get("niveau", "N1")).strip()
-                                
-                                if type_engin and type_engin != "None":
-                                    liste_engins_dropdown.append(type_engin)
-                                    
-                                    # Liaison pour votre calculateur de location
-                                    cle_location = f"{type_engin}_{nv_engin}"
-                                    dict_prix_location_direct[cle_location] = 380.0
-            except Exception:
-                pass
+                                t_eng = str(engin_map.get("type", "")).strip()
+                                n_eng = str(engin_map.get("niveau", "N1")).strip()
+                                if t_eng and t_eng != "None":
+                                    liste_engins_dropdown.append(t_eng)
+                                    dict_prix_location_direct[f"{t_eng}_{n_eng}"] = 380.0
+                    elif type_engin and str(type_engin) != "None":
+                        type_engin = str(type_engin).strip()
+                        liste_engins_dropdown.append(type_engin)
+                        dict_prix_location_direct[f"{type_engin}_{nv_engin}"] = 380.0
+            except Exception as e:
+                st.sidebar.error(f"Erreur lors de la lecture des étapes Firestore : {e}")
 
+        # Sécurité : Si le modèle sélectionné n'a pas encore d'étapes ou de champs valides
+        if not liste_engins_dropdown:
+            liste_engins_dropdown = ["Pelleteuses", "Camions Benne", "Camion Béton Malaxeur", "Chargeur Télescopique"]
+            
         # Tri et dédoublonnage pour nettoyer les options du menu déroulant
         liste_engins_dropdown = sorted(list(set([str(x) for x in liste_engins_dropdown if x])))
+
 
         # 🎯 2. RECUPÉRATION DE LA DURÉE RÉELLE ET REMPLACEMENT AUTOMATIQUE DU "NONE"
         if tableau_employes_etapes is not None and not tableau_employes_etapes.empty:
