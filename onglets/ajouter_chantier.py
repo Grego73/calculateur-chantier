@@ -308,23 +308,24 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         df_besoins_init = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "Type d'engin requis", "Niveau requis", "À louer ?", "❌ Supprimer la ligne"])
         raw_engins_state = st.session_state.get("cache_df_engins", df_besoins_init)
 
-        # 🎯 1. EXTRACTION DYNAMIQUE DES ENGINS DEPUIS LES ÉTAPES DU MODÈLE SÉLECTIONNÉ
+        # 🎯 1. EXTRACTION DYNAMIQUE DEPUIS L'ARBORESCENCE EXACTE DE VOTRE BASE NOSQL
         liste_engins_dropdown = []
         dict_prix_location_direct = {}
         
-        # 'nom_chantier_selectionne' doit correspondre à la variable de votre selectbox de chantier (ex: "Construction d'un hangar - 324600€")
-        chantier_actif_nom = st.session_state.get("chantier_selectionne", "") 
+        # Récupération de la vraie clé identifiée dans le dictionnaire de diagnostic
+        chantier_actif_nom = st.session_state.get("select_modele_chantier_dynamique", "") 
         
         if chantier_actif_nom:
             try:
-                # On descend dans modeles_chantiers -> [Nom du chantier] -> etapes
+                # Connexion à : modeles_chantiers -> [Nom du Chantier] -> sous-collection: etapes
                 etapes_stream = db.db.collection("modeles_chantiers").document(chantier_actif_nom).collection("etapes").stream()
                 
                 for etape_doc in etapes_stream:
                     etape_data = etape_doc.to_dict()
+                    
+                    # Lecture de la liste de maps (0: {...}, 1: {...}) visible sur vos captures
                     liste_engins_map = etape_data.get("engins", [])
                     
-                    # On parcourt la liste de maps (0, 1...) visible sur votre deuxième capture
                     if isinstance(liste_engins_map, list):
                         for engin_map in liste_engins_map:
                             if isinstance(engin_map, dict):
@@ -333,20 +334,17 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                                 
                                 if type_engin and type_engin != "None":
                                     liste_engins_dropdown.append(type_engin)
-                                    # Liaison avec votre table de prix de location par défaut de l'Espace Direction
+                                    
+                                    # Liaison pour votre calculateur de location
                                     cle_location = f"{type_engin}_{nv_engin}"
-                                    dict_prix_location_direct[cle_location] = 380.0 # Se liera automatiquement à vos tarifs d'administration
-            except Exception as e:
-                st.sidebar.error(f"Erreur de lecture du modèle : {e}")
+                                    dict_prix_location_direct[cle_location] = 380.0
+            except Exception:
+                pass
 
-        # Sécurité ultime : si le modèle sélectionné n'a pas encore d'étapes configurées
-        if not liste_engins_dropdown:
-            liste_engins_dropdown = ["Pelleteuses", "Camions Benne", "Camion Béton Malaxeur", "Chargeur Télescopique"]
-            
-        # Tri et dédoublonnage pour nettoyer le menu déroulant
+        # Tri et dédoublonnage pour nettoyer les options du menu déroulant
         liste_engins_dropdown = sorted(list(set([str(x) for x in liste_engins_dropdown if x])))
 
-        # 🎯 2. RECALCUL ET HARMONISATION DE LA DURÉE RÉELLE AUTOMATIQUE
+        # 🎯 2. RECUPÉRATION DE LA DURÉE RÉELLE ET REMPLACEMENT AUTOMATIQUE DU "NONE"
         if tableau_employes_etapes is not None and not tableau_employes_etapes.empty:
             df_rh_mapping = tableau_employes_etapes.dropna(subset=["N° Étape"])
             map_durees = dict(zip(df_rh_mapping["N° Étape"].astype(int), df_rh_mapping["Durée Étape (jours)"].astype(float)))
@@ -360,20 +358,20 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                     except Exception:
                         pass
 
-        # Forcer le typage en chaîne de caractères pour éviter le bug des cellules blanches
+        # Forcer le typage en texte brut pour éviter les cellules blanches figées
         if "Type d'engin requis" in raw_engins_state.columns:
             raw_engins_state["Type d'engin requis"] = raw_engins_state["Type d'engin requis"].astype(str)
 
         if "❌ Supprimer la ligne" not in raw_engins_state.columns:
             raw_engins_state["❌ Supprimer la ligne"] = False
 
-        # 🎯 3. RENDU DU TABLEAU DE LA FLOTTE TOTALEMENT INTERFAÇÉ À VOTRE BASE
+        # 🎯 3. AFFICHAGE DE L'ÉDITEUR AVEC MENU DÉROULANT BRANCHÉ SUR LE MODÈLE SÉLECTIONNÉ
         engins_necessaires_editeur = st.data_editor(
             raw_engins_state, num_rows="dynamic", width="stretch", key=f"editor_engins_data_{idx_refresh}", 
             column_config={
                 "N° Étape": st.column_config.NumberColumn("N° Étape", min_value=1, step=1, required=True, width="small"),
                 "Durée Étape (jours)": st.column_config.NumberColumn("Durée Réelle (j)", format="%.1f j", disabled=True),
-                # Remplissage automatique de la liste de choix par les vrais types de l'étape sélectionnée
+                # Remplissage par les vrais types d'engins du modèle de chantier
                 "Type d'engin requis": st.column_config.SelectboxColumn(
                     "Type d'engin requis", 
                     options=liste_engins_dropdown, 
@@ -385,6 +383,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                 "❌ Supprimer la ligne": st.column_config.CheckboxColumn("❌ Supprimer la ligne", default=False)
             }
         )
+
 
         # Filtrage et suppression automatique par case à cocher
         engins_necessaires = pd.DataFrame(columns=df_besoins_init.columns)
