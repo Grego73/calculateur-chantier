@@ -308,40 +308,45 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         df_besoins_init = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "Type d'engin requis", "Niveau requis", "À louer ?", "❌ Supprimer la ligne"])
         raw_engins_state = st.session_state.get("cache_df_engins", df_besoins_init)
 
-        # 🎯 EXTRACTION SÉCURISÉE DE TOUS LES ENGINS ENREGISTRÉS DANS LE CATALOGUE
+        # 🎯 1. EXTRACTION DYNAMIQUE DES ENGINS DEPUIS LES ÉTAPES DU MODÈLE SÉLECTIONNÉ
         liste_engins_dropdown = []
         dict_prix_location_direct = {}
-        try:
-            engins_base = db.db.collection("configuration_engins").stream()
-            for doc in engins_base:
-                d = doc.to_dict()
+        
+        # 'nom_chantier_selectionne' doit correspondre à la variable de votre selectbox de chantier (ex: "Construction d'un hangar - 324600€")
+        chantier_actif_nom = st.session_state.get("chantier_selectionne", "") 
+        
+        if chantier_actif_nom:
+            try:
+                # On descend dans modeles_chantiers -> [Nom du chantier] -> etapes
+                etapes_stream = db.db.collection("modeles_chantiers").document(chantier_actif_nom).collection("etapes").stream()
                 
-                # 🎯 MODIFICATION ICI : On utilise directement l'ID du document ou le "nom_brut" s'il contient le pluriel
-                nom_brut = str(d.get("nom_brut", doc.id)).strip()
-                niveau_brut = str(d.get("niveau", "N1")).strip()
-                
-                if nom_brut and nom_brut != "None":
-                    liste_engins_dropdown.append(nom_brut)
-                    dict_prix_location_direct[f"{nom_brut}_{niveau_brut}"] = float(d.get("prix_location_jour", 380.0))
-        except Exception:
-            pass
+                for etape_doc in etapes_stream:
+                    etape_data = etape_doc.to_dict()
+                    liste_engins_map = etape_data.get("engins", [])
+                    
+                    # On parcourt la liste de maps (0, 1...) visible sur votre deuxième capture
+                    if isinstance(liste_engins_map, list):
+                        for engin_map in liste_engins_map:
+                            if isinstance(engin_map, dict):
+                                type_engin = str(engin_map.get("type", "")).strip()
+                                nv_engin = str(engin_map.get("niveau", "N1")).strip()
+                                
+                                if type_engin and type_engin != "None":
+                                    liste_engins_dropdown.append(type_engin)
+                                    # Liaison avec votre table de prix de location par défaut de l'Espace Direction
+                                    cle_location = f"{type_engin}_{nv_engin}"
+                                    dict_prix_location_direct[cle_location] = 380.0 # Se liera automatiquement à vos tarifs d'administration
+            except Exception as e:
+                st.sidebar.error(f"Erreur de lecture du modèle : {e}")
 
+        # Sécurité ultime : si le modèle sélectionné n'a pas encore d'étapes configurées
         if not liste_engins_dropdown:
-            liste_engins_dropdown = ["Camions Benne", "Pelleteuses", "Camion Béton Malaxeur", "Chargeur Télescopique"]
+            liste_engins_dropdown = ["Pelleteuses", "Camions Benne", "Camion Béton Malaxeur", "Chargeur Télescopique"]
             
+        # Tri et dédoublonnage pour nettoyer le menu déroulant
         liste_engins_dropdown = sorted(list(set([str(x) for x in liste_engins_dropdown if x])))
 
-
-        # 🎯 2. SÉCURISATION DU DATAFRAME POUR L'ÉDITEUR (ÉVITE LES CELLULES BLANCHES)
-        if "Type d'engin requis" in raw_engins_state.columns:
-            # On force toutes les valeurs existantes à être du texte brut et on remplace les None par la 1ère option valide
-            raw_engins_state["Type d'engin requis"] = raw_engins_state["Type d'engin requis"].astype(str)
-            raw_engins_state.loc[raw_engins_state["Type d'engin requis"] == "None", "Type d'engin requis"] = liste_engins_dropdown[0]
-            raw_engins_state.loc[raw_engins_state["Type d'engin requis"] == "", "Type d'engin requis"] = liste_engins_dropdown[0]
-        else:
-            raw_engins_state["Type d'engin requis"] = liste_engins_dropdown[0]
-
-        # Recalcul automatique des durées réelles pour l'affichage
+        # 🎯 2. RECALCUL ET HARMONISATION DE LA DURÉE RÉELLE AUTOMATIQUE
         if tableau_employes_etapes is not None and not tableau_employes_etapes.empty:
             df_rh_mapping = tableau_employes_etapes.dropna(subset=["N° Étape"])
             map_durees = dict(zip(df_rh_mapping["N° Étape"].astype(int), df_rh_mapping["Durée Étape (jours)"].astype(float)))
@@ -355,21 +360,25 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                     except Exception:
                         pass
 
+        # Forcer le typage en chaîne de caractères pour éviter le bug des cellules blanches
+        if "Type d'engin requis" in raw_engins_state.columns:
+            raw_engins_state["Type d'engin requis"] = raw_engins_state["Type d'engin requis"].astype(str)
+
         if "❌ Supprimer la ligne" not in raw_engins_state.columns:
             raw_engins_state["❌ Supprimer la ligne"] = False
 
-        # 🎯 3. AFFICHAGE DE L'ÉDITEUR AVEC CONFIGURATION SÉCURISÉE
+        # 🎯 3. RENDU DU TABLEAU DE LA FLOTTE TOTALEMENT INTERFAÇÉ À VOTRE BASE
         engins_necessaires_editeur = st.data_editor(
             raw_engins_state, num_rows="dynamic", width="stretch", key=f"editor_engins_data_{idx_refresh}", 
             column_config={
                 "N° Étape": st.column_config.NumberColumn("N° Étape", min_value=1, step=1, required=True, width="small"),
-                "Durée Étape (jours)": st.column_config.NumberColumn("Durée Étele (j)", format="%.1f j", disabled=True),
-                # Utilisation d'une valeur par défaut obligatoire lors de l'ajout d'une ligne
+                "Durée Étape (jours)": st.column_config.NumberColumn("Durée Réelle (j)", format="%.1f j", disabled=True),
+                # Remplissage automatique de la liste de choix par les vrais types de l'étape sélectionnée
                 "Type d'engin requis": st.column_config.SelectboxColumn(
                     "Type d'engin requis", 
                     options=liste_engins_dropdown, 
                     required=True,
-                    default=liste_engins_dropdown[0]
+                    default=liste_engins_dropdown[0] if liste_engins_dropdown else None
                 ),
                 "Niveau requis": st.column_config.SelectboxColumn("Niveau requis", options=["N1", "N2", "N3", "N4"], required=True, default="N1"),
                 "À louer ?": st.column_config.CheckboxColumn("À louer ?", default=False),
