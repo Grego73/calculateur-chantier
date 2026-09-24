@@ -1,4 +1,4 @@
-# Fichier 100% Singulier : onglets/direction_admin/flotte.py
+# Fichier 100% épuré sans dictionnaire : onglets/direction_admin/flotte.py
 import streamlit as st
 import pandas as pd
 import database as db
@@ -7,7 +7,7 @@ import re
 def afficher_onglet_flotte():
     st.markdown("### 📊 Administration et Analyse de Rentabilité de la Flotte")
     
-    with st.form("form_parseur_html_flotte_singulier"):
+    with st.form("form_parseur_html_flotte_direct"):
         texte_html_brut = st.text_area("Collez le code HTML brut de Sim-TP ici :", height=120)
         
         if st.form_submit_button("⚡ PARSER LE CATALOGUE HTML", type="primary", use_container_width=True):
@@ -15,55 +15,31 @@ def afficher_onglet_flotte():
                 modals_machines = texte_html_brut.split('id="modal-materiel-')
                 compteur = 0
                 
-                # Table de correspondance stricte ramenée au SINGULIER
-                dictionnaire_categories_singulier = {
-                    "camions benne": "Camion benne",
-                    "camion benne": "Camion benne",
-                    "pelleteuses": "Pelleteuse",
-                    "pelleteuse": "Pelleteuse",
-                    "petite pelleteuse": "Pelleteuse",
-                    "grosse pelleteuse": "Pelleteuse",
-                    "mini-pelle": "Pelleteuse",
-                    "compacteurs de sol": "Compacteur de sol",
-                    "compacteur de sol": "Compacteur de sol",
-                    "compacteur pour enrobé": "Compacteur d'enrobé",
-                    "finisseur": "Finisseur",
-                    "les finisseurs": "Finisseur",
-                    "camion béton malaxeur": "Camion malaxeur",
-                    "camions béton malaxeur": "Camion malaxeur",
-                    "camion pompe à béton": "Camion malaxeur",
-                    "chargeuse compacte": "Chargeuse compacte",
-                    "chargeuse": "Chargeuse",
-                    "chargeur téléscopique": "Chargeur téléscopique",
-                    "niveleuse": "Niveleuse",
-                    "fraiseuse": "Fraiseuse"
-                }
-                
                 for bloc_html in modals_machines:
-                    if not bloc_html.strip(): continue
+                    if not bloc_html.strip(): 
+                        continue
                     
+                    # Extraction du nom, du niveau et du prix
                     match_nom = re.search(r"<h5>Voir (?:le|la)\s+([^<]+)</h5>", bloc_html, re.IGNORECASE)
                     match_niveau = re.search(r"<li>Niveau\s+(\d+)\s*:", bloc_html, re.IGNORECASE)
                     match_prix = re.search(r"Prix\s*:\s*([\d\s]+)\s*euros", bloc_html, re.IGNORECASE)
                     
                     if match_nom and match_niveau and match_prix:
-                        nom_brut_jeu = match_nom.group(1).strip().lower()
+                        # 🎯 ON PASSE TOUT EN MAJUSCULE SUR LA PREMIÈRE LETTRE DIRECTEMENT
+                        nom_officiel = match_nom.group(1).strip().capitalize()
                         niveau_machine = f"N{match_niveau.group(1).strip()}"
                         prix_val = float("".join(c for c in match_prix.group(1) if c.isdigit()))
                         
-                        # 🎯 FORCE LE PASSAGE AU SINGULIER DIRECTEMENT À L'ENTRÉE EN BASE
-                        nom_singulier_officiel = dictionnaire_categories_singulier.get(nom_brut_jeu, nom_brut_jeu.capitalize())
-                        
-                        # Clé Firebase unifiée (Ex: "Camion benne (N1)", "Pelleteuse (N2)")
-                        cle_document_nosql = f"{nom_singulier_officiel} ({niveau_machine})"
+                        # Création de la clé Firestore (Ex: "Pelleteuses (N2)")
+                        cle_document_nosql = f"{nom_officiel} ({niveau_machine})"
                         
                         db.db.collection("configuration_engins_officiels").document(cle_document_nosql).set({
-                            "nom_brut": nom_singulier_officiel,
+                            "nom_brut": nom_officiel,
                             "niveau": niveau_machine,
                             "tarif_location_jour": float(prix_val)
                         })
                         compteur += 1
                         
                 st.cache_data.clear()
-                st.success(f"🚀 {compteur} machine(s) enregistrée(s) au singulier strict dans Firebase !")
+                st.success(f"🚀 {compteur} machine(s) enregistrée(s) proprement avec une Majuscule sur Firebase !")
                 st.rerun()
