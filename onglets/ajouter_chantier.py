@@ -411,29 +411,18 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
             df_loues = engins_necessaires_editeur[engins_necessaires_editeur["À louer ?"] == True].dropna(subset=["Type d'engin requis"])
             
             # Code de lecture fluide basé sur le singulier strict
+            # Code final 100% sécurisé par le menu déroulant Firebase
             for _, row in df_loues.iterrows():
-                engin_nom = str(row["Type d'engin requis"]).strip() # Ex: "Camions Benne" ou "Pelleteuses"
+                engin_nom = str(row["Type d'engin requis"]).strip() # Ex: "Pelleteuses"
                 engin_niveau = str(row["Niveau requis"]).strip()       # Ex: "N2"
                 duree_location = float(row["Durée Étape (jours)"]) if not pd.isna(row["Durée Étape (jours)"]) else 1.0
                 
-                # 🎯 CONVERSION DU NOM AU SINGULIER POUR LA REQUÊTE FIREBASE
-                nom_singulier = engin_nom
-                if nom_singulier == "Camions Benne":
-                    nom_singulier = "Camion benne"
-                elif nom_singulier == "Pelleteuses":
-                    nom_singulier = "Pelleteuse"
-                elif nom_singulier == "Compacteurs de Sol":
-                    nom_singulier = "Compacteur de sol"
-                elif nom_singulier == "Camion Béton Malaxeur":
-                    nom_singulier = "Camion malaxeur"
-                elif nom_singulier.endswith("s") and not nom_singulier.endswith("ss"):
-                    nom_singulier = nom_singulier[:-1] # Retire le s final générique
-                
-                # Liaison texte directe et propre avec l'ID Firebase au singulier
-                id_doc_firebase = f"{nom_singulier} ({engin_niveau})"
+                # Liaison texte directe parfaite : "Pelleteuses (N2)" ou "Camions benne (N1)"
+                id_doc_firebase = f"{engin_nom} ({engin_niveau})"
                 prix_journalier_cloud = 380.0 
                 
                 try:
+                    # Requête réseau directe sur vos tarifs officiels
                     doc_snap = db.db.collection("configuration_engins_officiels").document(id_doc_firebase).get()
                     if doc_snap.exists:
                         prix_journalier_cloud = float(doc_snap.to_dict().get("tarif_location_jour", 380.0))
@@ -446,6 +435,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                     "Prix Location (€/jour)": prix_journalier_cloud, 
                     "Jours de Location (Réels)": duree_location
                 })
+
 
                 
         st.markdown("### --- RELEVÉ LOGISTIQUE DES ENGINS À LOUER ---")
