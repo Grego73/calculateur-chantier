@@ -40,7 +40,7 @@ with onglet3:
     afficher_onglet_suivi_interne(config_salaires, catalogue_engins, config_materiaux)
 
 with onglet4:
-    afficher_onglet_direction(config_salaires, config_materiaux)
+afficher_onglet_direction(config_salaires, config_materiaux)
 
 from onglets.direction_admin.outils import afficher_barre_diagnostic_globale
 afficher_barre_diagnostic_globale()
