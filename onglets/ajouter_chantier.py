@@ -374,6 +374,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                 duree_location = float(row["Durée Étape (jours)"]) if not pd.isna(row["Durée Étape (jours)"]) else 1.0
                 
                 # Liaison texte directe et propre au singulier : "Pelleteuse (N2)"
+                # Liaison texte directe et propre au singulier : "Pelleteuse (N2)"
                 id_doc_firebase = f"{engin_nom} ({engin_niveau})"
                 prix_journalier_cloud = 380.0 
                 
@@ -383,6 +384,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                         prix_journalier_cloud = float(doc_snap.to_dict().get("tarif_location_jour", 380.0))
                 except Exception:
                     pass
+
                 
                 engins_transferes_list.append({
                     "engin_modele": f"🚜 {engin_nom} ({engin_niveau})", 
