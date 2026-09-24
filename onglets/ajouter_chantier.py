@@ -259,35 +259,26 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         with c_rh_ch: type_contrat_chef = st.selectbox("Contrat Chefs :", ["CDI", "CDD"], key="type_contrat_chef")
         with c_rh_ou: type_contrat_ouv = st.selectbox("Contrat Ouvriers :", ["CDI", "CDD"], key="type_contrat_ouv")
         
-        # ==============================================================================
-        # 🎯 APPORT CORRECTIF : LIAISON DYNAMIQUE AVEC LA GRILLE DE SYNTHÈSE FIREBASE
-        # ==============================================================================
         def extraire_tarif_jour_firebase(poste, contrat_affiche):
-            # Normalisation du nom pour correspondre aux clés Firebase : "CDI" -> "CDI (Salaire mensuel)"
             type_contrat_nosql = "CDI (Salaire mensuel)" if contrat_affiche == "CDI" else "CDD (Salaire par jour)"
             doc_id_synthese = f"{poste}_{type_contrat_nosql}"
             
             try:
-                # Lecture brute instantanée de l'agrégat sur Firebase
                 doc_snap = db.db.collection("synthese_grille_tarifaire").document(doc_id_synthese).get()
                 if doc_snap.exists:
                     d_data = doc_snap.to_dict()
-                    # On extrait la valeur moyenne déjà convertie à la journée
                     return float(d_data.get("prix_moyen_journalier_7", d_data.get("prix_moyen_mensuel", 230.0)))
             except Exception:
                 pass
             
-            # Valeurs de secours si la base est vide
             secours = {"Conducteur": 250.0, "Chef": 300.0, "Ouvrier": 210.0}
             return secours.get(poste, 200.0)
 
-        # Extraction en temps réel selon les sélections des 3 menus déroulants
         px_cond = extraire_tarif_jour_firebase("Conducteur", type_contrat_cond)
         px_chef = extraire_tarif_jour_firebase("Chef", type_contrat_chef)
         px_ouvrier = extraire_tarif_jour_firebase("Ouvrier", type_contrat_ouv)
 
         st.info(f"💰 Tarifs : 🕹️ Cond : {px_cond:.2f}€/j | 🧑‍💼 Chef : {px_chef:.2f}€/j | 👷 Ouv : {px_ouvrier:.2f}€/j")
-
 
         st.markdown("**👥 Planification de la Durée Réelle (Par Étape) :**")
         df_rh_init = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "🕹️ Conducteurs", "🧑‍💼 Chefs", "👷 Ouvriers"])
@@ -308,52 +299,23 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         df_besoins_init = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "Type d'engin requis", "Niveau requis", "À louer ?", "❌ Supprimer la ligne"])
         raw_engins_state = st.session_state.get("cache_df_engins", df_besoins_init)
 
-        # 🎯 1. EXTRACTION DYNAMIQUE DEPUIS L'ARBORESCENCE EXACTE DE VOTRE BASE NOSQL
+        # 🎯 1. EXTRACTION DE LA LISTE DE LA BASE DE DONNÉES DEPUIS LA COLLECTION "engins"
         liste_engins_dropdown = []
-        dict_prix_location_direct = {}
-        
-        # Récupération de la clé identifiée dans le dictionnaire de diagnostic
-        chantier_actif_nom = st.session_state.get("select_modele_chantier_dynamique", "") 
-        
-        if chantier_actif_nom:
-            try:
-                # Connexion à : modeles_chantiers -> [Nom du Chantier] -> sous-collection: etapes
-                etapes_stream = db.db.collection("modeles_chantiers").document(chantier_actif_nom).collection("etapes").stream()
-                
-                for etape_doc in etapes_stream:
-                    etape_data = etape_doc.to_dict()
-                    
-                    # 🎯 CORRECTIF : On extrait le type d'engin directement depuis le champ du document d'étape
-                    # Si vos étapes contiennent des champs comme "engin_requis" ou "type_engin"
-                    type_engin = etape_data.get("type_engin", etape_data.get("engin", etape_data.get("type", "")))
-                    nv_engin = str(etape_data.get("niveau", "N1")).strip()
-                    
-                    # Si vos données sont stockées dans une liste "engins" à l'intérieur de l'étape
-                    liste_engins_map = etape_data.get("engins", [])
-                    if isinstance(liste_engins_map, list) and liste_engins_map:
-                        for engin_map in liste_engins_map:
-                            if isinstance(engin_map, dict):
-                                t_eng = str(engin_map.get("type", "")).strip()
-                                n_eng = str(engin_map.get("niveau", "N1")).strip()
-                                if t_eng and t_eng != "None":
-                                    liste_engins_dropdown.append(t_eng)
-                                    dict_prix_location_direct[f"{t_eng}_{n_eng}"] = 380.0
-                    elif type_engin and str(type_engin) != "None":
-                        type_engin = str(type_engin).strip()
-                        liste_engins_dropdown.append(type_engin)
-                        dict_prix_location_direct[f"{type_engin}_{nv_engin}"] = 380.0
-            except Exception as e:
-                st.sidebar.error(f"Erreur lors de la lecture des étapes Firestore : {e}")
+        try:
+            engins_base = db.db.collection("engins").stream()
+            for doc in engins_base:
+                d = doc.to_dict()
+                nom_brut = str(d.get("nom_brut")).strip()
+                if nom_brut and nom_brut != "None":
+                    liste_engins_dropdown.append(nom_brut)
+        except Exception:
+            pass
 
-        # Sécurité : Si le modèle sélectionné n'a pas encore d'étapes ou de champs valides
         if not liste_engins_dropdown:
-            liste_engins_dropdown = ["Pelleteuses", "Camions Benne", "Camion Béton Malaxeur", "Chargeur Télescopique"]
-            
-        # Tri et dédoublonnage pour nettoyer les options du menu déroulant
-        liste_engins_dropdown = sorted(list(set([str(x) for x in liste_engins_dropdown if x])))
+            liste_engins_dropdown = ["Camion benne", "Pelleteuse", "Compacteur de sol", "Camion malaxeur", "Chargeur téléscopique"]
+        liste_engins_dropdown = sorted(list(set(liste_engins_dropdown)))
 
-
-        # 🎯 2. RECUPÉRATION DE LA DURÉE RÉELLE ET REMPLACEMENT AUTOMATIQUE DU "NONE"
+        # 🎯 2. RECUPÉRATION AUTOMATIQUE DE LA DURÉE RÉELLE SANS CELLULE BLANCHE
         if tableau_employes_etapes is not None and not tableau_employes_etapes.empty:
             df_rh_mapping = tableau_employes_etapes.dropna(subset=["N° Étape"])
             map_durees = dict(zip(df_rh_mapping["N° Étape"].astype(int), df_rh_mapping["Durée Étape (jours)"].astype(float)))
@@ -367,20 +329,18 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                     except Exception:
                         pass
 
-        # Forcer le typage en texte brut pour éviter les cellules blanches figées
         if "Type d'engin requis" in raw_engins_state.columns:
             raw_engins_state["Type d'engin requis"] = raw_engins_state["Type d'engin requis"].astype(str)
 
         if "❌ Supprimer la ligne" not in raw_engins_state.columns:
             raw_engins_state["❌ Supprimer la ligne"] = False
 
-        # 🎯 3. AFFICHAGE DE L'ÉDITEUR AVEC MENU DÉROULANT BRANCHÉ SUR LE MODÈLE SÉLECTIONNÉ
+        # 🎯 3. RENDU ÉDITEUR D'ENGINS PAR ÉTAPE (SÉCURISÉ AU SINGULIER STRICT)
         engins_necessaires_editeur = st.data_editor(
             raw_engins_state, num_rows="dynamic", width="stretch", key=f"editor_engins_data_{idx_refresh}", 
             column_config={
                 "N° Étape": st.column_config.NumberColumn("N° Étape", min_value=1, step=1, required=True, width="small"),
                 "Durée Étape (jours)": st.column_config.NumberColumn("Durée Réelle (j)", format="%.1f j", disabled=True),
-                # Remplissage par les vrais types d'engins du modèle de chantier
                 "Type d'engin requis": st.column_config.SelectboxColumn(
                     "Type d'engin requis", 
                     options=liste_engins_dropdown, 
@@ -393,7 +353,6 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
             }
         )
 
-
         # Filtrage et suppression automatique par case à cocher
         engins_necessaires = pd.DataFrame(columns=df_besoins_init.columns)
         if engins_necessaires_editeur is not None and not engins_necessaires_editeur.empty:
@@ -402,27 +361,23 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                 st.session_state["cache_df_engins"] = engins_necessaires.reset_index(drop=True)
                 st.rerun()
 
-
         # ==============================================================================
-        # 🎯 APPORT CORRECTIF : LIAISON AVEC LA COLLECTION "engins"
+        # 🎯 4. RELEVÉ DE LOCATION AUTOMATIQUE SANS FILTRE INTERMÉDIAIRE (SINGULIER DIRECT)
         # ==============================================================================
         engins_transferes_list = []
         if engins_necessaires_editeur is not None and not engins_necessaires_editeur.empty and "À louer ?" in engins_necessaires_editeur.columns:
-            # Filtrage des lignes cochées "À louer ?" par l'utilisateur
             df_loues = engins_necessaires_editeur[engins_necessaires_editeur["À louer ?"] == True].dropna(subset=["Type d'engin requis"])
             
-            # Code de lecture fluide basé sur le singulier strict unifié
             for _, row in df_loues.iterrows():
-                engin_nom = str(row["Type d'engin requis"]).strip() # L'étape est au singulier ("Pelleteuse")
-                engin_niveau = str(row["Niveau requis"]).strip()       # Le niveau ("N2")
+                engin_nom = str(row["Type d'engin requis"]).strip()
+                engin_niveau = str(row["Niveau requis"]).strip()
                 duree_location = float(row["Durée Étape (jours)"]) if not pd.isna(row["Durée Étape (jours)"]) else 1.0
                 
-                # Liaison texte directe et propre : "Pelleteuse (N2)"
+                # Liaison texte directe et propre au singulier : "Pelleteuse (N2)"
                 id_doc_firebase = f"{engin_nom} ({engin_niveau})"
                 prix_journalier_cloud = 380.0 
                 
                 try:
-                    # Lecture directe dans la collection racine "engins"
                     doc_snap = db.db.collection("engins").document(id_doc_firebase).get()
                     if doc_snap.exists:
                         prix_journalier_cloud = float(doc_snap.to_dict().get("tarif_location_jour", 380.0))
@@ -435,15 +390,12 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                     "Prix Location (€/jour)": prix_journalier_cloud, 
                     "Jours de Location (Réels)": duree_location
                 })
-
-
                 
         st.markdown("### --- RELEVÉ LOGISTIQUE DES ENGINS À LOUER ---")
         df_engins_init = pd.DataFrame(columns=["engin_modele", "Quantité", "Prix Location (€/jour)", "Jours de Location (Réels)"])
         if len(engins_transferes_list) > 0: 
             df_engins_init = pd.DataFrame(engins_transferes_list)
         
-        # Rendu du tableau logistique totalement interfaçé aux vrais prix
         engins_edites = st.data_editor(
             df_engins_init, num_rows="dynamic", width="stretch", key=f"table_engins_a_louer_{idx_refresh}",
             column_config={
@@ -454,9 +406,8 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
             }
         )
 
-
     # ==============================================================================
-    # --- 3. CONSOLIDATION FINANCIÈRE PAR ÉTAPE (TOUTE JOURNÉE ENTAMÉE EST DUE) ---
+    # --- 5. CONSOLIDATION FINANCIÈRE PAR ÉTAPE (TOUTE JOURNÉE ENTAMÉE EST DUE) ---
     # ==============================================================================
     total_mats_recap = float(total_mats_direct)
     total_location_recap = 0.0
@@ -518,19 +469,17 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
     txt_duree_indic_kpi = f"{jours_indic_entiers}j {heures_indic_restantes}h"
 
     # ==============================================================================
-    # --- 4. AFFICHAGE DES KPIS COMPTABLES SUR DEUX LIGNES PROPRES ---
+    # --- 6. AFFICHAGE DES KPIS COMPTABLES SUR DEUX LIGNES PROPRES ---
     # ==============================================================================
     st.markdown("---")
     st.markdown("### 📊 Récapitulatif Budgétaire Consolidé (Sim-TP)")
     
-    # Ligne 1 : Les centres de coûts
     c_rc1, c_rc2, c_rc3, c_rc4 = st.columns(4)
     with c_rc1: st.metric(label="🧱 Total Matériaux", value=f"{txt_mats} €")
     with c_rc2: st.metric(label="🚜 Total Location", value=f"{txt_loc} €")
     with c_rc3: st.metric(label="👥 Total Salaires", value=f"{txt_sal} €")
     with c_rc4: st.metric(label="📉 Dépenses Totales", value=f"{txt_depenses} €")
 
-    # Ligne 2 : Restauration et alignement du montant, des bénéfices nets et des ROIs
     c_g1, c_g2, c_g3, c_g4, c_g5, c_g6 = st.columns(6)
     with c_g1: st.metric(label="💰 Montant du Chantier", value=f"{revenus:,.0f}".replace(",", " ") + " €")
     with c_g2: st.metric(label="📈 Bénéfice Net", value=f"{txt_benefice} €")
@@ -552,7 +501,6 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
     else: 
         st.error(f"🔴 **Chantier déficitaire :** Perte de **{txt_benefice} €** (ROI Global : **{roi_recap:.2f} %**)")
 
-    # --- 5. LIAISON COMPTABLE DIRECTE HISTORIQUE CLOUD ---
     if st.button("✅ VALIDER LE CALCUL ET ENVOYER À LA PAGE HISTORIQUE & CLASSEMENT", type="primary", width="stretch", key="btn_ajouter_chantier_final_v20"):
         df_actuel = db.charger_donnees()
         doublon_existe = False if df_actuel.empty else not df_actuel[(df_actuel["Nom du Chantier"] == nom_chantier) & (df_actuel["Revenus (€)"] == revenus)].empty
@@ -598,34 +546,23 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         popup_confirmation_enregistrement()
 
     # ==============================================================================
-    # 🎯 BLOC DE DIAGNOSTIC DES VARIABLES (TOUT EN BAS DE PAGE)
+    # 🎯 BLOC DE DIAGNOSTIC DES VARIABLES
     # ==============================================================================
     st.markdown("---")
     with st.expander("🔍 Centre de Diagnostic des Variables Système (Mode Développeur)", expanded=False):
         st.info("Ce panneau affiche l'état en temps réel des variables mémoire et des structures NoSQL lues sur Firebase.")
-        
-        # 1. Variables de Session Streamlit
-        st.markdown("##### 📱 Variables globales en Session (`st.session_state`)")
         st.json(dict(st.session_state))
         
-        # 2. État des Tableaux d'Édition
-        st.markdown("##### 📊 Données brutes des Tableaux (DataFrames)")
         c_diag1, c_diag2 = st.columns(2)
         with c_diag1:
             st.caption("Planification des Employés (RH) :")
             if 'tableau_employes_etapes' in locals() and tableau_employes_etapes is not None:
                 st.dataframe(pd.DataFrame(tableau_employes_etapes), use_container_width=True)
-            else:
-                st.caption("⚠️ Non initialisé ou vide")
         with c_diag2:
             st.caption("Flotte d'Engins par Étape :")
             if 'engins_necessaires_editeur' in locals() and engins_necessaires_editeur is not None:
                 st.dataframe(pd.DataFrame(engins_necessaires_editeur), use_container_width=True)
-            else:
-                st.caption("⚠️ Non initialisé ou vide")
                 
-        # 3. Variables de Tarifications RH issues de la base
-        st.markdown("##### 💰 Variables de Tarifs Courants (Extraits de Firebase)")
         dict_tarifs_diag = {
             "Taux Conducteurs (€/j)": px_cond if 'px_cond' in locals() else "Introuvable",
             "Taux Chefs (€/j)": px_chef if 'px_chef' in locals() else "Introuvable",
@@ -633,9 +570,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         }
         st.json(dict_tarifs_diag)
 
-        # 4. Liste Déroulante Générée
         st.markdown("##### 🚜 Options extraites pour le Menu Déroulant des Engins")
         if 'liste_engins_dropdown' in locals():
             st.write(liste_engins_dropdown)
-        else:
-            st.caption("⚠️ Variable 'liste_engins_dropdown' non générée dans ce contexte.")
+
