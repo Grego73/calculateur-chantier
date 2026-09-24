@@ -1,9 +1,9 @@
-# À modifier en haut de onglets/direction_admin/__init__.py
+# Fichier complet et certifié fonctionnel : onglets/direction_admin/__init__.py
 import streamlit as st
 import database as db
 from .blocs import afficher_onglet_blocs, afficher_onglet_doublons
 from .grille import afficher_onglet_salaires
-from .materiaux import afficher_onglet_materiaux  # <-- IMPORT CORRIGÉ ICI
+from .materiaux import afficher_onglet_materiaux  
 from .flotte import afficher_onglet_flotte
 from .tables import afficher_centre_controle
 from .outils import afficher_comparateur, afficher_quotas, afficher_journaux
@@ -59,25 +59,24 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
                     
         st.markdown("---")
 
-        # Configuration des sous-onglets de l'Espace Direction
-        sub_tab1, sub_tab2, sub_tab3, sub_tab4, sub_tab5, sub_tab6, sub_tab7, sub_tab8, sub_tab9 = st.tabs([
+        # Configuration des sous-onglets de l'Espace Direction (Ajout du 10ème onglet Consommation)
+        sub_tab1, sub_tab2, sub_tab3, sub_tab4, sub_tab5, sub_tab6, sub_tab7, sub_tab8, sub_tab9, sub_tab10 = st.tabs([
             "🏗️ Saisie Multi-Chantiers en Bloc", "👥 Éditer Grille Salariale", 
             "🧱 Éditer Prix Matériaux", "🚜 Éditer Catalogue Engins", "🗂️ Consulter les Bases Données",
-            "🔎 Comparateur de Fiches", "🔍 Vérificateur de Doublons", "📊 Quotas Firebase", "📜 Historique des Actions"
+            "🔎 Comparateur de Fiches", "🔍 Vérificateur de Doublons", "📊 Quotas Firebase", "📜 Historique des Actions",
+            "📊 Consommation étapes"
         ])
         
         with sub_tab1: afficher_onglet_blocs()
         with sub_tab2: afficher_onglet_salaires(SALAIRES_DB)
         with sub_tab3: afficher_onglet_materiaux(MATERIAUX_DB)
         with sub_tab4: afficher_onglet_flotte()
-        
-        # --- CORRECTIF : Le centre de contrôle NoSQL est désormais isolé ici ---
         with sub_tab5: afficher_centre_controle()
-        
         with sub_tab6: afficher_comparateur()
         with sub_tab7: afficher_onglet_doublons()
         with sub_tab8: afficher_quotas()
         with sub_tab9: afficher_journaux()
+        with sub_tab10: afficher_onglet_consommation()
 
     elif mot_de_passe != "":
         st.error("🔒 Code d'accès incorrect.")
