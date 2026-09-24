@@ -32,8 +32,9 @@ onglets_principaux = st.tabs([
 # 📋 ROUTAGE SECURISE ET ALIGNÉ DES ONGLETS PRINCIPAUX
 # ==============================================================================
 with onglets_principaux[0]:
-    # Utilise vos fonctions importées et vos variables chargées depuis Firebase
-    afficher_onglet_ajouter(config_salaires, catalogue_engins, config_materiaux)
+    # Remplacement de catalogue_engins par types_engins
+    afficher_onglet_ajouter(config_salaires, types_engins, config_materiaux)
+
 
 with onglets_principaux[1]:
     afficher_onglet_historique()
