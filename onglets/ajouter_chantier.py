@@ -308,31 +308,44 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         df_besoins_init = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "Type d'engin requis", "Niveau requis", "À louer ?", "❌ Supprimer la ligne"])
         raw_engins_state = st.session_state.get("cache_df_engins", df_besoins_init)
 
-        # 🎯 1. EXTRACTION STRICTE DE LA LISTE DE LA BASE DE DONNÉES (POUR LE MENU DÉROULANT)
+        # 🎯 1. EXTRACTION ET NETTOYAGE STRICT DE LA LISTE DEPUIS FIREBASE
         liste_engins_dropdown = []
         dict_prix_location_direct = {}
         try:
             engins_base = db.db.collection("configuration_engins").stream()
             for doc in engins_base:
                 d = doc.to_dict()
-                nom_brut = str(d.get("nom_brut")).strip()
-                liste_engins_dropdown.append(nom_brut)
-                # Utilisation du séparateur "_" pour correspondre scrupuleusement au catalogue
-                dict_prix_location_direct[f"{nom_brut}_{d.get('niveau')}"] = float(d.get("prix_location_jour", 380.0))
+                nom_brut = str(d.get("nom_brut", "")).strip()
+                niveau_brut = str(d.get("niveau", "N1")).strip()
+                
+                # On n'ajoute que les noms valides et non vides
+                if nom_brut and nom_brut != "None":
+                    liste_engins_dropdown.append(nom_brut)
+                    dict_prix_location_direct[f"{nom_brut}_{niveau_brut}"] = float(d.get("prix_location_jour", 380.0))
         except Exception:
             pass
 
+        # Sécurité : Si Firebase ne renvoie rien, on met des valeurs propres par défaut
         if not liste_engins_dropdown:
-            liste_engins_dropdown = ["Camion", "Pelle", "Dumper", "Bulldozer"]
-        liste_engins_dropdown = sorted(list(set(liste_engins_dropdown)))
+            liste_engins_dropdown = ["Camion", "Pelle", "Dumper", "Bulldozer", "Chargeur"]
+            
+        # Tri et suppression définitive des doublons ou valeurs corrompues
+        liste_engins_dropdown = sorted(list(set([str(x) for x in liste_engins_dropdown if x])))
 
-        # 🎯 2. RECUPÉRATION AUTOMATIQUE ET CALCUL DE LA DURÉE RÉELLE
+        # 🎯 2. SÉCURISATION DU DATAFRAME POUR L'ÉDITEUR (ÉVITE LES CELLULES BLANCHES)
+        if "Type d'engin requis" in raw_engins_state.columns:
+            # On force toutes les valeurs existantes à être du texte brut et on remplace les None par la 1ère option valide
+            raw_engins_state["Type d'engin requis"] = raw_engins_state["Type d'engin requis"].astype(str)
+            raw_engins_state.loc[raw_engins_state["Type d'engin requis"] == "None", "Type d'engin requis"] = liste_engins_dropdown[0]
+            raw_engins_state.loc[raw_engins_state["Type d'engin requis"] == "", "Type d'engin requis"] = liste_engins_dropdown[0]
+        else:
+            raw_engins_state["Type d'engin requis"] = liste_engins_dropdown[0]
+
+        # Recalcul automatique des durées réelles pour l'affichage
         if tableau_employes_etapes is not None and not tableau_employes_etapes.empty:
             df_rh_mapping = tableau_employes_etapes.dropna(subset=["N° Étape"])
-            # Mapping dynamique : Numéro Étape -> Durée Étape (jours)
             map_durees = dict(zip(df_rh_mapping["N° Étape"].astype(int), df_rh_mapping["Durée Étape (jours)"].astype(float)))
             
-            # Injection de la durée correspondante dans le tableau de la flotte
             if not raw_engins_state.empty:
                 for idx_row, row_eng in raw_engins_state.iterrows():
                     try:
@@ -345,14 +358,20 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         if "❌ Supprimer la ligne" not in raw_engins_state.columns:
             raw_engins_state["❌ Supprimer la ligne"] = False
 
-        # Affichage de l'éditeur d'engins par étape
+        # 🎯 3. AFFICHAGE DE L'ÉDITEUR AVEC CONFIGURATION SÉCURISÉE
         engins_necessaires_editeur = st.data_editor(
             raw_engins_state, num_rows="dynamic", width="stretch", key=f"editor_engins_data_{idx_refresh}", 
             column_config={
                 "N° Étape": st.column_config.NumberColumn("N° Étape", min_value=1, step=1, required=True, width="small"),
-                "Durée Étape (jours)": st.column_config.NumberColumn("Durée Réelle (j)", format="%.1f j", disabled=True),
-                "Type d'engin requis": st.column_config.SelectboxColumn("Type d'engin requis", options=liste_engins_dropdown, required=True),
-                "Niveau requis": st.column_config.SelectboxColumn("Niveau requis", options=["N1", "N2", "N3", "N4"], required=True),
+                "Durée Étape (jours)": st.column_config.NumberColumn("Durée Étele (j)", format="%.1f j", disabled=True),
+                # Utilisation d'une valeur par défaut obligatoire lors de l'ajout d'une ligne
+                "Type d'engin requis": st.column_config.SelectboxColumn(
+                    "Type d'engin requis", 
+                    options=liste_engins_dropdown, 
+                    required=True,
+                    default=liste_engins_dropdown[0]
+                ),
+                "Niveau requis": st.column_config.SelectboxColumn("Niveau requis", options=["N1", "N2", "N3", "N4"], required=True, default="N1"),
                 "À louer ?": st.column_config.CheckboxColumn("À louer ?", default=False),
                 "❌ Supprimer la ligne": st.column_config.CheckboxColumn("❌ Supprimer la ligne", default=False)
             }
