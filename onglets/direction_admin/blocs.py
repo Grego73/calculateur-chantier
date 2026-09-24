@@ -178,7 +178,7 @@ def afficher_onglet_blocs():
                     continue
 
                 # 🎯 6. EXTRACTION CORRIGÉE ET SÉCURISÉE AU SINGULIER AVEC MAJUSCULE EN PREMIER
-                if "requis :" in l_clean.lower() or "necessite :" in l_clean.lower():
+                if "requis" in l_clean.lower() or "necessite" in db_module.normaliser_texte(l_clean):
                     ligne_brute_clean = l_clean.lower().replace("é", "e").replace("è", "e").replace("à", "a")
                     cat_engin = None
                     
@@ -237,7 +237,7 @@ def afficher_onglet_blocs():
                 for n_e, e_data in data['etapes_techniques'].items():
                     desc_mats = f"🧱 Matériaux : {e_data['materiaux']}" if e_data['materiaux'] else "🧱 Matériaux : Aucun"
                     desc_engins = f"🚜 Engins : {len(e_data['engins'])} requis" if e_data['engins'] else "🚜 Engins : Aucun"
-                    st.caption(f"▪️ **Étape {n_e} ({e_data['duree_jours']}j) :** 🕹️ Cond: {e_data['jh_cond']} | 🧑‍💼 Chef: {e_data['jh_chef']} | <b>👷 Ouvriers:</b> {e_data['jh_ouvrier']} | {desc_mats} | {desc_engins}")
+                    st.caption(f"▪️ **Étape {n_e} ({e_data['duree_jours']}j) :** 🕹️ Cond: {e_data['jh_cond']} | 🧑‍💼 Chef: {e_data['jh_chef']} | 👷 Ouvriers: {e_data['jh_ouvrier']} | {desc_mats} | {desc_engins}")
 
             st.markdown("<br>", unsafe_allow_html=True)
             
