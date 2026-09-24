@@ -403,25 +403,51 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                 st.rerun()
 
         # ==============================================================================
-        # 🎯 3. RELEVÉ STRICT VERROUILLÉ ET LIÉ AU CATALOGUE SANS FAUTE DE FRAPPE
+        # 🎯 APPORT CORRECTIF : LIAISON DYNAMIQUE AVEC configuration_engins_officiels
         # ==============================================================================
         engins_transferes_list = []
         if engins_necessaires_editeur is not None and not engins_necessaires_editeur.empty and "À louer ?" in engins_necessaires_editeur.columns:
+            # Filtrage des lignes cochées "À louer ?" par l'utilisateur
             df_loues = engins_necessaires_editeur[engins_necessaires_editeur["À louer ?"] == True].dropna(subset=["Type d'engin requis"])
             
             for _, row in df_loues.iterrows():
                 engin_nom = str(row["Type d'engin requis"]).strip()
-                engin_niveau = str(row["Niveau requis"]).strip()
+                engin_niveau = str(row["Niveau requis"]).strip() # Ex: "N2"
                 duree_location = float(row["Durée Étape (jours)"]) if not pd.isna(row["Durée Étape (jours)"]) else 1.0
                 
-                # Clé unifiée avec le séparateur "_" pour une liaison à 100% avec le dictionnaire
-                cle_recherche_catalogue = f"{engin_nom}_{engin_niveau}"
-                prix_journalier_base = dict_prix_location_direct.get(cle_recherche_catalogue, 380.0)
+                # 🎯 CORRECTION DE LA CLÉ SÉCURISÉE POUR CORRESPONDRE À FIREBASE
+                # Vos documents sont enregistrés au format exact : "Nom_machine (NX)"
+                # Exemple : "Camion benne" + " (N1)" -> "Camion benne (N1)"
+                
+                # Règle de redressement pour le singulier/pluriel ou fautes de frappe de la base
+                nom_normalise = engin_nom
+                if nom_normalise.lower() == "camions benne":
+                    nom_normalise = "Camion benne"
+                elif nom_normalise.lower() == "pelleteuses":
+                    nom_normalise = "Pelleteuse"
+                elif nom_normalise.lower() == "camion béton malaxeur":
+                    nom_normalise = "Camion malaxeur"
+                
+                # Construction de l'ID Document exact visible sur votre capture Firebase
+                id_doc_firebase = f"{nom_normalise} ({engin_niveau})"
+                
+                # Prix de secours par défaut si le document n'existe pas encore
+                prix_journalier_cloud = 380.0 
+                
+                try:
+                    # Requête réseau en direct dans la bonne collection configurée par le parseur
+                    doc_snap = db.db.collection("configuration_engins_officiels").document(id_doc_firebase).get()
+                    if doc_snap.exists:
+                        data_engin = doc_snap.to_dict()
+                        # Extraction du champ exact : tarif_location_jour
+                        prix_journalier_cloud = float(data_engin.get("tarif_location_jour", 380.0))
+                except Exception:
+                    pass
                 
                 engins_transferes_list.append({
                     "engin_modele": f"🚜 {engin_nom} ({engin_niveau})", 
                     "Quantité": 1, 
-                    "Prix Location (€/jour)": prix_journalier_base, 
+                    "Prix Location (€/jour)": prix_journalier_cloud, 
                     "Jours de Location (Réels)": duree_location
                 })
                 
@@ -430,13 +456,13 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         if len(engins_transferes_list) > 0: 
             df_engins_init = pd.DataFrame(engins_transferes_list)
         
-        # Rendu du tableau logistique final sécurisé
+        # Rendu du tableau logistique totalement interfaçé aux vrais prix
         engins_edites = st.data_editor(
             df_engins_init, num_rows="dynamic", width="stretch", key=f"table_engins_a_louer_{idx_refresh}",
             column_config={
                 "engin_modele": st.column_config.TextColumn("Engin & Modèle", disabled=True),
                 "Quantité": st.column_config.NumberColumn("Quantité", min_value=1, default=1, step=1),
-                "Prix Location (€/jour)": st.column_config.NumberColumn("Prix/j (Catalogue)", min_value=0, step=10, format="%d €", disabled=True),
+                "Prix Location (€/jour)": st.column_config.NumberColumn("Prix/j (Catalogue)", min_value=0, step=10, format="%.2f €", disabled=True),
                 "Jours de Location (Réels)": st.column_config.NumberColumn("Durée Réelle (j)", format="%.1f j", disabled=True)
             }
         )
