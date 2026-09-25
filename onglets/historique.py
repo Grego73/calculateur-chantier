@@ -60,6 +60,22 @@ def afficher_onglet_historique():
     with c4: 
         st.metric(label="🏆 Top Projet (Bénéfice)", value=f"{val_top_chantier:,.0f}".replace(",", " ") + " €", delta=nom_top_chantier, delta_color="normal")
 
+    # 🎯 ACCROCHE VISUELLE : Les 5 chantiers les plus rentables de l'entreprise
+    st.markdown("#### 🏆 Top 5 des Chantiers les Plus Rentables")
+    
+    # Extraction et tri des 5 meilleurs chantiers par bénéfice net
+    df_top_5 = df_affichage.sort_values(by="Bénéfice Net (€)", ascending=False).head(5)
+    
+    # Rendu sous forme de petites cartes horizontales (colonnes)
+    cols_top = st.columns(len(df_top_5))
+    for idx, (_, row_top) in enumerate(df_top_5.iterrows()):
+        with cols_top[idx]:
+            st.metric(
+                label=f"⭐ Rang {idx+1} : {row_top['Nom du Chantier']}",
+                value=f"{int(row_top['Bénéfice Net (€)']):,} €".replace(",", " "),
+                delta=f"{row_top['ROI (%)']:.1f}% ROI" if "ROI (%)" in row_top else None
+            )
+    
     st.markdown("---")
 
     # 3. SECTION 2 : SYSTÈME DE FILTRES AVANCÉS (RECHERCHE ET TRIS)
