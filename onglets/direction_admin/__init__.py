@@ -9,6 +9,7 @@ from .tables import afficher_centre_controle
 from .outils import afficher_comparateur, afficher_journaux
 from .engins_jeu import afficher_onglet_catalogue_engins_total
 from onglets.direction_admin.consommation import afficher_onglet_consommation
+from .comparateur_rentabilite import afficher_onglet_comparateur_rentabilite
 
 
 def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
@@ -64,7 +65,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
             "🏗️ Saisie Multi-Chantiers en Bloc", "👥 Éditer Grille Salariale", 
             "🧱 Éditer Prix Matériaux", "🚜 Éditer Catalogue Engins", "🗂️ Consulter les Bases Données",
             "🔎 Comparateur de Fiches", "🔍 Vérificateur de Doublons", "📜 Historique des Actions",
-            "📊 Consommation étapes"
+            "📊 Consommation étapes", "📈 Plus Rentables"
         ])
         
         with sub_tab1: afficher_onglet_blocs()
@@ -76,6 +77,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
         with sub_tab7: afficher_onglet_doublons()
         with sub_tab8: afficher_journaux()
         with sub_tab9: afficher_onglet_consommation()
+        with sub_tab10: afficher_onglet_comparateur_rentabilite()
 
     elif mot_de_passe != "":
         st.error("🔒 Code d'accès incorrect.")
