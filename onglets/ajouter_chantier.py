@@ -555,7 +555,6 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                     details=f"Création et insertion du chantier cloud [{nom_chantier}] pour un CA de {revenus} €."
                 )
             st.toast("🚜 Simulation enregistrée avec succès sur le Cloud Firestore !")
-            st.snow()
 
     # ==============================================================================
     # 🎯 BLOC DE DIAGNOSTIC DES VARIABLES
