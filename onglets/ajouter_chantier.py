@@ -118,10 +118,15 @@ def popup_confirmation_enregistrement():
 # --- 2. EN-TÊTE PRINCIPAL DE SAISIE ---
 # ==============================================================================
 def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_ENGINS_BRUTS):
-    # 🎯 APPEL LOCAL : Le catalogue se charge uniquement ici et reste bien au chaud dans son cache !
-    CATALOGUE_CHANTIERS = db.charger_catalogue_chantiers()
-
     st.subheader("Formulaire de saisie")
+
+    # 🎯 VERROU MEMOIRE D'ONGLET : On charge le catalogue UNE SEULE FOIS en session
+    if "catalogue_chantiers_memoire" not in st.session_state:
+        with st.spinner("Chargement initial du catalogue de chantiers..."):
+            st.session_state["catalogue_chantiers_memoire"] = db.charger_catalogue_chantiers()
+            
+    # On utilise la copie stockée en mémoire vive qui répond en 0 milliseconde
+    CATALOGUE_CHANTIERS = st.session_state["catalogue_chantiers_memoire"]
     
     liste_triee = ["Choisir un chantier pré-configuré..."] + sorted([k for k in CATALOGUE_CHANTIERS.keys() if k != "Choisir un chantier pré-configuré..."])
     
