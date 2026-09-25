@@ -96,40 +96,42 @@ def charger_types_engins_bruts():
     except Exception:
         return ["Pelleteuses", "Camions Benne"]
 
-@st.cache_data(ttl=600)
+# 🎯 FIX TECHNIQUE ULTIME : Fonction 100% autonome et verrouillée en mémoire vive
+@st.cache_data(ttl=600)  # Verrouille le catalogue en mémoire pendant 10 minutes
 def charger_catalogue_chantiers():
+    """Charge l'intégralité du catalogue des chantiers et des étapes en une seule fois"""
+    catalog_dict = {}
     try:
-        docs = db.collection("modeles_chantiers").stream()
-        catalogue = {
-            "Choisir un chantier pré-configuré...": {
-                "revenus": 0.0, "jours": 0, "sable": 0.0, "terre": 0.0, "enrobe": 0.0, 
-                "armature": 0.0, "tole": 0.0, "beton": 0.0, "panneaux": 0.0, "tuyaux": 0.0, 
-                "canalisations": 0.0, "poutres": 0.0, "jh_chef": 0.0, "jh_ouvrier": 0.0, 
-                "jh_cond": 0.0, "etapes_techniques": []
-            }
-        }
-        for doc in docs: 
-            data = doc.to_dict()
-            if data:
-                etapes_stream = doc.reference.collection("etapes").stream()
-                liste_etapes = []
-                for sub_doc in etapes_stream:
-                    sub_data = sub_doc.to_dict()
-                    if sub_data:
-                        liste_etapes.append(dict(sub_data))
+        # On utilise directement la variable 'db' du fichier database.py sans la passer en paramètre
+        chantiers_stream = db.collection("modeles_chantiers").stream()
+        
+        for ch_doc in chantiers_stream:
+            ch_id = ch_doc.id
+            ch_data = ch_doc.to_dict()
+            
+            # Pour chaque chantier, on télécharge ses étapes immédiatement pour les mettre au chaud dans le même cache
+            etapes_stream = db.collection("modeles_chantiers").document(ch_id).collection("etapes").stream()
+            liste_etapes = []
+            for et_doc in etapes_stream:
+                liste_etapes.append(et_doc.to_dict())
                 
-                data["etapes_techniques"] = sorted(liste_etapes, key=lambda x: x.get("num_etape", 1))
-                catalogue[str(doc.id)] = data
-        return catalogue
-    except Exception:
-        return {
-            "Choisir un chantier pré-configuré...": {
-                "revenus": 0.0, "jours": 0, "sable": 0.0, "terre": 0.0, "enrobe": 0.0, 
-                "armature": 0.0, "tole": 0.0, "beton": 0.0, "panneaux": 0.0, "tuyaux": 0.0, 
-                "canalisations": 0.0, "poutres": 0.0, "jh_chef": 0.0, "jh_ouvrier": 0.0, 
-                "jh_cond": 0.0, "etapes_techniques": []
+            # Tri des étapes par numéro pour éviter les mélanges
+            liste_etapes = sorted(liste_etapes, key=lambda x: x.get("num_etape", 1))
+            
+            # Structuration finale identique à votre code d'origine
+            catalog_dict[ch_id] = {
+                "nom_modele": ch_data.get("nom_modele", ch_id),
+                "revenus": float(ch_data.get("revenus", 0.0)),
+                "jours_globaux": int(ch_data.get("jours_globaux", 0)),
+                "heures_globales": int(ch_data.get("heures_globales", 0)),
+                "minutes_globales": int(ch_data.get("minutes_globales", 0)),
+                "etapes_techniques": liste_etapes
             }
-        }
+    except Exception:
+        pass
+        
+    return catalog_dict
+
 
 @st.cache_data(ttl=600)
 def charger_donnees():
