@@ -105,14 +105,14 @@ def popup_confirmation_enregistrement():
             if "temp_submit_data" in st.session_state:
                 del st.session_state["temp_submit_data"]
             st.toast("🚀 Simulation enregistrée avec succès sur le Cloud Firestore !")
-            st.rerun()
+
             
     with col_pop2:
         if st.button("❌ ANNULER & MODIFIER", width="stretch"): 
             st.session_state["activer_popup_confirmation"] = False
             if "temp_submit_data" in st.session_state:
                 del st.session_state["temp_submit_data"]
-            st.rerun()
+
 
 # ==============================================================================
 # --- 2. EN-TÊTE PRINCIPAL DE SAISIE ---
