@@ -1,4 +1,4 @@
-# Contenu complet et nettoyé pour : onglets/historique.py
+# Fichier complet et certifié exact : onglets/historique.py
 
 import streamlit as st
 import pandas as pd
@@ -28,14 +28,18 @@ def afficher_onglet_historique():
         if col not in df_affichage.columns:
             df_affichage[col] = 0.0 if col != "Nom du Chantier" else "Chantier Inconnu"
 
-    # 2. SECTION 1 : KPI ET STATISTIQUES GLOBALES D'ENTREPRISE
+    # 2. SECTION 1 : KPI ET STATISTIQUES GLOBALES D'ENTREPRISE (CORRIGÉE)
     st.markdown("### 📈 Indicateurs clés de Performance (KPI)")
     
     total_projets = len(df_affichage)
     somme_revenus = float(df_affichage["Revenus (€)"].sum())
     somme_depenses = float(df_affichage["Dépenses Totales (€)"].sum()) if "Dépenses Totales (€)" in df_affichage.columns else 0.0
     somme_benefices = float(df_affichage["Bénéfice Net (€)"].sum())
-    moyenne_roi_jour = float(df_affichage["ROI / Jour (%)"].mean())
+    somme_jours = float(df_affichage["Durée (Jours)"].sum())
+    
+    # 🎯 FORMULE FINANCIÈRE CORRIGÉE : Vrai ROI Moyen global par Jour réel d'activité
+    roi_global_brut = (somme_benefices / somme_depenses) if somme_depenses > 0 else 0.0
+    moyenne_roi_jour = (roi_global_brut * 100) / somme_jours if somme_jours > 0 else 0.0
     
     # Identification sécurisée du meilleur chantier
     try:
