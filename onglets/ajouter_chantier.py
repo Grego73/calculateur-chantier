@@ -368,12 +368,27 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         if engins_necessaires_editeur is not None and not engins_necessaires_editeur.empty and "À louer ?" in engins_necessaires_editeur.columns:
             df_loues = engins_necessaires_editeur[engins_necessaires_editeur["À louer ?"] == True].dropna(subset=["Type d'engin requis"])
             
+            # 🔥 CORRECTION PERFORMANCE : On charge TOUS les tarifs de la base en UNE SEULE REQUÊTE et on les met en cache
+            @st.cache_data(ttl=300) # Garde en mémoire pendant 5 minutes
+            def charger_tarifs_engins_du_cloud():
+                dictionnaire_tarifs = {}
+                try:
+                    engins_stream = db.db.collection("engins").stream()
+                    for doc in engins_stream:
+                        dictionnaire_tarifs[doc.id] = float(doc.to_dict().get("tarif_location_jour", 380.0))
+                except Exception:
+                    pass
+                return dictionnaire_tarifs
+
+            # Appel immédiat de la fonction optimisée
+            catalogue_prix_memoire = charger_tarifs_engins_du_cloud()
+            
             for _, row in df_loues.iterrows():
                 engin_nom = str(row["Type d'engin requis"]).strip()
                 engin_niveau = str(row["Niveau requis"]).strip()
                 duree_location = float(row["Durée Étape (jours)"]) if not pd.isna(row["Durée Étape (jours)"]) else 1.0
                 
-                # 🎯 Recherche intelligente sur le niveau sans toucher au texte
+                # Recherche intelligente sur le niveau sans toucher au texte
                 paliers = ["N1", "N2", "N3", "N4"]
                 prix_journalier_cloud = 380.0
                 niveau_final_applique = engin_niveau
@@ -383,21 +398,17 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                 except ValueError:
                     idx_depart = 0
                 
-                # On teste le niveau demandé, puis les niveaux au-dessus si absent
+                # 🎯 RECHERCHE INSTANTANÉE EN MÉMOIRE SANS FAIRE DE REQUÊTE INTERNET EN BOUCLE
                 for i in range(idx_depart, len(paliers)):
                     niveau_test = paliers[i]
                     id_doc_firebase = f"{engin_nom} ({niveau_test})"
                     
-                    try:
-                        doc_snap = db.db.collection("engins").document(id_doc_firebase).get()
-                        if doc_snap.exists:
-                            prix_journalier_cloud = float(doc_snap.to_dict().get("tarif_location_jour", 380.0))
-                            niveau_final_applique = niveau_test
-                            break # On a trouvé le premier niveau disponible au-dessus, on s'arrête
-                    except Exception:
-                        pass
+                    if id_doc_firebase in catalogue_prix_memoire:
+                        prix_journalier_cloud = catalogue_prix_memoire[id_doc_firebase]
+                        niveau_final_applique = niveau_test
+                        break
                 
-                # 🎯 TEXTE D'ALERTE DYNAMIQUE : Si le niveau appliqué est supérieur au niveau requis
+                # Texte d'alerte dynamique
                 if niveau_final_applique != engin_niveau:
                     label_affichage = f"🚜 {engin_nom} ({engin_niveau}) ⚠️ Indisponible ➡️ {niveau_final_applique} tarifé"
                 else:
