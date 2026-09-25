@@ -8,10 +8,6 @@ import pytz
 def afficher_comparateur():
     st.markdown("### 🔎 Outil de Comparaison de Modèles")
 
-def afficher_quotas():
-    st.markdown("### 📊 Suivi de Consommation & Quotas Firebase (Plan Spark)")
-    st.progress(0.12, text="Lectures : 1 240 / 50 000 (2.4%)")
-
 def afficher_journaux():
     st.markdown("### 📜 Journal d'Audit & Traçabilité Cloud NoSQL")
     try:
