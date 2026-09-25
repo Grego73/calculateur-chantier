@@ -19,7 +19,6 @@ config_salaires = db.charger_salaires_config()
 config_materiaux = db.charger_materiaux_config()
 catalogue_engins = db.charger_catalogue_engins()
 types_engins = db.charger_types_engins_bruts()
-catalogue_chantiers = db.charger_catalogue_chantiers()
 
 # 2. AJOUTER "👥 Suivi Interne" DANS LA LISTE DES TABS :
 onglet1, onglet2, onglet3, onglet4 = st.tabs([
@@ -30,7 +29,7 @@ onglet1, onglet2, onglet3, onglet4 = st.tabs([
 ])
 
 with onglet1:
-    afficher_onglet_ajouter(config_salaires, config_materiaux, catalogue_engins, types_engins, catalogue_chantiers)
+    afficher_onglet_ajouter(config_salaires, config_materiaux, catalogue_engins, types_engins)
 
 with onglet2:
     afficher_onglet_historique()
