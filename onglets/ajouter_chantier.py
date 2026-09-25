@@ -1,5 +1,4 @@
-# Fichier complet, nettoyé et optimisé : onglets/ajouter_chantier.py
-
+# Fichier : onglets/ajouter_chantier.py (Section Haute Corrigée et Allégée)
 import streamlit as st
 import pandas as pd
 import math
@@ -114,22 +113,21 @@ def popup_confirmation_enregistrement():
                 del st.session_state["temp_submit_data"]
             st.rerun()
 
+
 # ==============================================================================
 # --- 2. EN-TÊTE PRINCIPAL DE SAISIE ---
 # ==============================================================================
 def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_ENGINS_BRUTS):
     st.subheader("Formulaire de saisie")
-
-    # 🎯 VERROU MEMOIRE D'ONGLET : On charge le catalogue UNE SEULE FOIS en session
-    if "catalogue_chantiers_memoire" not in st.session_state:
-        with st.spinner("Chargement initial du catalogue de chantiers..."):
-            st.session_state["catalogue_chantiers_memoire"] = db.charger_catalogue_chantiers()
+    
+    # 🎯 1. Extraction ultra-légère des noms uniquement pour le menu déroulant
+    if "liste_noms_chantiers_bruts" not in st.session_state:
+        with st.spinner("Synchronisation du catalogue..."):
+            docs_parents = db.db.collection("modeles_chantiers").select([]).stream()
+            st.session_state["liste_noms_chantiers_bruts"] = sorted([doc.id for doc in docs_parents])
             
-    # On utilise la copie stockée en mémoire vive qui répond en 0 milliseconde
-    CATALOGUE_CHANTIERS = st.session_state["catalogue_chantiers_memoire"]
-    
-    liste_triee = ["Choisir un chantier pré-configuré..."] + sorted([k for k in CATALOGUE_CHANTIERS.keys() if k != "Choisir un chantier pré-configuré..."])
-    
+    liste_triee = ["Choisir un chantier pré-configuré..."] + st.session_state["liste_noms_chantiers_bruts"]
+
     if "val_revenus" not in st.session_state:
         st.session_state["val_revenus"] = 0.0
         st.session_state["val_jours"] = 0
@@ -141,17 +139,69 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
     if "compteur_refresh_engins" not in st.session_state:
         st.session_state["compteur_refresh_engins"] = 0
 
-    def mise_a_jour_cache_modele():
-        st.session_state["compteur_refresh_engins"] += 1
-        
-        # 🎯 FIX PERFORMANCE FIN COMPTEUR : On supprime uniquement l'ancien éditeur visuel
-        # Plus de st.cache_data.clear() global ici ! On préserve charger_catalogue_chantiers().
-        for key in list(st.session_state.keys()):
-            if "editor_rh_data" in key or "editor_engins_data" in key:
-                del st.session_state[key]
+    # 🎯 2. Sélecteur de modèle
+    chantier_selectionne = st.selectbox(
+        "🚀 Sélectionner un modèle de chantier dynamique :", 
+        liste_triee, key="select_modele_chantier_dynamique"
+    )
 
-        selection = st.session_state["select_modele_chantier_dynamique"]
-        if selection == "Choisir un chantier pré-configuré...":
+    # 🎯 3. Téléchargement exclusif du chantier sélectionné (Anti-Surcharge)
+    CATALOGUE_CHANTIERS = {}
+    if chantier_selectionne != "Choisir un chantier pré-configuré...":
+        if st.session_state.get("dernier_chantier_charge") != chantier_selectionne:
+            with st.spinner("Chargement de la fiche technique..."):
+                doc_parent = db.db.collection("modeles_chantiers").document(chantier_selectionne).get()
+                etapes_stream = db.db.collection("modeles_chantiers").document(chantier_selectionne).collection("etapes").stream()
+                
+                liste_etapes = sorted([e.to_dict() for e in etapes_stream], key=lambda x: x.get("num_etape", 1))
+                ch_data = doc_parent.to_dict() if doc_parent.exists else {}
+                
+                st.session_state["fiche_active_chargee"] = {
+                    "nom_modele": ch_data.get("nom_modele", chantier_selectionne),
+                    "revenus": float(ch_data.get("revenus", 0.0)),
+                    "jours_globaux": int(ch_data.get("jours_globaux", 0)),
+                    "heures_globales": int(ch_data.get("heures_globales", 0)),
+                    "minutes_globales": int(ch_data.get("minutes_globales", 0)),
+                    "etapes_techniques": liste_etapes
+                }
+                st.session_state["dernier_chantier_charge"] = chantier_selectionne
+                
+                # Mise à jour des valeurs du formulaire
+                modele = st.session_state["fiche_active_chargee"]
+                st.session_state["val_revenus"] = float(modele.get("revenus", 0.0))
+                st.session_state["val_jours"] = int(modele.get("jours_globaux", 0))
+                st.session_state["val_heures"] = int(modele.get("heures_globales", 0))
+                st.session_state["val_minutes"] = int(modele.get("minutes_globales", 0))
+                
+                # Reconstruction des tableaux RH/Engins pour l'éditeur
+                lignes_rh = []
+                lignes_engins = []
+                liste_mats_cles = ["sable","terre","enrobe","armature","tole","beton","panneaux","tuyaux","canalisations","poutres"]
+                for m_k in liste_mats_cles: st.session_state[f"val_{m_k}"] = 0.0
+                
+                for etape in liste_etapes:
+                    num_e = etape.get("num_etape", 1)
+                    duree_j = etape.get("duree_jours", 1)
+                    mats_qp = etape.get("materiaux", {})
+                    for m_n, q_v in mats_qp.items():
+                        if m_n in liste_mats_cles: st.session_state[f"val_{m_n}"] += float(q_v)
+                        
+                    lignes_rh.append({
+                        "N° Étape": int(num_e), "Durée Étape (jours)": int(duree_j),
+                        "🕹️ Conducteurs": int(etape.get("jh_cond", 0)), "🧑‍💼 Chefs": int(etape.get("jh_chef", 0)), "👷 Ouvriers": int(etape.get("jh_ouvrier", 0))
+                    })
+                    for engine in etape.get("engins", []):
+                        lignes_engins.append({
+                            "N° Étape": int(num_e), "Durée Étape (jours)": int(duree_j),
+                            "Type d'engin requis": engine.get("type", "Autre"), "Niveau requis": engine.get("niveau", "N1"), "À louer ?": False
+                        })
+                st.session_state["cache_df_rh"] = pd.DataFrame(lignes_rh)
+                st.session_state["cache_df_engins"] = pd.DataFrame(lignes_engins).drop_duplicates(subset=["N° Étape", "Type d'engin requis", "Niveau requis"]).reset_index(drop=True)
+                st.session_state["compteur_refresh_engins"] += 1
+
+        CATALOGUE_CHANTIERS = {chantier_selectionne: st.session_state["fiche_active_chargee"]}
+    else:
+        if st.session_state.get("dernier_chantier_charge") != "Choisir un chantier pré-configuré...":
             st.session_state["val_revenus"] = 0.0
             st.session_state["val_jours"] = 0
             st.session_state["val_heures"] = 0
@@ -160,62 +210,12 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                 st.session_state[f"val_{mat}"] = 0.0
             st.session_state["cache_df_rh"] = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "🕹️ Conducteurs", "🧑‍💼 Chefs", "👷 Ouvriers"])
             st.session_state["cache_df_engins"] = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "Type d'engin requis", "Niveau requis", "À louer ?"])
-            return
-            
-        modele = CATALOGUE_CHANTIERS[selection]
-        # 🎯 On lit les étapes depuis le cache mémoire instantané !
-        etapes_cloud = db.charger_etapes_chantier_cache(selection)
-            
-        st.session_state["val_revenus"] = float(modele.get("revenus", 0.0))
-        st.session_state["val_jours"] = int(modele.get("jours_globaux", 0))
-        st.session_state["val_heures"] = int(modele.get("heures_globales", 0))
-        st.session_state["val_minutes"] = int(modele.get("minutes_globales", 0))
-        
-        liste_mats_cles = ["sable","terre","enrobe","armature","tole","beton","panneaux","tuyaux","canalisations","poutres"]
-        for mat in liste_mats_cles:
-            st.session_state[f"val_{mat}"] = 0.0
-            
-        lignes_rh = []
-        lignes_engins = []
-        
-        for etape in etapes_cloud:
-            num_e = etape.get("num_etape", 1)
-            duree_j = etape.get("duree_jours", 1)
-            
-            mats_qp = etape.get("materiaux", {})
-            for mat_nom, qte in mats_qp.items():
-                if mat_nom in liste_mats_cles:
-                    st.session_state[f"val_{mat_nom}"] += float(qte)
-                    
-            lignes_rh.append({
-                "N° Étape": int(num_e), "Durée Étape (jours)": int(duree_j),
-                "🕹️ Conducteurs": int(etape.get("jh_cond", 0)), "🧑‍💼 Chefs": int(etape.get("jh_chef", 0)), "👷 Ouvriers": int(etape.get("jh_ouvrier", 0))
-            })
-            
-            engins_etape = etape.get("engins", [])
-            for engine in engins_etape:
-                lignes_engins.append({
-                    "N° Étape": int(num_e), "Durée Étape (jours)": int(duree_j),
-                    "Type d'engin requis": engine.get("type", "Autre"), "Niveau requis": engine.get("niveau", "N1"), "À louer ?": False
-                })
-                
-        st.session_state["cache_df_rh"] = pd.DataFrame(lignes_rh)
-        df_engins_brut = pd.DataFrame(lignes_engins)
-        if not df_engins_brut.empty:
-            st.session_state["cache_df_engins"] = df_engins_brut.drop_duplicates(
-                subset=["N° Étape", "Type d'engin requis", "Niveau requis"], keep="first"
-            ).reset_index(drop=True)
-        else:
-            st.session_state["cache_df_engins"] = df_engins_brut
-            
-    idx_refresh = st.session_state["compteur_refresh_engins"]
+            st.session_state["dernier_chantier_charge"] = "Choisir un chantier pré-configuré..."
+            st.session_state["compteur_refresh_engins"] += 1
 
-    chantier_selectionne = st.selectbox(
-        "🚀 Sélectionner un modèle de chantier dynamique :", 
-        liste_triee, key="select_modele_chantier_dynamique", on_change=mise_a_jour_cache_modele
-    )
-    
+    idx_refresh = st.session_state["compteur_refresh_engins"]
     valeur_nom_defaut = "" if chantier_selectionne == "Choisir un chantier pré-configuré..." else chantier_selectionne
+    
     nom_chantier = st.text_input("Nom ou Numéro du chantier :", value=valeur_nom_defaut).strip()
     
     col1, col2 = st.columns(2)
