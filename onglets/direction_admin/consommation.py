@@ -3,59 +3,62 @@ import streamlit as st
 import pandas as pd
 import database as db_module
 
+@st.cache_data(ttl=300) # Met en cache le calcul lourd pendant 5 minutes
+def recuperer_donnees_consommation_cache():
+    chantiers_stream = db_module.db.collection("modeles_chantiers").stream()
+    lignes_consommation = []
+    
+    for chantier_doc in chantiers_stream:
+        id_chantier = chantier_doc.id
+        chantier_data = chantier_doc.to_dict()
+        nom_chantier = chantier_data.get("nom_modele", id_chantier.split(" - ")[0])
+
+        etapes_stream = db_module.db.collection("modeles_chantiers").document(id_chantier).collection("etapes").stream()
+        for etape_doc in etapes_stream:
+            etape_data = etape_doc.to_dict()
+            num_etape = etape_data.get("num_etape", 1)
+            nom_etape = etape_data.get("nom_etape", "Étape")
+            materiaux_etape = etape_data.get("materiaux", {})
+
+            if isinstance(materiaux_etape, dict) and materiaux_etape:
+                for mat_cle, quantite in materiaux_etape.items():
+                    if float(quantite) > 0:
+                        lignes_consommation.append({
+                            "Chantier": nom_chantier,
+                            "id_chantier": id_chantier,
+                            "num_etape": num_etape,
+                            "nom_etape": nom_etape,
+                            "mat_cle": mat_cle,
+                            "quantite": float(quantite)
+                        })
+    return lignes_consommation
+
 def afficher_onglet_consommation():
     st.markdown("### 🧱 Tableau de Consommation Globale des Matériaux par Étape")
-    st.caption("Ce tableau compile et totalise en direct les volumes requis étape par étape pour tous vos modèles de chantiers.")
+    st.caption("Ce tableau compile et totalise en direct les volumes requis étape par étape.")
 
-    # 1. Dictionnaire de traduction (Clés en minuscules/singulier conformes à Firestore)
     traduction_materiaux = {
-        "sable": "Sable",
-        "terre": "Terre",
-        "enrobe": "Enrobé",
-        "armature": "Armature métallique",
-        "tole": "Plaque de tôle ondulée",
-        "beton": "Béton",
-        "panneaux": "Panneaux signalisation",
-        "tuyaux": "Tuyaux d'eau standards",
-        "canalisations": "Canalisations eaux usées",
-        "poutres": "Poutres en acier"
+        "sable": "Sable", "terre": "Terre", "enrobe": "Enrobé", "armature": "Armature métallique",
+        "tole": "Plaque de tôle ondulée", "beton": "Béton", "panneaux": "Panneaux signalisation",
+        "tuyaux": "Tuyaux d'eau standards", "canalisations": "Canalisations eaux usées", "poutres": "Poutres en acier"
     }
 
     try:
-        # 2. Lecture de la Table 1 (Les chantiers parents)
-        chantiers_stream = db_module.db.collection("modeles_chantiers").stream()
+        # 🎯 APPEL SÉCURISÉ DU CACHE MEMOIRE
+        brut_logs = recuperer_donnees_consommation_cache()
         lignes_consommation = []
-
-        for chantier_doc in chantiers_stream:
-            id_chantier = chantier_doc.id  # Ex: "Pose de tuyaux d'eau potable (niveau 1) - 177360€"
-            chantier_data = chantier_doc.to_dict()
-            nom_chantier = chantier_data.get("nom_modele", id_chantier.split(" - ")[0])
-
-            # 3. Lecture de la Table 2 (Les sous-collections d'étapes liées)
-            etapes_stream = db_module.db.collection("modeles_chantiers").document(id_chantier).collection("etapes").stream()
+        
+        for item in brut_logs:
+            nom_propre_mat = traduction_materiaux.get(item["mat_cle"], item["mat_cle"].capitalize())
+            type_unite = "Tonnes" if item["mat_cle"] in ["sable", "terre", "enrobe", "beton"] else "Unités"
             
-            for etape_doc in etapes_stream:
-                etape_data = etape_doc.to_dict()
-                num_etape = etape_data.get("num_etape", 1)
-                nom_etape = etape_data.get("nom_etape", "Étape")
-                materiaux_etape = etape_data.get("materiaux", {})  # Map NoSQL en minuscules
-
-                # Si l'étape contient des matériaux, on les extrait un par un
-                if isinstance(materiaux_etape, dict) and materiaux_etape:
-                    for mat_cle, quantite in materiaux_etape.items():
-                        if float(quantite) > 0:
-                            nom_propre_mat = traduction_materiaux.get(mat_cle, mat_cle.capitalize())
-                            type_unite = "Tonnes" if mat_cle in ["sable", "terre", "enrobe", "beton"] else "Unités"
-                            
-                            # 🎯 CORRECTION VALIDÉE : Utilisation de num_etape stricte
-                            lignes_consommation.append({
-                                "Chantier": nom_chantier,
-                                "Étape": f"Étape {int(num_etape):02d} : {nom_etape}",
-                                "Matériau Requis": nom_propre_mat,
-                                "Quantité brute": float(quantite),
-                                "Unité": type_unite
-                            })
-
+            lignes_consommation.append({
+                "Chantier": item["Chantier"],
+                "Étape": f"Étape {int(item['num_etape']):02d} : {item['nom_etape']}",
+                "Matériau Requis": nom_propre_mat,
+                "Quantité brute": item["quantite"],
+                "Unité": type_unite
+            })
         # 4. Rendu visuel si des données existent
         if lignes_consommation:
             df_conso = pd.DataFrame(lignes_consommation)
