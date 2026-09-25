@@ -521,7 +521,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         st.error(f"🔴 **Chantier déficitaire :** Perte de **{txt_benefice} €** (ROI Global : **{roi_recap:.2f} %**)")
 
     # ==============================================================================
-    # --- 6. SOUMISSION ET OUVERTURE POPUP DE BILAN ---
+    # --- 6. LE BOUTON DE SOUMISSION DIRECT SUR LA PAGE ---
     # ==============================================================================
     if st.button("✅ VALIDER LE CALCUL ET ENVOYER À LA PAGE HISTORIQUE & CLASSEMENT", type="primary", width="stretch", key="btn_ajouter_chantier_final_v20"):
         df_actuel = db.charger_donnees()
@@ -532,39 +532,22 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         elif doublon_existe: 
             st.error(f"❌ Erreur NoSQL : Une fiche identique au nom de '{nom_chantier}' existe déjà dans l'Historique.")
         else:
-            st.session_state["temp_submit_data"] = {
-                "nom_chantier": nom_chantier, 
-                "revenus": revenus, 
-                "jours_saisis": jours_indic_entiers,
-                "heures_saisies": heures_indic_restantes, 
-                "minutes_saisies": 0,
-                "type_contrat_cond": type_contrat_cond, 
-                "type_contrat_chef": type_contrat_chef, 
-                "type_contrat_ouv": type_contrat_ouv,
-                "cout_cond": cout_cond, 
-                "cout_chefs": cout_chefs, 
-                "cout_ouvriers": cout_ouvriers,
-                "txt_mats": txt_mats, 
-                "txt_loc": txt_loc, 
-                "txt_sal": txt_sal, 
-                "txt_depenses": txt_depenses,
-                "roi_recap": roi_recap, 
-                "roi_par_jour_recap": roi_par_jour_recap, 
-                "txt_gain_jour": txt_gain_jour, 
-                "total_mats_recap": total_mats_recap, 
-                "total_location_recap": total_location_recap, 
-                "total_salaires_recap": total_salaires_recap,
-                "total_depenses_recap": total_depenses_recap, 
-                "benefice_net_recap": benefice_net_recap,
-                "jours_totaux": jours_totaux, 
-                "gain_par_jour_recap": gain_par_jour_recap,
-                "txt_duree_indic": txt_duree_indic_kpi, 
-                "txt_duree_etapes": txt_duree_etapes_kpi
-            }
-            st.session_state["activer_popup_confirmation"] = True
-
-    if st.session_state.get("activer_popup_confirmation") and "temp_submit_data" in st.session_state:
-        popup_confirmation_enregistrement()
+            # L'enregistrement se fait INSTANTANÉMENT ici sans ouvrir de popup lente
+            with st.spinner("Écriture cloud en cours vers l'historique..."):
+                db.inserer_chantier(
+                    nom_chantier, revenus, total_mats_recap, 
+                    total_location_recap, total_salaires_recap, 
+                    total_depenses_recap, benefice_net_recap, 
+                    round(roi_recap, 2), float(jours_totaux), 
+                    round(gain_par_jour_recap, 2), round(roi_par_jour_recap, 2)
+                )
+                
+                db.enregistrer_log(
+                    type_action="CHANTIER",
+                    details=f"Création et insertion du chantier cloud [{nom_chantier}] pour un CA de {revenus} €."
+                )
+            st.toast("🚀 Simulation enregistrée avec succès sur le Cloud Firestore !")
+            st.balloons()
 
     # ==============================================================================
     # 🎯 BLOC DE DIAGNOSTIC DES VARIABLES
@@ -594,3 +577,4 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         st.markdown("##### 🚜 Options extraites pour le Menu Déroulant des Engins")
         if 'liste_engins_dropdown' in locals():
             st.write(liste_engins_dropdown)
+
