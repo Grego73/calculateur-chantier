@@ -155,7 +155,8 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
             return
             
         modele = CATALOGUE_CHANTIERS[selection]
-        etapes_cloud = modele.get("etapes_techniques", [])
+        # 🎯 On lit les étapes depuis le cache mémoire instantané !
+        etapes_cloud = db.charger_etapes_chantier_cache(selection)
             
         st.session_state["val_revenus"] = float(modele.get("revenus", 0.0))
         st.session_state["val_jours"] = int(modele.get("jours_globaux", 0))
