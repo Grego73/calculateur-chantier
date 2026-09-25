@@ -6,7 +6,7 @@ from .grille import afficher_onglet_salaires
 from .materiaux import afficher_onglet_materiaux  
 from .flotte import afficher_onglet_flotte
 from .tables import afficher_centre_controle
-from .outils import afficher_comparateur, afficher_quotas, afficher_journaux
+from .outils import afficher_comparateur, afficher_journaux
 from .engins_jeu import afficher_onglet_catalogue_engins_total
 from onglets.direction_admin.consommation import afficher_onglet_consommation
 
@@ -63,7 +63,7 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
         sub_tab1, sub_tab2, sub_tab3, sub_tab4, sub_tab5, sub_tab6, sub_tab7, sub_tab8, sub_tab9, sub_tab10 = st.tabs([
             "🏗️ Saisie Multi-Chantiers en Bloc", "👥 Éditer Grille Salariale", 
             "🧱 Éditer Prix Matériaux", "🚜 Éditer Catalogue Engins", "🗂️ Consulter les Bases Données",
-            "🔎 Comparateur de Fiches", "🔍 Vérificateur de Doublons", "📊 Quotas Firebase", "📜 Historique des Actions",
+            "🔎 Comparateur de Fiches", "🔍 Vérificateur de Doublons", "📜 Historique des Actions",
             "📊 Consommation étapes"
         ])
         
@@ -74,9 +74,8 @@ def afficher_onglet_direction(SALAIRES_DB, MATERIAUX_DB):
         with sub_tab5: afficher_centre_controle()
         with sub_tab6: afficher_comparateur()
         with sub_tab7: afficher_onglet_doublons()
-        with sub_tab8: afficher_quotas()
-        with sub_tab9: afficher_journaux()
-        with sub_tab10: afficher_onglet_consommation()
+        with sub_tab8: afficher_journaux()
+        with sub_tab9: afficher_onglet_consommation()
 
     elif mot_de_passe != "":
         st.error("🔒 Code d'accès incorrect.")
