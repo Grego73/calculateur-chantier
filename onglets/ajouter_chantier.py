@@ -117,7 +117,10 @@ def popup_confirmation_enregistrement():
 # ==============================================================================
 # --- 2. EN-TÊTE PRINCIPAL DE SAISIE ---
 # ==============================================================================
-def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_ENGINS_BRUTS, CATALOGUE_CHANTIERS):
+def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_ENGINS_BRUTS):
+    # 🎯 APPEL LOCAL : Le catalogue se charge uniquement ici et reste bien au chaud dans son cache !
+    CATALOGUE_CHANTIERS = db.charger_catalogue_chantiers()
+
     st.subheader("Formulaire de saisie")
     
     liste_triee = ["Choisir un chantier pré-configuré..."] + sorted([k for k in CATALOGUE_CHANTIERS.keys() if k != "Choisir un chantier pré-configuré..."])
