@@ -556,30 +556,6 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                 )
             st.toast("🚜 Simulation enregistrée avec succès sur le Cloud Firestore !")
 
-    # ==============================================================================
-    # 🎯 BLOC DE DIAGNOSTIC DES VARIABLES
-    # ==============================================================================
-    st.markdown("---")
-    with st.expander("🔍 Centre de Diagnostic des Variables Système (Mode Développeur)", expanded=False):
-        st.info("Ce panneau affiche l'état en temps réel des variables mémoire et des structures NoSQL lues sur Firebase.")
-        st.json(dict(st.session_state))
-        
-        c_diag1, c_diag2 = st.columns(2)
-        with c_diag1:
-            st.caption("Planification des Employés (RH) :")
-            if 'tableau_employes_etapes' in locals() and tableau_employes_etapes is not None:
-                st.dataframe(pd.DataFrame(tableau_employes_etapes), use_container_width=True)
-        with c_diag2:
-            st.caption("Flotte d'Engins par Étape :")
-            if 'engins_necessaires_editeur' in locals() and engins_necessaires_editeur is not None:
-                st.dataframe(pd.DataFrame(engins_necessaires_editeur), use_container_width=True)
-                
-        dict_tarifs_diag = {
-            "Taux Conducteurs (€/j)": px_cond if 'px_cond' in locals() else "Introuvable",
-            "Taux Chefs (€/j)": px_chef if 'px_chef' in locals() else "Introuvable",
-            "Taux Ouvriers (€/j)": px_ouvrier if 'px_ouvrier' in locals() else "Introuvable"
-        }
-        st.json(dict_tarifs_diag)
 
         st.markdown("##### 🚜 Options extraites pour le Menu Déroulant des Engins")
         if 'liste_engins_dropdown' in locals():
