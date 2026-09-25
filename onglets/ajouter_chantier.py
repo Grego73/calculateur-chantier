@@ -1,4 +1,4 @@
-# Fichier complet et certifié fonctionnel : onglets/ajouter_chantier.py
+# Fichier complet, nettoyé et optimisé : onglets/ajouter_chantier.py
 
 import streamlit as st
 import pandas as pd
@@ -134,13 +134,15 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         st.session_state["compteur_refresh_engins"] = 0
 
     def mise_a_jour_cache_modele():
-        selection = st.session_state["select_modele_chantier_dynamique"]
         st.session_state["compteur_refresh_engins"] += 1
         
+        # 🎯 FIX PERFORMANCE FIN COMPTEUR : On supprime uniquement l'ancien éditeur visuel
+        # Plus de st.cache_data.clear() global ici ! On préserve charger_catalogue_chantiers().
         for key in list(st.session_state.keys()):
             if "editor_rh_data" in key or "editor_engins_data" in key:
                 del st.session_state[key]
 
+        selection = st.session_state["select_modele_chantier_dynamique"]
         if selection == "Choisir un chantier pré-configuré...":
             st.session_state["val_revenus"] = 0.0
             st.session_state["val_jours"] = 0
@@ -299,7 +301,6 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         df_besoins_init = pd.DataFrame(columns=["N° Étape", "Durée Étape (jours)", "Type d'engin requis", "Niveau requis", "À louer ?", "❌ Supprimer la ligne"])
         raw_engins_state = st.session_state.get("cache_df_engins", df_besoins_init)
 
-        # 🎯 1. EXTRACTION DE LA LISTE DE LA BASE DE DONNÉES DEPUIS LA COLLECTION "engins"
         liste_engins_dropdown = []
         try:
             engins_base = db.db.collection("engins").stream()
@@ -315,7 +316,6 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
             liste_engins_dropdown = ["Camion benne", "Pelleteuse", "Compacteur de sol", "Camion malaxeur", "Chargeur téléscopique"]
         liste_engins_dropdown = sorted(list(set(liste_engins_dropdown)))
 
-        # 🎯 2. RECUPÉRATION AUTOMATIQUE DE LA DURÉE RÉELLE SANS CELLULE BLANCHE
         if tableau_employes_etapes is not None and not tableau_employes_etapes.empty:
             df_rh_mapping = tableau_employes_etapes.dropna(subset=["N° Étape"])
             map_durees = dict(zip(df_rh_mapping["N° Étape"].astype(int), df_rh_mapping["Durée Étape (jours)"].astype(float)))
@@ -335,7 +335,6 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         if "❌ Supprimer la ligne" not in raw_engins_state.columns:
             raw_engins_state["❌ Supprimer la ligne"] = False
 
-        # 🎯 3. RENDU ÉDITEUR D'ENGINS PAR ÉTAPE (SÉCURISÉ AU SINGULIER STRICT)
         engins_necessaires_editeur = st.data_editor(
             raw_engins_state, num_rows="dynamic", width="stretch", key=f"editor_engins_data_{idx_refresh}", 
             column_config={
@@ -345,7 +344,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                     "Type d'engin requis", 
                     options=liste_engins_dropdown, 
                     required=True,
-                    default=liste_engins_dropdown[0] if liste_engins_dropdown else None
+                    default=liste_engins_dropdown if liste_engins_dropdown else None
                 ),
                 "Niveau requis": st.column_config.SelectboxColumn("Niveau requis", options=["N1", "N2", "N3", "N4"], required=True, default="N1"),
                 "À louer ?": st.column_config.CheckboxColumn("À louer ?", default=False),
@@ -362,14 +361,13 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                 st.rerun()
 
         # ==============================================================================
-        # 🎯 4. RELEVÉ DE LOCATION AUTOMATIQUE SANS FILTRE INTERMÉDIAIRE (SINGULIER DIRECT)
+        # 🎯 RELEVÉ DE LOCATION AUTOMATIQUE AVEC CACHE GROUPÉ EN MÉMOIRE
         # ==============================================================================
         engins_transferes_list = []
         if engins_necessaires_editeur is not None and not engins_necessaires_editeur.empty and "À louer ?" in engins_necessaires_editeur.columns:
             df_loues = engins_necessaires_editeur[engins_necessaires_editeur["À louer ?"] == True].dropna(subset=["Type d'engin requis"])
             
-            # 🔥 CORRECTION PERFORMANCE : On charge TOUS les tarifs de la base en UNE SEULE REQUÊTE et on les met en cache
-            @st.cache_data(ttl=300) # Garde en mémoire pendant 5 minutes
+            @st.cache_data(ttl=300)
             def charger_tarifs_engins_du_cloud():
                 dictionnaire_tarifs = {}
                 try:
@@ -380,7 +378,6 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                     pass
                 return dictionnaire_tarifs
 
-            # Appel immédiat de la fonction optimisée
             catalogue_prix_memoire = charger_tarifs_engins_du_cloud()
             
             for _, row in df_loues.iterrows():
@@ -388,7 +385,6 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                 engin_niveau = str(row["Niveau requis"]).strip()
                 duree_location = float(row["Durée Étape (jours)"]) if not pd.isna(row["Durée Étape (jours)"]) else 1.0
                 
-                # Recherche intelligente sur le niveau sans toucher au texte
                 paliers = ["N1", "N2", "N3", "N4"]
                 prix_journalier_cloud = 380.0
                 niveau_final_applique = engin_niveau
@@ -398,7 +394,6 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                 except ValueError:
                     idx_depart = 0
                 
-                # 🎯 RECHERCHE INSTANTANÉE EN MÉMOIRE SANS FAIRE DE REQUÊTE INTERNET EN BOUCLE
                 for i in range(idx_depart, len(paliers)):
                     niveau_test = paliers[i]
                     id_doc_firebase = f"{engin_nom} ({niveau_test})"
@@ -408,7 +403,6 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                         niveau_final_applique = niveau_test
                         break
                 
-                # Texte d'alerte dynamique
                 if niveau_final_applique != engin_niveau:
                     label_affichage = f"🚜 {engin_nom} ({engin_niveau}) ⚠️ Indisponible ➡️ {niveau_final_applique} tarifé"
                 else:
@@ -420,7 +414,6 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                     "Prix Location (€/jour)": prix_journalier_cloud, 
                     "Jours de Location (Réels)": duree_location
                 })
-
                 
         st.markdown("### --- RELEVÉ LOGISTIQUE DES ENGINS À LOUER ---")
         df_engins_init = pd.DataFrame(columns=["engin_modele", "Quantité", "Prix Location (€/jour)", "Jours de Location (Réels)"])
@@ -438,7 +431,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
         )
 
     # ==============================================================================
-    # --- 5. CONSOLIDATION FINANCIÈRE PAR ÉTAPE (TOUTE JOURNÉE ENTAMÉE EST DUE) ---
+    # --- 5. CONSOLIDATION COMPTABLE ET KPIS ---
     # ==============================================================================
     total_mats_recap = float(total_mats_direct)
     total_location_recap = 0.0
@@ -499,9 +492,6 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
     heures_indic_restantes = int(round((jours_totaux_indicatif - jours_indic_entiers) * 24))
     txt_duree_indic_kpi = f"{jours_indic_entiers}j {heures_indic_restantes}h"
 
-    # ==============================================================================
-    # --- 6. AFFICHAGE DES KPIS COMPTABLES SUR DEUX LIGNES PROPRES ---
-    # ==============================================================================
     st.markdown("---")
     st.markdown("### 📊 Récapitulatif Budgétaire Consolidé (Sim-TP)")
     
@@ -520,10 +510,7 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
     with c_g6: st.metric(label="⏱ Planification Élaborée (Réelle)", value=txt_duree_etapes_kpi)
 
     if jours_totaux_calcul_etapes > 0 and abs(jours_totaux_indicatif - jours_totaux_calcul_etapes) > 0.05:
-        st.warning(
-            f"⚠️ **Désynchronisation de planning :** La durée globale du contrat (`{txt_duree_indic_kpi}`) "
-            f"diffère de la durée réelle cumulée étape par étape (`{txt_duree_etapes_kpi}`)."
-        )
+        st.warning(f"⚠️ **Désynchronisation de planning :** La durée globale du contrat (`{txt_duree_indic_kpi}`) diffère de la durée réelle cumulée étape par étape (`{txt_duree_etapes_kpi}`).")
     else:
         st.success("✅ **Planning Parfaitement Aligné :** La durée réelle des étapes correspond à l'en-tête du contrat.")
 
@@ -532,6 +519,9 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
     else: 
         st.error(f"🔴 **Chantier déficitaire :** Perte de **{txt_benefice} €** (ROI Global : **{roi_recap:.2f} %**)")
 
+    # ==============================================================================
+    # --- 6. SOUMISSION ET OUVERTURE POPUP DE BILAN ---
+    # ==============================================================================
     if st.button("✅ VALIDER LE CALCUL ET ENVOYER À LA PAGE HISTORIQUE & CLASSEMENT", type="primary", width="stretch", key="btn_ajouter_chantier_final_v20"):
         df_actuel = db.charger_donnees()
         doublon_existe = False if df_actuel.empty else not df_actuel[(df_actuel["Nom du Chantier"] == nom_chantier) & (df_actuel["Revenus (€)"] == revenus)].empty
@@ -558,16 +548,16 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                 "txt_sal": txt_sal, 
                 "txt_depenses": txt_depenses,
                 "roi_recap": roi_recap, 
-                "roi_par_jour_recap": roi_par_jour_recap,
+                "roi_par_jour_recap": roi_par_jour_recap, 
                 "txt_gain_jour": txt_gain_jour, 
-                "total_mats_recap": total_mats_recap,
+                "total_mats_recap": total_mats_recap, 
                 "total_location_recap": total_location_recap, 
                 "total_salaires_recap": total_salaires_recap,
                 "total_depenses_recap": total_depenses_recap, 
                 "benefice_net_recap": benefice_net_recap,
                 "jours_totaux": jours_totaux, 
                 "gain_par_jour_recap": gain_par_jour_recap,
-                "txt_duree_indic": txt_duree_indic_kpi,
+                "txt_duree_indic": txt_duree_indic_kpi, 
                 "txt_duree_etapes": txt_duree_etapes_kpi
             }
             st.session_state["activer_popup_confirmation"] = True
@@ -575,3 +565,32 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
 
     if st.session_state.get("activer_popup_confirmation") and "temp_submit_data" in st.session_state:
         popup_confirmation_enregistrement()
+
+    # ==============================================================================
+    # 🎯 BLOC DE DIAGNOSTIC DES VARIABLES
+    # ==============================================================================
+    st.markdown("---")
+    with st.expander("🔍 Centre de Diagnostic des Variables Système (Mode Développeur)", expanded=False):
+        st.info("Ce panneau affiche l'état en temps réel des variables mémoire et des structures NoSQL lues sur Firebase.")
+        st.json(dict(st.session_state))
+        
+        c_diag1, c_diag2 = st.columns(2)
+        with c_diag1:
+            st.caption("Planification des Employés (RH) :")
+            if 'tableau_employes_etapes' in locals() and tableau_employes_etapes is not None:
+                st.dataframe(pd.DataFrame(tableau_employes_etapes), use_container_width=True)
+        with c_diag2:
+            st.caption("Flotte d'Engins par Étape :")
+            if 'engins_necessaires_editeur' in locals() and engins_necessaires_editeur is not None:
+                st.dataframe(pd.DataFrame(engins_necessaires_editeur), use_container_width=True)
+                
+        dict_tarifs_diag = {
+            "Taux Conducteurs (€/j)": px_cond if 'px_cond' in locals() else "Introuvable",
+            "Taux Chefs (€/j)": px_chef if 'px_chef' in locals() else "Introuvable",
+            "Taux Ouvriers (€/j)": px_ouvrier if 'px_ouvrier' in locals() else "Introuvable"
+        }
+        st.json(dict_tarifs_diag)
+
+        st.markdown("##### 🚜 Options extraites pour le Menu Déroulant des Engins")
+        if 'liste_engins_dropdown' in locals():
+            st.write(liste_engins_dropdown)
