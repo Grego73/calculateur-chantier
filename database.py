@@ -156,6 +156,21 @@ def charger_donnees():
     except Exception:
         return pd.DataFrame()
 
+# 🎯 REPAIR ABSOLU DES LENTEURS : À ajouter tout en bas de database.py
+
+@st.cache_data(ttl=300)  # Garde les étapes en mémoire pendant 5 minutes
+def charger_etapes_chantier_cache(chantier_id):
+    """Télécharge et met en cache les étapes d'un chantier pour éviter les requêtes en boucle"""
+    etapes_liste = []
+    try:
+        etapes_stream = db.collection("modeles_chantiers").document(chantier_id).collection("etapes").stream()
+        for doc in etapes_stream:
+            etapes_liste.append(doc.to_dict())
+    except Exception:
+        pass
+    return etapes_liste
+
+
 
 # ==============================================================================
 # --- 3. FONCTIONS D'ÉCRITURE ---
