@@ -561,7 +561,6 @@ def afficher_onglet_ajouter(SALAIRES_DB, MATERIAUX_DB, CATALOGUE_ENGINS, TYPES_E
                 "txt_duree_etapes": txt_duree_etapes_kpi
             }
             st.session_state["activer_popup_confirmation"] = True
-            st.rerun()
 
     if st.session_state.get("activer_popup_confirmation") and "temp_submit_data" in st.session_state:
         popup_confirmation_enregistrement()
