@@ -12,6 +12,7 @@ from onglets.suivi_interne import afficher_onglet_suivi_interne
 from onglets.ajouter_chantier import afficher_onglet_ajouter
 from onglets.historique import afficher_onglet_historique
 from onglets.suivi_contrats import afficher_onglet_suivi_contrats
+from onglets.marche_actuel import afficher_onglet_marche_actuel
 
 st.set_page_config(page_title="Gestion des Chantiers", page_icon="🏗️", layout="wide")
 st.title("Gestion et Rentabilité des Chantiers")
@@ -26,6 +27,7 @@ onglet1, onglet2, onglet3, onglet4, onglet5 = st.tabs([
     "➕ Ajouter un Chantier", 
     "📊 Historique & Classement",
     "📋 Contrats SIM-TP",
+    "🌍 Marché des Coopératives",
     "👥 Suivi Interne Coop",
     "🔒 Espace Direction"
 ])
@@ -41,10 +43,13 @@ with onglet3:
     afficher_onglet_suivi_contrats()
 
 with onglet4:
+    afficher_onglet_marche_actuel()
+
+with onglet5:
     # 3. L'APPEL DE LA FONCTION POUR CONSTRUIRE LA PAGE :
     afficher_onglet_suivi_interne(config_salaires, catalogue_engins, config_materiaux)
 
-with onglet5:
+with onglet6:
     afficher_onglet_direction(config_salaires, config_materiaux)
 
 
