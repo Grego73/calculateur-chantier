@@ -114,19 +114,21 @@ def afficher_onglet_suivi_contrats():
                     if "Surface du chantier" in text:
                         surface = text.split(':')[-1].strip()
                     if "Matériaux nécessaires" in text:
-                        materiaux_texte = text.split(':')[-1].strip()
+                        # On nettoie la chaîne pour enlever l'en-tête "Matériaux nécessaires :"
+                        materiaux_texte = text.split('Matériaux nécessaires :')[-1].strip()
 
-                # Extraction et cumul des besoins en matériaux
+                # --- 🎯 CORRECTIF DU MOTEUR LOGISTIQUE (REGEX ROBUSTE) ---
                 if "aucun" not in materiaux_texte.lower():
-                    elements_requis = materiaux_texte.split('+') if '+' in materiaux_texte else [materiaux_texte]
-                    for el in elements_requis:
-                        qte_match = re.search(r"(\d[\d\s]*)", el)
-                        if qte_match:
-                            val_requis = float(qte_match.group(1).replace(" ", ""))
-                            for cle_reg, nom_officiel in traduction_cles.items():
-                                if cle_reg in el.lower():
-                                    besoins_cumules[nom_officiel] += val_requis
-                                    break
+                    # Recherche globale de tous les couples [Nom / Chiffre] dans la chaîne nettoyée
+                    # Exemple traité : "Enrobé : 1710 tonnes + Sable : 1350 tonnes"
+                    for cle_reg, nom_officiel in traduction_cles.items():
+                        if cle_reg in materiaux_texte.lower():
+                            # Extraction du nombre spécifique qui suit directement le nom du matériau
+                            pattern = re.compile(rf"{cle_reg}.*?(\d[\d\s]*)", re.IGNORECASE)
+                            match = pattern.search(materiaux_texte.lower().replace("é", "e").replace("ô", "o"))
+                            if match:
+                                val_requis = float(match.group(1).replace(" ", ""))
+                                besoins_cumules[nom_officiel] += val_requis
 
                 status_card = item.find(class_='basic-card')
                 statut = status_card.text.strip() if status_card else "Non démarré"
