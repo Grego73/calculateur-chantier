@@ -4,9 +4,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import streamlit as st
 import database as db
 
-# 1. BIEN VÉRIFIER QUE L'IMPORT DE LA NOUVELLE PAGE EST PRÉSENT ICI :
-
-# Par le nouvel import du dossier segmenté :
+# Importations des onglets applicatifs
 from onglets.direction_admin import afficher_onglet_direction
 from onglets.suivi_interne import afficher_onglet_suivi_interne
 from onglets.ajouter_chantier import afficher_onglet_ajouter
@@ -22,8 +20,8 @@ config_materiaux = db.charger_materiaux_config()
 catalogue_engins = db.charger_catalogue_engins()
 types_engins = db.charger_types_engins_bruts()
 
-# Mettez à jour la structure existante en ajoutant le 5ème onglet à la suite :
-onglet1, onglet2, onglet3, onglet4, onglet5 = st.tabs([
+# 🔥 CORRECTIF : Déclaration stricte des 6 variables pour les 6 onglets créés
+onglet1, onglet2, onglet3, onglet4, onglet5, onglet6 = st.tabs([
     "➕ Ajouter un Chantier", 
     "📊 Historique & Classement",
     "📋 Contrats SIM-TP",
@@ -31,7 +29,6 @@ onglet1, onglet2, onglet3, onglet4, onglet5 = st.tabs([
     "👥 Suivi Interne Coop",
     "🔒 Espace Direction"
 ])
-
 
 with onglet1:
     afficher_onglet_ajouter(config_salaires, config_materiaux, catalogue_engins, types_engins)
@@ -46,15 +43,13 @@ with onglet4:
     afficher_onglet_marche_actuel()
 
 with onglet5:
-    # 3. L'APPEL DE LA FONCTION POUR CONSTRUIRE LA PAGE :
     afficher_onglet_suivi_interne(config_salaires, catalogue_engins, config_materiaux)
 
 with onglet6:
     afficher_onglet_direction(config_salaires, config_materiaux)
 
-
 # ==============================================================================
-# 🎯 BARRE DE DIAGNOSTIC GLOBALE (ALIGNÉE COMPLÈTEMENT À GAUCHE)
+# 🎯 BARRE DE DIAGNOSTIC GLOBALE
 # ==============================================================================
 from onglets.direction_admin.outils import afficher_barre_diagnostic_globale
 afficher_barre_diagnostic_globale()
