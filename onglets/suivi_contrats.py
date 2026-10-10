@@ -122,9 +122,8 @@ def afficher_onglet_suivi_contrats():
                 nom = item.get('data-nom', 'Chantier Inconnu')
                 revenu_brut = item.get('data-revenu', '0')
                 revenu = float(revenu_brut) if revenu_brut.isdigit() else 0.0
-                niveau = item.get('data-niveau', 'N/A')
 
-                form_annuler = item.find('form', action=lambda x: x and 'annuler-contract' in x)
+                form_annuler = item.find('form', action=lambda x: x and 'annuler-contrat' in x)
                 id_contrat = "Inconnu"
                 if form_annuler:
                     input_id = form_annuler.find('input', {'name': 'id'})
@@ -147,31 +146,30 @@ def afficher_onglet_suivi_contrats():
                 if status_card:
                     statut = status_card.text.strip()
 
-                # --- 👥 1. CORRECTION DU CALCUL DE LA DURÉE DU CONTRAT (EN JOURS DU) ---
-                # On extrait la taille ou longueur brute (ex: "3 km") pour en déduire la durée de base du contrat de niveau 1 (1 km = 1 jour de travail)
+                # --- 👥 1. MASSE SALARIALE CDI (JOURNÉE ENTAMÉE = DUE) ---
                 duree_totale_jours = 1.0
                 chiffres_surface = re.findall(r"(\d+)", surface)
                 if chiffres_surface:
                     val_surface = float(chiffres_surface[0])
                     if "km" in surface.lower():
-                        duree_totale_jours = val_surface # Règle Sim-TP : 3 km = 3 jours de travail
+                        duree_totale_jours = val_surface 
                     elif "m2" in surface.lower():
                         duree_totale_jours = max(1.0, math.ceil(val_surface / 100.0))
 
-                # Définition de la structure de l'équipe affectée selon le type de chantier
+                # Définition des structures RH d'étapes Sim-TP
                 nb_cond, nb_chef, nb_ouv = 1.0, 0.0, 0.0
                 if "tuyaux" in nom.lower() or "assainissement" in nom.lower():
                     nb_cond, nb_chef, nb_ouv = 1.0, 1.0, 2.0
                 elif "hangar" in nom.lower() or "batiment" in nom.lower():
                     nb_cond, nb_chef, nb_ouv = 1.0, 1.0, 3.0
 
-                # Calcul de la masse salariale brute sur la durée complète du contrat (Toute journée entamée est due)
+                # Calcul de la main d'œuvre sur les journées dues
                 jours_dus = math.ceil(duree_totale_jours)
                 cout_salaires_contrat = (
                     (nb_cond * px_cond) + (nb_chef * px_chef) + (nb_ouv * px_ouvrier)
                 ) * jours_dus
 
-                # --- 🧱 2. CALCUL DU COÛT DES MATÉRIAUX POUR L'ÉTAPE SUIVANTE ---
+                # --- 🧱 2. CALCUL DU COÛT DES MATÉRIAUX ---
                 cout_mats_contrat = 0.0
                 if "aucun" not in materiaux_texte.lower():
                     for cle_reg, nom_officiel in traduction_cles.items():
@@ -184,18 +182,17 @@ def afficher_onglet_suivi_contrats():
                                 prix_u = float(prix_coops_mini.get(nom_officiel, 0.0))
                                 cout_mats_contrat += val_requis * prix_u
 
-                # Marge nette prévisionnelle
+                # Rentabilité nette
                 marge_nette_prevue = revenu - cout_mats_contrat - cout_salaires_contrat
 
+                # 🎯 Les colonnes Niveau et Surface ne sont plus injectées ici
                 contrats_list.append({
                     "ID Contrat": id_contrat,
                     "Nom du Chantier": nom,
-                    "Niveau": f"Niveau {niveau}",
                     "Chiffre d'Affaires (€)": revenu,
                     "Coût Matériaux (€)": cout_mats_contrat,
                     "Masse Salariale (€)": cout_salaires_contrat,
                     "Marge Nette (€)": marge_nette_prevue,
-                    "Surface": surface,
                     "Matériaux Étape Suivante": materiaux_texte,
                     "Statut Actuel": statut
                 })
@@ -207,10 +204,10 @@ def afficher_onglet_suivi_contrats():
                 total_salaires = df_contrats["Masse Salariale (€)"].sum()
                 total_marge_nette = df_contrats["Marge Nette (€)"].sum()
 
-                # Rendu du tableau principal avec CA, Coûts et Marge alignés
+                # Rendu du tableau principal filtré sans Niveau ni Surface
                 st.markdown(f"### 🏗️ Vos Chantiers Signés ({len(contrats_list)} détectés)")
                 st.dataframe(
-                    df_contrats,
+                    df_contrats, 
                     use_container_width=True,
                     hide_index=True,
                     column_config={
@@ -305,4 +302,3 @@ def afficher_onglet_suivi_contrats():
 
         except Exception as e:
             st.error(f"❌ Erreur lors du parsing des fichiers : {e}")
-
