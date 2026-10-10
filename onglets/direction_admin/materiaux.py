@@ -61,9 +61,11 @@ def afficher_onglet_materiaux(MATERIAUX_DB):
                                 nom_coop = "Système / Inconnu"
                                 quantite_dispo = "illimité"
                                 
+                                # 🎯 REPAIR DU BUG DE MULTIPLE PARAGRAPHES (Extraction par Index)
                                 if len(p_elements) >= 2:
-                                    nom_coop = p_elements.text.strip()
-                                    txt_qte = p_elements.text.lower()
+                                    nom_coop = p_elements[0].text.strip()
+                                    txt_qte = p_elements[1].text.lower()
+                                    
                                     if "illimite" not in txt_qte:
                                         match_qte = re.search(r"(\d[\d\s]*)", txt_qte)
                                         if match_qte:
@@ -94,7 +96,7 @@ def afficher_onglet_materiaux(MATERIAUX_DB):
                         db.db.collection("configuration_materiaux").document("catalogue").set(form_mats)
                         
                         st.cache_data.clear()
-                        st.success(f"🟢 Marché mis à jour ! {compteur_offres} offres poussées sur le Cloud. Le calculateur de chantier a été mis à jour avec les meilleurs tarifs.")
+                        st.success(f"🟢 Marché mis à jour ! {compteur_offres} offres poussées sur le Cloud Firebase. Le calculateur a retenu les prix optimaux.")
                         st.balloons()
                         st.rerun()
                     else:
