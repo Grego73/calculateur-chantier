@@ -3,12 +3,13 @@ import pandas as pd
 import database as db
 from bs4 import BeautifulSoup
 import re
+import math
 
 def afficher_onglet_suivi_contrats():
     st.subheader("📋 Analyse des Contrats, Logistique & Masse Salariale CDI")
     st.write(
         "Collez le code source HTML de vos **Contrats** et de votre **Aire de Stockage** "
-        "pour croiser vos besoins avec vos stocks réels, vos tarifs de main-d'œuvre CDI (ramenés au jour) et le prix mini des coopératives."
+        "pour croiser vos besoins logistiques de l'étape suivante avec vos stocks réels et vos paies CDI."
     )
 
     # 1. Double zone d'importation HTML en colonnes
@@ -43,7 +44,6 @@ def afficher_onglet_suivi_contrats():
     prix_coops_mini = db.charger_materiaux_config()
     
     # --- 👥 EXTRACTION DES TARIFS CDI DEPUIS FIREBASE ---
-    # Règle Sim-TP : 1 semaine réelle = 1 mois de paie. On divise le salaire du mois par 7 pour le coût par jour.
     px_cond = 1600.0 / 7.0  
     px_chef = 2100.0 / 7.0
     px_ouvrier = 1470.0 / 7.0
@@ -124,7 +124,7 @@ def afficher_onglet_suivi_contrats():
                 revenu = float(revenu_brut) if revenu_brut.isdigit() else 0.0
                 niveau = item.get('data-niveau', 'N/A')
 
-                form_annuler = item.find('form', action=lambda x: x and 'annuler-contrat' in x)
+                form_annuler = item.find('form', action=lambda x: x and 'annuler-contract' in x)
                 id_contrat = "Inconnu"
                 if form_annuler:
                     input_id = form_annuler.find('input', {'name': 'id'})
@@ -147,29 +147,31 @@ def afficher_onglet_suivi_contrats():
                 if status_card:
                     statut = status_card.text.strip()
 
-                # --- 👥 1. ESTIMATION DE LA MASSE SALARIALE CDI (JOURNÉE ENTAMÉE = DUE) ---
-                jours_restants_projet = 1.0
-                match_jours = re.search(r"dans\s*(\d+)\s*jour", statut.lower())
-                if match_jours:
-                    jours_restants_projet = max(1.0, float(match_jours.group(1)))
-                    
-                # Sécurité : Si le jeu affiche moins de 24h restantes (0 jour), la journée est entamée donc due
-                if "0 jour" in statut.lower() and ("heure" in statut.lower() or "minute" in statut.lower()):
-                    jours_restants_projet = 1.0
+                # --- 👥 1. CORRECTION DU CALCUL DE LA DURÉE DU CONTRAT (EN JOURS DU) ---
+                # On extrait la taille ou longueur brute (ex: "3 km") pour en déduire la durée de base du contrat de niveau 1 (1 km = 1 jour de travail)
+                duree_totale_jours = 1.0
+                chiffres_surface = re.findall(r"(\d+)", surface)
+                if chiffres_surface:
+                    val_surface = float(chiffres_surface[0])
+                    if "km" in surface.lower():
+                        duree_totale_jours = val_surface # Règle Sim-TP : 3 km = 3 jours de travail
+                    elif "m2" in surface.lower():
+                        duree_totale_jours = max(1.0, math.ceil(val_surface / 100.0))
 
-                # Définition des équipes affectées par défaut selon le type de chantier
+                # Définition de la structure de l'équipe affectée selon le type de chantier
                 nb_cond, nb_chef, nb_ouv = 1.0, 0.0, 0.0
                 if "tuyaux" in nom.lower() or "assainissement" in nom.lower():
                     nb_cond, nb_chef, nb_ouv = 1.0, 1.0, 2.0
                 elif "hangar" in nom.lower() or "batiment" in nom.lower():
                     nb_cond, nb_chef, nb_ouv = 1.0, 1.0, 3.0
 
-                # Calcul de la main d'œuvre sur les journées dues (forfait jour ramené de la semaine)
+                # Calcul de la masse salariale brute sur la durée complète du contrat (Toute journée entamée est due)
+                jours_dus = math.ceil(duree_totale_jours)
                 cout_salaires_contrat = (
                     (nb_cond * px_cond) + (nb_chef * px_chef) + (nb_ouv * px_ouvrier)
-                ) * jours_restants_projet
+                ) * jours_dus
 
-                # --- 🧱 2. CALCUL DU COÛT DES MATÉRIAUX AU PRIX MINI ---
+                # --- 🧱 2. CALCUL DU COÛT DES MATÉRIAUX POUR L'ÉTAPE SUIVANTE ---
                 cout_mats_contrat = 0.0
                 if "aucun" not in materiaux_texte.lower():
                     for cle_reg, nom_officiel in traduction_cles.items():
@@ -182,7 +184,7 @@ def afficher_onglet_suivi_contrats():
                                 prix_u = float(prix_coops_mini.get(nom_officiel, 0.0))
                                 cout_mats_contrat += val_requis * prix_u
 
-                # Calcul du bénéfice net prévisionnel du contrat
+                # Marge nette prévisionnelle
                 marge_nette_prevue = revenu - cout_mats_contrat - cout_salaires_contrat
 
                 contrats_list.append({
@@ -194,7 +196,7 @@ def afficher_onglet_suivi_contrats():
                     "Masse Salariale (€)": cout_salaires_contrat,
                     "Marge Nette (€)": marge_nette_prevue,
                     "Surface": surface,
-                    "Matériaux Requis": materiaux_texte,
+                    "Matériaux Étape Suivante": materiaux_texte,
                     "Statut Actuel": statut
                 })
 
@@ -204,6 +206,7 @@ def afficher_onglet_suivi_contrats():
                 total_cout_mats = df_contrats["Coût Matériaux (€)"].sum()
                 total_salaires = df_contrats["Masse Salariale (€)"].sum()
                 total_marge_nette = df_contrats["Marge Nette (€)"].sum()
+
                 # Rendu du tableau principal avec CA, Coûts et Marge alignés
                 st.markdown(f"### 🏗️ Vos Chantiers Signés ({len(contrats_list)} détectés)")
                 st.dataframe(
@@ -218,14 +221,14 @@ def afficher_onglet_suivi_contrats():
                     }
                 )
 
-                # Vue macro des indicateurs consolidés de rentabilité
+                # KPIs macro-économiques consolidés d'entreprise
                 c_total1, c_total2, c_total3, c_total4 = st.columns(4)
                 with c_total1:
                     st.metric(label="Chiffre d'Affaires Prévu", value=f"{total_ca:,.0f}".replace(",", " ") + " €")
                 with c_total2:
-                    st.metric(label="Budget Matériaux Total", value=f"{total_cout_mats:,.0f}".replace(",", " ") + " €", delta_color="inverse")
+                    st.metric(label="Budget Matériaux Étape Suivante", value=f"{total_cout_mats:,.0f}".replace(",", " ") + " €", delta_color="inverse")
                 with c_total3:
-                    st.metric(label="Masse Salariale CDI Estimée", value=f"{total_salaires:,.0f}".replace(",", " ") + " €", delta_color="inverse")
+                    st.metric(label="Masse Salariale Globale CDI", value=f"{total_salaires:,.0f}".replace(",", " ") + " €", delta_color="inverse")
                 with c_total4:
                     st.metric(label="Bénéfice Net Réel Estimé", value=f"{total_marge_nette:,.0f}".replace(",", " ") + " €")
 
@@ -233,7 +236,7 @@ def afficher_onglet_suivi_contrats():
                 # --- ÉTAPE C : COMPARATEUR LOGISTIQUE (BESOINS VS STOCKS DE L'AIRE) ---
                 # ==========================================================================
                 st.markdown("---")
-                st.markdown("### 📊 Comparateur Logistique : Besoins Chantiers vs Stocks Disponibles")
+                st.markdown("### 📊 Comparateur Logistique : Besoins Étape Suivante vs Stocks Disponibles")
 
                 if not stocks_extraits:
                     st.info("💡 Pour activer la comparaison de votre stock réel (Aire) et calculer vos restes à charge, collez le code HTML de votre aire de stockage en haut à droite.")
@@ -257,7 +260,7 @@ def afficher_onglet_suivi_contrats():
 
                         lignes_comparatif.append({
                             "Matériau": mat_nom,
-                            "Total Requis (Chantiers)": besoin,
+                            "Total Requis (Étape Suivante)": besoin,
                             "En Réserve (Aire)": stock,
                             "Écart Restant": ecart,
                             "Prix Mini Coop": f"{prix_unitaire_coop:.0f} €",
@@ -273,7 +276,7 @@ def afficher_onglet_suivi_contrats():
                         use_container_width=True,
                         hide_index=True,
                         column_config={
-                            "Total Requis (Chantiers)": st.column_config.NumberColumn(format="%.0f"),
+                            "Total Requis (Étape Suivante)": st.column_config.NumberColumn(format="%.0f"),
                             "En Réserve (Aire)": st.column_config.NumberColumn(format="%.0f"),
                             "Écart Restant": st.column_config.NumberColumn(format="%.0f"),
                             "Reste à Payer (€)": st.column_config.NumberColumn(format="%.0f €"),
@@ -286,15 +289,15 @@ def afficher_onglet_suivi_contrats():
                         col_res1, col_res2 = st.columns(2)
                         with col_res1:
                             st.metric(
-                                label="💰 Reste à débourser pour combler les manques",
+                                label="💰 Reste à débourser en coopératives pour l'étape suivante",
                                 value=f"{cout_total_achat_coop:,.0f}".replace(",", " ") + " €"
                             )
                         with col_res2:
                             manquants_check = df_comparatif[df_comparatif["Écart Restant"] < 0]
                             if not manquants_check.empty:
-                                st.error("🚨 Des matériaux sont manquants ! Consultez la colonne 'Reste à Payer (€)' pour régulariser vos stocks.")
+                                st.error("🚨 Des matériaux manquent pour ouvrir l'étape suivante ! Consultez la colonne 'Reste à Payer (€)'.")
                             else:
-                                st.success("🎉 Vos stocks actuels couvrent à 100% vos besoins. Aucun achat requis !")
+                                st.success("🎉 Vos stocks actuels couvrent à 100% vos besoins futurs. Aucun achat requis !")
                 else:
                     st.caption("Félicitations, aucun besoin en matériau détecté sur vos fiches.")
             else:
