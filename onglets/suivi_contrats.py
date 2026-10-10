@@ -1,16 +1,17 @@
 import streamlit as st
 import pandas as pd
+import database as db
 from bs4 import BeautifulSoup
 import re
 
 def afficher_onglet_suivi_contrats():
-    st.subheader("📋 Analyse des Contrats & Vérification des Matériaux Disponibles")
+    st.subheader("📋 Analyse des Contrats & Estimation des Achats Matériaux")
     st.write(
         "Collez le code source HTML de vos **Contrats** et de votre **Aire de Stockage** "
-        "pour croiser vos besoins logistiques avec vos stocks réels."
+        "pour croiser vos besoins avec vos stocks réels et calculer le coût d'achat au prix mini des coopératives."
     )
 
-    # Double zone d'importation HTML en colonnes
+    # 1. Double zone d'importation HTML en colonnes
     col_import1, col_import2 = st.columns(2)
     
     with col_import1:
@@ -29,21 +30,25 @@ def afficher_onglet_suivi_contrats():
             key="html_stockage_cross"
         )
 
-    # Dictionnaires de parsing et de traduction standardisés
+    # --- DICTIONNAIRES DE PARSING ET DE TRADUCTION ---
+    # Liaison stricte avec les clés de votre base de données config_materiaux
     traduction_cles = {
         "sable": "Sable", "terre": "Terre", "enrobe": "Enrobé", 
-        "armature": "Armature métallique", "tole": "Plaque de tôle ondulée", 
-        "beton": "Béton", "panneaux": "Panneaux signalisation",
-        "tuyaux": "Tuyaux d'eau standards", "canalisations": "Canalisations eaux usées", 
-        "poutres": "Poutres en acier"
+        "armature": "Armature", "tole": "Tôle", 
+        "beton": "Béton", "panneaux": "Panneaux",
+        "tuyaux": "Tuyaux", "canalisation": "Canalisations", 
+        "poutre": "Poutres"
     }
 
-    # Initialisation des compteurs
+    # Récupération en direct des prix mini calculés et stockés par l'admin sur Firebase
+    prix_coops_mini = db.charger_materiaux_config()
+
+    # Initialisation des compteurs logistiques
     stocks_disponibles = {v: 0.0 for v in traduction_cles.values()}
     besoins_cumules = {v: 0.0 for v in traduction_cles.values()}
 
     # ==========================================================================
-    # --- ÉTAPE A : EXTRACTION DES STOCKS DISPONIBLES ---
+    # --- ÉTAPE A : EXTRACTION DES STOCKS DISPONIBLES DE L'AIRE ---
     # ==========================================================================
     stocks_extraits = False
     if html_stockage:
@@ -61,7 +66,7 @@ def afficher_onglet_suivi_contrats():
                         valeur_num = float(re.sub(r'[^0-9]', '', qte_brute)) if re.sub(r'[^0-9]', '', qte_brute) else 0.0
                         
                         for cle_regex, nom_officiel in traduction_cles.items():
-                            if cle_regex in nom_mat_brut.lower() or nom_officiel.lower() in nom_mat_brut.lower():
+                            if cle_regex in nom_mat_brut.lower():
                                 stocks_disponibles[nom_officiel] = valeur_num
                                 break
             stocks_extraits = True
@@ -114,16 +119,12 @@ def afficher_onglet_suivi_contrats():
                     if "Surface du chantier" in text:
                         surface = text.split(':')[-1].strip()
                     if "Matériaux nécessaires" in text:
-                        # On nettoie la chaîne pour enlever l'en-tête "Matériaux nécessaires :"
                         materiaux_texte = text.split('Matériaux nécessaires :')[-1].strip()
 
-                # --- 🎯 CORRECTIF DU MOTEUR LOGISTIQUE (REGEX ROBUSTE) ---
+                # --- EXTRACTION DES BESOINS VIA REGEX ULTRA BLINDÉE ---
                 if "aucun" not in materiaux_texte.lower():
-                    # Recherche globale de tous les couples [Nom / Chiffre] dans la chaîne nettoyée
-                    # Exemple traité : "Enrobé : 1710 tonnes + Sable : 1350 tonnes"
                     for cle_reg, nom_officiel in traduction_cles.items():
                         if cle_reg in materiaux_texte.lower():
-                            # Extraction du nombre spécifique qui suit directement le nom du matériau
                             pattern = re.compile(rf"{cle_reg}.*?(\d[\d\s]*)", re.IGNORECASE)
                             match = pattern.search(materiaux_texte.lower().replace("é", "e").replace("ô", "o"))
                             if match:
@@ -153,33 +154,47 @@ def afficher_onglet_suivi_contrats():
                 st.metric(label="Chiffre d'Affaires global prévisionnel", value=f"{total_ca:,.0f}".replace(",", " ") + " €")
                 
                 # ==========================================================================
-                # --- ÉTAPE C : COMPARATEUR BESOINS VS STOCKS ---
+                # --- ÉTAPE C : COMPARATEUR BESOINS VS STOCKS AVEC PRIX MINI COOP ---
                 # ==========================================================================
                 st.markdown("---")
-                st.markdown("### 📊 Comparateur Logistique : Besoins Chantiers vs Stocks Disponibles")
+                st.markdown("### 📊 Analyse Logistique & Budget d'Achat Coopératives")
                 
                 if not stocks_extraits:
-                    st.info("💡 Pour activer la comparaison des stocks en temps réel, collez le code HTML de votre aire de stockage dans la zone supérieure droite.")
+                    st.info("💡 Pour activer la comparaison des stocks et le calcul des coûts d'achat, collez le code HTML de votre aire de stockage en haut à droite.")
                 
                 lignes_comparatif = []
+                cout_total_achat_coop = 0.0
+
                 for mat_nom in traduction_cles.values():
                     besoin = besoins_cumules[mat_nom]
                     stock = stocks_disponibles[mat_nom]
                     ecart = stock - besoin
                     
+                    # Récupération du prix mini enregistré sur Firebase pour ce matériau
+                    prix_unitaire_coop = float(prix_coops_mini.get(mat_nom, 0.0))
+
                     if besoin > 0 or stock > 0:
-                        status_icone = "✅ OK" if ecart >= 0 else "🚨 MANQUANT"
+                        # Calcul du coût financier de la commande (uniquement sur ce qui manque)
+                        manquant = abs(ecart) if ecart < 0 else 0.0
+                        cout_achat_ligne = manquant * prix_unitaire_coop
+                        cout_total_achat_coop += cout_achat_ligne
+
+                        status_icone = "✅ Stock OK" if ecart >= 0 else "🚨 À commander"
+                        
                         lignes_comparatif.append({
                             "Matériau": mat_nom,
                             "Total Requis (Chantiers)": besoin,
                             "En Réserve (Aire)": stock,
                             "Écart Restant": ecart,
+                            "Prix Mini Coop (€)": f"{prix_unitaire_coop:.0f} €",
+                            "Coût d'Achat Estimé (€)": cout_achat_ligne,
                             "Statut Logistique": status_icone
                         })
 
                 if lignes_comparatif:
                     df_comparatif = pd.DataFrame(lignes_comparatif)
                     
+                    # Affichage de la table d'analyse financière et logistique
                     st.dataframe(
                         df_comparatif,
                         use_container_width=True,
@@ -188,16 +203,27 @@ def afficher_onglet_suivi_contrats():
                             "Total Requis (Chantiers)": st.column_config.NumberColumn(format="%.0f"),
                             "En Réserve (Aire)": st.column_config.NumberColumn(format="%.0f"),
                             "Écart Restant": st.column_config.NumberColumn(format="%.0f"),
+                            "Coût d'Achat Estimé (€)": st.column_config.NumberColumn(format="%.0f €"),
                             "Statut Logistique": st.column_config.TextColumn("Disponibilité")
                         }
                     )
                     
-                    # Alertes visuelles de santé logistique
-                    manquants = df_comparatif[df_comparatif["Écart Restant"] < 0]
-                    if not manquants.empty and stocks_extraits:
-                        st.error("⚠️ **Alerte Approvisionnement :** Vos stocks actuels ne couvrent pas la totalité des besoins de vos chantiers en cours.")
-                    elif stocks_extraits:
-                        st.success("🎉 **Logistique Parfaite :** Votre aire de stockage contient toutes les provisions requises pour couvrir vos contrats actuels !")
+                    # --- RENDU DES INDICATEURS DE COMMANDE FINAUX ---
+                    if stocks_extraits:
+                        col_res1, col_res2 = st.columns(2)
+                        with col_res1:
+                            st.metric(
+                                label="💰 Budget d'Achat Total Estimé (Au Prix Mini)", 
+                                value=f"{cout_total_achat_coop:,.0f}".replace(",", " ") + " €"
+                            )
+                        with col_res2:
+                            manquants_check = df_comparatif[df_comparatif["Écart Restant"] < 0]
+                            if not manquants_check.empty:
+                                st.error("🚨 Des matériaux sont manquants ! Consultez la colonne 'Coût d'Achat Estimé' pour vos commandes.")
+                            else:
+                                st.success("🎉 Vos stocks actuels couvrent à 100% vos besoins. Aucun achat requis !")
+                else:
+                    st.caption("Félicitations, aucun besoin en matériau détecté sur vos fiches.")
             else:
                 st.warning("⚠️ Aucun contrat valide trouvé dans le premier bloc HTML.")
 
