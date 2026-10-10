@@ -38,14 +38,16 @@ with onglet2:
     afficher_onglet_historique()
 
 with onglet3:
+    afficher_onglet_suivi_contrats()
+
+with onglet4:
     # 3. L'APPEL DE LA FONCTION POUR CONSTRUIRE LA PAGE :
     afficher_onglet_suivi_interne(config_salaires, catalogue_engins, config_materiaux)
 
-with onglet4:
+with onglet5:
     afficher_onglet_direction(config_salaires, config_materiaux)
 
-with onglet5:
-    afficher_onglet_suivi_contrats()
+
 # ==============================================================================
 # 🎯 BARRE DE DIAGNOSTIC GLOBALE (ALIGNÉE COMPLÈTEMENT À GAUCHE)
 # ==============================================================================
