@@ -25,9 +25,9 @@ types_engins = db.charger_types_engins_bruts()
 onglet1, onglet2, onglet3, onglet4, onglet5 = st.tabs([
     "➕ Ajouter un Chantier", 
     "📊 Historique & Classement",
-    "📋 Contrats SIM-TP"
+    "📋 Contrats SIM-TP",
     "👥 Suivi Interne Coop",
-    "🔒 Espace Direction",
+    "🔒 Espace Direction"
 ])
 
 
