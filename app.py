@@ -11,6 +11,7 @@ from onglets.direction_admin import afficher_onglet_direction
 from onglets.suivi_interne import afficher_onglet_suivi_interne
 from onglets.ajouter_chantier import afficher_onglet_ajouter
 from onglets.historique import afficher_onglet_historique
+from onglets.suivi_contrats import afficher_onglet_suivi_contrats
 
 st.set_page_config(page_title="Gestion des Chantiers", page_icon="🏗️", layout="wide")
 st.title("Gestion et Rentabilité des Chantiers")
@@ -20,13 +21,15 @@ config_materiaux = db.charger_materiaux_config()
 catalogue_engins = db.charger_catalogue_engins()
 types_engins = db.charger_types_engins_bruts()
 
-# 2. AJOUTER "👥 Suivi Interne" DANS LA LISTE DES TABS :
-onglet1, onglet2, onglet3, onglet4 = st.tabs([
+# Mettez à jour la structure existante en ajoutant le 5ème onglet à la suite :
+onglet1, onglet2, onglet3, onglet4, onglet5 = st.tabs([
     "➕ Ajouter un Chantier", 
-    "📊 Historique & Classement", 
+    "📊 Historique & Classement",
+    "📋 Contrats SIM-TP"
     "👥 Suivi Interne Coop",
     "🔒 Espace Direction",
 ])
+
 
 with onglet1:
     afficher_onglet_ajouter(config_salaires, config_materiaux, catalogue_engins, types_engins)
@@ -41,7 +44,8 @@ with onglet3:
 with onglet4:
     afficher_onglet_direction(config_salaires, config_materiaux)
 
-
+with onglet5:
+    afficher_onglet_suivi_contrats()
 # ==============================================================================
 # 🎯 BARRE DE DIAGNOSTIC GLOBALE (ALIGNÉE COMPLÈTEMENT À GAUCHE)
 # ==============================================================================
