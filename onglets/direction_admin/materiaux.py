@@ -5,100 +5,114 @@ from bs4 import BeautifulSoup
 import re
 
 def afficher_onglet_materiaux(MATERIAUX_DB):
-    st.markdown("### 🧱 Coût unitaire d'Approvisionnement des Matériaux")
+    st.markdown("### 🧱 Configuration & Injection Globale du Marché NoSQL")
     
-    # Table de correspondance entre les identifiants HTML (data-category) et les clés de votre base NoSQL
     liaison_categories = {
-        "sable": "Sable", "terre": "Terre", "enrobe": "Enrobé", 
-        "armature": "Armature", "toles_ondulees": "Tôle", 
-        "beton": "Béton", "panneaux": "Panneaux", "tuyaux": "Tuyaux", 
-        "tuyaux_assainissement": "Canalisations", "poutres_acier": "Poutres"
+        "sable": {"nom": "Sable", "unite": "tonne", "type": "vrac"},
+        "terre": {"nom": "Terre", "unite": "tonne", "type": "vrac"},
+        "enrobe": {"nom": "Enrobé", "unite": "tonne", "type": "vrac"},
+        "beton": {"nom": "Béton", "unite": "tonne", "type": "vrac"},
+        "tuyaux": {"nom": "Tuyaux", "unite": "u", "type": "structure"},
+        "tuyaux_assainissement": {"nom": "Canalisations", "unite": "u", "type": "structure"},
+        "armature": {"nom": "Armature", "unite": "u", "type": "structure"},
+        "toles_ondulees": {"nom": "Tôle", "unite": "u", "type": "structure"},
+        "poutres_acier": {"nom": "Poutres", "unite": "u", "type": "structure"},
+        "panneaux": {"nom": "Panneaux", "unite": "u", "type": "structure"}
     }
 
     form_mats = dict(MATERIAUX_DB)
+    liste_cles = list(form_mats.keys())
 
-    # ==========================================================================
-    # --- 🎯 PARSEUR ET INJECTEUR AUTOMATIQUE DU MARCHÉ DES COOPÉRATIVES ---
-    # ==========================================================================
-    with st.expander("📥 MISE À JOUR AUTOMATIQUE VIA HTML DES COOPÉRATIVES", expanded=True):
-        st.write("Collez ici le code source HTML de la page 'Acheter des matériaux' pour configurer automatiquement les meilleurs prix du marché.")
-        html_coops = st.text_area("Code source HTML du marché :", height=130, key="textarea_update_prix_mats_coop")
+    with st.expander("📥 IMPORTER LE HTML DU MARCHÉ (SAUVEGARDE & CONFIGURATION GENERALE)", expanded=True):
+        st.write("Collez ici le code source HTML de la page 'Acheter des matériaux' pour mettre à jour la page Marché et configurer le calculateur.")
+        html_coops = st.text_area("Code source HTML du marché :", height=130, key="textarea_admin_global_injector")
         
-        if st.button("⚡ ANALYSER LE MARCHÉ & RETENIR LES MEILLEURS TARIFS", type="secondary", use_container_width=True):
+        if st.button("⚡ SYNCHRONISER L'INTÉGRALITÉ DU MARCHÉ SUR FIREBASE", type="primary", use_container_width=True):
             if html_coops.strip():
                 try:
                     soup = BeautifulSoup(html_coops, 'html.parser')
                     cartes_offres = soup.find_all(class_="exp-card")
                     
+                    # 1. Purge complète de l'ancien marché public
+                    docs_anciens = db.db.collection("offres_cooperatives").stream()
+                    for d_old in docs_anciens:
+                        d_old.reference.delete()
+
                     meilleurs_prix_detectes = {}
                     compteur_offres = 0
 
-                    for carte in cartes_offres:
+                    # 2. Scan et enregistrement de CHAQUE offre individuelle en base
+                    for idx, carte in enumerate(cartes_offres):
                         cat_brute = carte.get("data-category")
                         if cat_brute in liaison_categories:
-                            cle_db = liaison_categories[cat_brute]
+                            config = liaison_categories[cat_brute]
+                            cle_db = config["nom"]
                             
-                            # Extraction du tarif de l'offre (Ex: "13 € / tonne" ou "71 € / unité")
                             title_span = carte.find(class_="exp-title")
+                            prix_offre = 0.0
                             if title_span:
-                                text_prix = title_span.text
-                                match_prix = re.search(r"(\d[\d\s]*)\s*€", text_prix)
+                                match_prix = re.search(r"(\d[\d\s]*)\s*€", title_span.text)
                                 if match_prix:
                                     prix_offre = float(match_prix.group(1).replace(" ", ""))
-                                    compteur_offres += 1
-                                    
-                                    # On retient le prix le plus bas trouvé pour ce matériau (le meilleur tarif)
-                                    if cle_db not in meilleurs_prix_detectes or prix_offre < meilleurs_prix_detectes[cle_db]:
-                                        meilleurs_prix_detectes[cle_db] = prix_offre
 
-                    # Injection des valeurs détectées dans la structure de session pour mettre à jour les inputs
+                            form_body = carte.find(class_="exp-body")
+                            if form_body:
+                                p_elements = form_body.find_all('p')
+                                nom_coop = "Système / Inconnu"
+                                quantite_dispo = "illimité"
+                                
+                                if len(p_elements) >= 2:
+                                    nom_coop = p_elements.text.strip()
+                                    txt_qte = p_elements.text.lower()
+                                    if "illimite" not in txt_qte:
+                                        match_qte = re.search(r"(\d[\d\s]*)", txt_qte)
+                                        if match_qte:
+                                            quantite_dispo = f"{int(match_qte.group(1).replace(' ', ''))} {config['unite']}s dispos"
+
+                                # Enregistrement de l'offre brute pour la page publique
+                                id_unique_offre = f"offre_{idx:03d}_{cat_brute}_{nom_coop.lower().replace(' ', '_')}"
+                                db.db.collection("offres_cooperatives").document(id_unique_offre).set({
+                                    "materiau": config["nom"],
+                                    "type_logistique": config["type"],
+                                    "unite": config["unite"],
+                                    "cooperative": nom_coop,
+                                    "prix_unitaire": prix_offre,
+                                    "quantite_dispo": quantite_dispo
+                                })
+                                compteur_offres += 1
+
+                                # Calcul du prix le plus bas pour l'onglet "Ajouter Chantier"
+                                if cle_db not in meilleurs_prix_detectes or prix_offre < meilleurs_prix_detectes[cle_db]:
+                                    meilleurs_prix_detectes[cle_db] = prix_offre
+
                     if meilleurs_prix_detectes:
+                        # On injecte les meilleurs prix dans le catalogue de calcul
                         for cle_m, prix_m in meilleurs_prix_detectes.items():
-                            st.session_state[f"input_prix_dynamique_{cle_m}"] = prix_m
+                            form_mats[cle_m] = prix_m
                         
-                        st.success(f"🎉 Analyse terminée ! {compteur_offres} offres analysées. Les prix optimaux ont été pré-remplis dans les champs ci-dessous. Cliquez sur le bouton vert pour valider.")
+                        # Enregistrement du catalogue de calcul
+                        db.db.collection("configuration_materiaux").document("catalogue").set(form_mats)
+                        
+                        st.cache_data.clear()
+                        st.success(f"🟢 Marché mis à jour ! {compteur_offres} offres poussées sur le Cloud. Le calculateur de chantier a été mis à jour avec les meilleurs tarifs.")
+                        st.balloons()
+                        st.rerun()
                     else:
-                        st.warning("⚠️ Aucun badge de prix valide n'a pu être extrait. Vérifiez que vous avez copié la bonne page.")
-                        
+                        st.warning("⚠️ Aucun prix valide détecté.")
                 except Exception as e:
-                    st.error(f"❌ Erreur lors du traitement analytique du fichier : {e}")
+                    st.error(f"❌ Erreur lors de l'enregistrement NoSQL : {e}")
             else:
-                st.error("⚠️ La zone de texte est vide.")
+                st.error("⚠️ Veuillez coller le code HTML.")
 
     # ==========================================================================
-    # --- FORMULAIRE D'ÉDITION CLASSIQUE CONSERVÉ ET SYNCHRONISÉ ---
+    # --- AFFICHAGE SIMPLE DES TARIFS EN BASE ---
     # ==========================================================================
-    st.markdown("#### ⚙️ Ajustement unitaire manuel des tarifs configurés")
-    
+    st.markdown("#### 📋 Prix actuellement appliqués sur le Calculateur")
     col_m1, col_m2 = st.columns(2)
-    liste_cles = list(form_mats.keys())
     milieu = math.ceil(len(liste_cles) / 2)
-    
     with col_m1:
         for m_k in liste_cles[:milieu]:
-            # Initialisation sécurisée par session_state pour capter les modifications du parseur
-            key_state = f"input_prix_dynamique_{m_k}"
-            if key_state not in st.session_state:
-                st.session_state[key_state] = float(form_mats[m_k])
-                
-            form_mats[m_k] = st.number_input(f"Prix {m_k} (€) :", min_value=0.0, step=1.0, key=key_state)
-            
+            st.number_input(f"Prix {m_k} (€) :", value=float(form_mats[m_k]), disabled=True)
     with col_m2:
         for m_k in liste_cles[milieu:]:
-            key_state = f"input_prix_dynamique_{m_k}"
-            if key_state not in st.session_state:
-                st.session_state[key_state] = float(form_mats[m_k])
-                
-            form_mats[m_k] = st.number_input(f"Prix {m_k} (€) :", min_value=0.0, step=1.0, key=key_state)
-            
-    if st.button("✅ RE-SYNCHRONISER LES PRIX MATÉRIAUX", type="primary", use_container_width=True):
-        db.db.collection("configuration_materiaux").document("catalogue").set(form_mats)
-        st.cache_data.clear()
-        
-        # Nettoyage des clés temporaires de la session après l'écriture Firebase
-        for m_k in liste_cles:
-            if f"input_prix_dynamique_{m_k}" in st.session_state:
-                del st.session_state[f"input_prix_dynamique_{m_k}"]
-                
-        st.toast("🧱 Prix synchronisés avec succès sur Firestore !")
-        st.rerun()
+            st.number_input(f"Prix {m_k} (€) :", value=float(form_mats[m_k]), disabled=True)
