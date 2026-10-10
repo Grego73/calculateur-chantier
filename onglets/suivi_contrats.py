@@ -5,10 +5,10 @@ from bs4 import BeautifulSoup
 import re
 
 def afficher_onglet_suivi_contrats():
-    st.subheader("📋 Analyse des Contrats & Estimation des Achats Matériaux")
+    st.subheader("📋 Analyse des Contrats, Logistique & Masse Salariale CDI")
     st.write(
         "Collez le code source HTML de vos **Contrats** et de votre **Aire de Stockage** "
-        "pour croiser vos besoins avec vos stocks réels et calculer le coût d'achat au prix mini des coopératives."
+        "pour croiser vos besoins avec vos stocks réels, vos tarifs de main-d'œuvre CDI (ramenés au jour) et le prix mini des coopératives."
     )
 
     # 1. Double zone d'importation HTML en colonnes
@@ -31,7 +31,6 @@ def afficher_onglet_suivi_contrats():
         )
 
     # --- DICTIONNAIRES DE PARSING ET DE TRADUCTION ---
-    # Liaison stricte avec les clés de votre base de données config_materiaux
     traduction_cles = {
         "sable": "Sable", "terre": "Terre", "enrobe": "Enrobé", 
         "armature": "Armature", "tole": "Tôle", 
@@ -40,10 +39,31 @@ def afficher_onglet_suivi_contrats():
         "poutre": "Poutres"
     }
 
-    # Récupération en direct des prix mini calculés et stockés par l'admin sur Firebase
+    # Récupération en direct des configurations de prix mini et de salaires sur Firebase
     prix_coops_mini = db.charger_materiaux_config()
+    
+    # --- 👥 EXTRACTION DES TARIFS CDI DEPUIS FIREBASE ---
+    # Règle Sim-TP : 1 semaine réelle = 1 mois de paie. On divise le salaire du mois par 7 pour le coût par jour.
+    px_cond = 1600.0 / 7.0  
+    px_chef = 2100.0 / 7.0
+    px_ouvrier = 1470.0 / 7.0
+    
+    try:
+        snap_cond = db.db.collection("synthese_grille_tarifaire").document("Conducteur_CDI (Salaire mensuel)").get().to_dict()
+        if snap_cond: 
+            px_cond = float(snap_cond.get("prix_moyen_mensuel", 1600.0)) / 7.0
+            
+        snap_chef = db.db.collection("synthese_grille_tarifaire").document("Chef_CDI (Salaire mensuel)").get().to_dict()
+        if snap_chef: 
+            px_chef = float(snap_chef.get("prix_moyen_mensuel", 2100.0)) / 7.0
+            
+        snap_ouv = db.db.collection("synthese_grille_tarifaire").document("Ouvrier_CDI (Salaire mensuel)").get().to_dict()
+        if snap_ouv: 
+            px_ouvrier = float(snap_ouv.get("prix_moyen_mensuel", 1470.0)) / 7.0
+    except Exception:
+        pass
 
-    # Initialisation des compteurs logistiques
+    # Initialisation des compteurs logistiques globaux
     stocks_disponibles = {v: 0.0 for v in traduction_cles.values()}
     besoins_cumules = {v: 0.0 for v in traduction_cles.values()}
 
@@ -74,7 +94,7 @@ def afficher_onglet_suivi_contrats():
             st.error(f"❌ Erreur lors de l'analyse de l'aire de stockage : {e}")
 
     # ==========================================================================
-    # --- ÉTAPE B : EXTRACTION DES CONTRATS EN COURS ---
+    # --- ÉTAPE B : EXTRACTION DES CONTRATS EN COURS & CALCULS RH ---
     # ==========================================================================
     if html_contrats:
         try:
@@ -113,6 +133,8 @@ def afficher_onglet_suivi_contrats():
 
                 surface = "Inconnue"
                 materiaux_texte = "Aucun"
+                statut = "Non démarré"
+                
                 paragraphs = item.find_all('p')
                 for p in paragraphs:
                     text = p.text.strip()
@@ -121,7 +143,34 @@ def afficher_onglet_suivi_contrats():
                     if "Matériaux nécessaires" in text:
                         materiaux_texte = text.split('Matériaux nécessaires :')[-1].strip()
 
-                # --- EXTRACTION DES BESOINS VIA REGEX ULTRA BLINDÉE ---
+                status_card = item.find(class_='basic-card')
+                if status_card:
+                    statut = status_card.text.strip()
+
+                # --- 👥 1. ESTIMATION DE LA MASSE SALARIALE CDI (JOURNÉE ENTAMÉE = DUE) ---
+                jours_restants_projet = 1.0
+                match_jours = re.search(r"dans\s*(\d+)\s*jour", statut.lower())
+                if match_jours:
+                    jours_restants_projet = max(1.0, float(match_jours.group(1)))
+                    
+                # Sécurité : Si le jeu affiche moins de 24h restantes (0 jour), la journée est entamée donc due
+                if "0 jour" in statut.lower() and ("heure" in statut.lower() or "minute" in statut.lower()):
+                    jours_restants_projet = 1.0
+
+                # Définition des équipes affectées par défaut selon le type de chantier
+                nb_cond, nb_chef, nb_ouv = 1.0, 0.0, 0.0
+                if "tuyaux" in nom.lower() or "assainissement" in nom.lower():
+                    nb_cond, nb_chef, nb_ouv = 1.0, 1.0, 2.0
+                elif "hangar" in nom.lower() or "batiment" in nom.lower():
+                    nb_cond, nb_chef, nb_ouv = 1.0, 1.0, 3.0
+
+                # Calcul de la main d'œuvre sur les journées dues (forfait jour ramené de la semaine)
+                cout_salaires_contrat = (
+                    (nb_cond * px_cond) + (nb_chef * px_chef) + (nb_ouv * px_ouvrier)
+                ) * jours_restants_projet
+
+                # --- 🧱 2. CALCUL DU COÛT DES MATÉRIAUX AU PRIX MINI ---
+                cout_mats_contrat = 0.0
                 if "aucun" not in materiaux_texte.lower():
                     for cle_reg, nom_officiel in traduction_cles.items():
                         if cle_reg in materiaux_texte.lower():
@@ -130,15 +179,20 @@ def afficher_onglet_suivi_contrats():
                             if match:
                                 val_requis = float(match.group(1).replace(" ", ""))
                                 besoins_cumules[nom_officiel] += val_requis
+                                prix_u = float(prix_coops_mini.get(nom_officiel, 0.0))
+                                cout_mats_contrat += val_requis * prix_u
 
-                status_card = item.find(class_='basic-card')
-                statut = status_card.text.strip() if status_card else "Non démarré"
+                # Calcul du bénéfice net prévisionnel du contrat
+                marge_nette_prevue = revenu - cout_mats_contrat - cout_salaires_contrat
 
                 contrats_list.append({
                     "ID Contrat": id_contrat,
                     "Nom du Chantier": nom,
                     "Niveau": f"Niveau {niveau}",
                     "Chiffre d'Affaires (€)": revenu,
+                    "Coût Matériaux (€)": cout_mats_contrat,
+                    "Masse Salariale (€)": cout_salaires_contrat,
+                    "Marge Nette (€)": marge_nette_prevue,
                     "Surface": surface,
                     "Matériaux Requis": materiaux_texte,
                     "Statut Actuel": statut
@@ -147,21 +201,43 @@ def afficher_onglet_suivi_contrats():
             if contrats_list:
                 df_contrats = pd.DataFrame(contrats_list)
                 total_ca = df_contrats["Chiffre d'Affaires (€)"].sum()
-
-                # Rendu du tableau des contrats
+                total_cout_mats = df_contrats["Coût Matériaux (€)"].sum()
+                total_salaires = df_contrats["Masse Salariale (€)"].sum()
+                total_marge_nette = df_contrats["Marge Nette (€)"].sum()
+                # Rendu du tableau principal avec CA, Coûts et Marge alignés
                 st.markdown(f"### 🏗️ Vos Chantiers Signés ({len(contrats_list)} détectés)")
-                st.dataframe(df_contrats, use_container_width=True, hide_index=True)
-                st.metric(label="Chiffre d'Affaires global prévisionnel", value=f"{total_ca:,.0f}".replace(",", " ") + " €")
-                
+                st.dataframe(
+                    df_contrats,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "Chiffre d'Affaires (€)": st.column_config.NumberColumn(format="%.0f €"),
+                        "Coût Matériaux (€)": st.column_config.NumberColumn(format="%.0f €"),
+                        "Masse Salariale (€)": st.column_config.NumberColumn(format="%.0f €"),
+                        "Marge Nette (€)": st.column_config.NumberColumn(format="%.0f €")
+                    }
+                )
+
+                # Vue macro des indicateurs consolidés de rentabilité
+                c_total1, c_total2, c_total3, c_total4 = st.columns(4)
+                with c_total1:
+                    st.metric(label="Chiffre d'Affaires Prévu", value=f"{total_ca:,.0f}".replace(",", " ") + " €")
+                with c_total2:
+                    st.metric(label="Budget Matériaux Total", value=f"{total_cout_mats:,.0f}".replace(",", " ") + " €", delta_color="inverse")
+                with c_total3:
+                    st.metric(label="Masse Salariale CDI Estimée", value=f"{total_salaires:,.0f}".replace(",", " ") + " €", delta_color="inverse")
+                with c_total4:
+                    st.metric(label="Bénéfice Net Réel Estimé", value=f"{total_marge_nette:,.0f}".replace(",", " ") + " €")
+
                 # ==========================================================================
-                # --- ÉTAPE C : COMPARATEUR BESOINS VS STOCKS AVEC PRIX MINI COOP ---
+                # --- ÉTAPE C : COMPARATEUR LOGISTIQUE (BESOINS VS STOCKS DE L'AIRE) ---
                 # ==========================================================================
                 st.markdown("---")
-                st.markdown("### 📊 Analyse Logistique & Budget d'Achat Coopératives")
-                
+                st.markdown("### 📊 Comparateur Logistique : Besoins Chantiers vs Stocks Disponibles")
+
                 if not stocks_extraits:
-                    st.info("💡 Pour activer la comparaison des stocks et le calcul des coûts d'achat, collez le code HTML de votre aire de stockage en haut à droite.")
-                
+                    st.info("💡 Pour activer la comparaison de votre stock réel (Aire) et calculer vos restes à charge, collez le code HTML de votre aire de stockage en haut à droite.")
+
                 lignes_comparatif = []
                 cout_total_achat_coop = 0.0
 
@@ -169,32 +245,29 @@ def afficher_onglet_suivi_contrats():
                     besoin = besoins_cumules[mat_nom]
                     stock = stocks_disponibles[mat_nom]
                     ecart = stock - besoin
-                    
-                    # Récupération du prix mini enregistré sur Firebase pour ce matériau
+
                     prix_unitaire_coop = float(prix_coops_mini.get(mat_nom, 0.0))
 
                     if besoin > 0 or stock > 0:
-                        # Calcul du coût financier de la commande (uniquement sur ce qui manque)
                         manquant = abs(ecart) if ecart < 0 else 0.0
                         cout_achat_ligne = manquant * prix_unitaire_coop
                         cout_total_achat_coop += cout_achat_ligne
 
                         status_icone = "✅ Stock OK" if ecart >= 0 else "🚨 À commander"
-                        
+
                         lignes_comparatif.append({
                             "Matériau": mat_nom,
                             "Total Requis (Chantiers)": besoin,
                             "En Réserve (Aire)": stock,
                             "Écart Restant": ecart,
-                            "Prix Mini Coop (€)": f"{prix_unitaire_coop:.0f} €",
-                            "Coût d'Achat Estimé (€)": cout_achat_ligne,
+                            "Prix Mini Coop": f"{prix_unitaire_coop:.0f} €",
+                            "Reste à Payer (€)": cout_achat_ligne,
                             "Statut Logistique": status_icone
                         })
 
                 if lignes_comparatif:
                     df_comparatif = pd.DataFrame(lignes_comparatif)
-                    
-                    # Affichage de la table d'analyse financière et logistique
+
                     st.dataframe(
                         df_comparatif,
                         use_container_width=True,
@@ -203,23 +276,23 @@ def afficher_onglet_suivi_contrats():
                             "Total Requis (Chantiers)": st.column_config.NumberColumn(format="%.0f"),
                             "En Réserve (Aire)": st.column_config.NumberColumn(format="%.0f"),
                             "Écart Restant": st.column_config.NumberColumn(format="%.0f"),
-                            "Coût d'Achat Estimé (€)": st.column_config.NumberColumn(format="%.0f €"),
+                            "Reste à Payer (€)": st.column_config.NumberColumn(format="%.0f €"),
                             "Statut Logistique": st.column_config.TextColumn("Disponibilité")
                         }
                     )
-                    
-                    # --- RENDU DES INDICATEURS DE COMMANDE FINAUX ---
+
                     if stocks_extraits:
+                        st.markdown("<br>", unsafe_allow_html=True)
                         col_res1, col_res2 = st.columns(2)
                         with col_res1:
                             st.metric(
-                                label="💰 Budget d'Achat Total Estimé (Au Prix Mini)", 
+                                label="💰 Reste à débourser pour combler les manques",
                                 value=f"{cout_total_achat_coop:,.0f}".replace(",", " ") + " €"
                             )
                         with col_res2:
                             manquants_check = df_comparatif[df_comparatif["Écart Restant"] < 0]
                             if not manquants_check.empty:
-                                st.error("🚨 Des matériaux sont manquants ! Consultez la colonne 'Coût d'Achat Estimé' pour vos commandes.")
+                                st.error("🚨 Des matériaux sont manquants ! Consultez la colonne 'Reste à Payer (€)' pour régulariser vos stocks.")
                             else:
                                 st.success("🎉 Vos stocks actuels couvrent à 100% vos besoins. Aucun achat requis !")
                 else:
@@ -229,3 +302,4 @@ def afficher_onglet_suivi_contrats():
 
         except Exception as e:
             st.error(f"❌ Erreur lors du parsing des fichiers : {e}")
+
