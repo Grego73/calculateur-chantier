@@ -9,7 +9,7 @@ def afficher_onglet_suivi_contrats():
     st.subheader("📋 Analyse des Contrats, Logistique & Masse Salariale CDI")
     st.write(
         "Collez le code source HTML de vos **Contrats** et de votre **Aire de Stockage** "
-        "pour croiser vos besoins logistiques de l'étape suivante avec vos stocks réels et vos paies CDI."
+        "pour croiser vos besoins logistiques de l'étape suivante avec vos stocks réels et vos paies CDI exactes."
     )
 
     # 1. Double zone d'importation HTML en colonnes
@@ -40,28 +40,22 @@ def afficher_onglet_suivi_contrats():
         "poutre": "Poutres"
     }
 
-    # Récupération en direct des configurations de prix mini et de salaires sur Firebase
+    # Récupération sécurisée du catalogue de prix des matériaux
     prix_coops_mini = db.charger_materiaux_config()
     
-    # --- 👥 EXTRACTION DES TARIFS CDI DEPUIS FIREBASE ---
-    px_cond = 1600.0 / 7.0  
-    px_chef = 2100.0 / 7.0
-    px_ouvrier = 1470.0 / 7.0
+    # --- 👥 EXTRACTION SÉCURISÉE DES SALAIRES CDI ---
+    # Utilisation de la fonction native de votre application pour éviter les crashs Firestore
+    salaires_config = db.charger_salaires_config()
     
-    try:
-        snap_cond = db.db.collection("synthese_grille_tarifaire").document("Conducteur_CDI (Salaire mensuel)").get().to_dict()
-        if snap_cond: 
-            px_cond = float(snap_cond.get("prix_moyen_mensuel", 1600.0)) / 7.0
-            
-        snap_chef = db.db.collection("synthese_grille_tarifaire").document("Chef_CDI (Salaire mensuel)").get().to_dict()
-        if snap_chef: 
-            px_chef = float(snap_chef.get("prix_moyen_mensuel", 2100.0)) / 7.0
-            
-        snap_ouv = db.db.collection("synthese_grille_tarifaire").document("Ouvrier_CDI (Salaire mensuel)").get().to_dict()
-        if snap_ouv: 
-            px_ouvrier = float(snap_ouv.get("prix_moyen_mensuel", 1470.0)) / 7.0
-    except Exception:
-        pass
+    # Extraction des valeurs mensuelles brutes avec clés de secours si non configurées
+    val_mensuelle_cond = float(salaires_config.get("Conducteur_CDI", 1600.0))
+    val_mensuelle_chef = float(salaires_config.get("Chef_CDI", 2100.0))
+    val_mensuelle_ouv = float(salaires_config.get("Ouvrier_CDI", 1470.0))
+    
+    # Règle Sim-TP : 1 mois de paie = 1 semaine de jeu (7 jours). Coût par jour = Salaire / 7.
+    px_cond = val_mensuelle_cond / 7.0
+    px_chef = val_mensuelle_chef / 7.0
+    px_ouvrier = val_mensuelle_ouv / 7.0
 
     # Initialisation des compteurs logistiques globaux
     stocks_disponibles = {v: 0.0 for v in traduction_cles.values()}
@@ -146,30 +140,30 @@ def afficher_onglet_suivi_contrats():
                 if status_card:
                     statut = status_card.text.strip()
 
-                # --- 👥 1. MASSE SALARIALE CDI (JOURNÉE ENTAMÉE = DUE) ---
+                # --- 👥 1. MASSE SALARIALE CDI CORRIGÉE (DURÉE DU CONTRAT INITIAL EN JOURS) ---
                 duree_totale_jours = 1.0
                 chiffres_surface = re.findall(r"(\d+)", surface)
                 if chiffres_surface:
                     val_surface = float(chiffres_surface[0])
                     if "km" in surface.lower():
                         duree_totale_jours = val_surface 
-                    elif "m2" in surface.lower():
+                    elif "m2" in surface.lower() or "m²" in surface.lower():
                         duree_totale_jours = max(1.0, math.ceil(val_surface / 100.0))
 
-                # Définition des structures RH d'étapes Sim-TP
+                # Structure de l'équipe affectée selon le type de chantier (Nombre d'employés réels)
                 nb_cond, nb_chef, nb_ouv = 1.0, 0.0, 0.0
                 if "tuyaux" in nom.lower() or "assainissement" in nom.lower():
                     nb_cond, nb_chef, nb_ouv = 1.0, 1.0, 2.0
                 elif "hangar" in nom.lower() or "batiment" in nom.lower():
                     nb_cond, nb_chef, nb_ouv = 1.0, 1.0, 3.0
 
-                # Calcul de la main d'œuvre sur les journées dues
+                # Calcul rigoureux : (Somme des salaires journaliers des employés requis) * Jours totaux du contrat
                 jours_dus = math.ceil(duree_totale_jours)
                 cout_salaires_contrat = (
                     (nb_cond * px_cond) + (nb_chef * px_chef) + (nb_ouv * px_ouvrier)
                 ) * jours_dus
 
-                # --- 🧱 2. CALCUL DU COÛT DES MATÉRIAUX ---
+                # --- 🧱 2. CALCUL DU COÛT DES MATÉRIAUX POUR L'ÉTAPE SUIVANTE ---
                 cout_mats_contrat = 0.0
                 if "aucun" not in materiaux_texte.lower():
                     for cle_reg, nom_officiel in traduction_cles.items():
@@ -182,10 +176,9 @@ def afficher_onglet_suivi_contrats():
                                 prix_u = float(prix_coops_mini.get(nom_officiel, 0.0))
                                 cout_mats_contrat += val_requis * prix_u
 
-                # Rentabilité nette
+                # Rentabilité nette finale
                 marge_nette_prevue = revenu - cout_mats_contrat - cout_salaires_contrat
 
-                # 🎯 Les colonnes Niveau et Surface ne sont plus injectées ici
                 contrats_list.append({
                     "ID Contrat": id_contrat,
                     "Nom du Chantier": nom,
@@ -208,7 +201,7 @@ def afficher_onglet_suivi_contrats():
                 st.markdown(f"### 🏗️ Vos Chantiers Signés ({len(contrats_list)} détectés)")
                 st.dataframe(
                     df_contrats, 
-                    use_container_width=True,
+                    use_container_width=True, 
                     hide_index=True,
                     column_config={
                         "Chiffre d'Affaires (€)": st.column_config.NumberColumn(format="%.0f €"),
