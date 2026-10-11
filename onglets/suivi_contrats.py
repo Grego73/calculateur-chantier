@@ -32,7 +32,6 @@ def afficher_onglet_suivi_contrats():
         )
 
     # --- DICTIONNAIRES DE PARSING ET DE TRADUCTION ---
-    # Réparation : Ajout de "tole" et "armature" pour assurer la détection complète du hangar
     traduction_cles = {
         "sable": "Sable", "terre": "Terre", "enrobe": "Enrobé", 
         "armature": "Armature", "tole": "Tôle", 
@@ -46,11 +45,12 @@ def afficher_onglet_suivi_contrats():
     
     # --- 👥 EXTRACTION SÉCURISÉE DES SALAIRES CDI ---
     salaires_config = db.charger_salaires_config()
+    
     val_mensuelle_cond = float(salaires_config.get("Conducteur_CDI", 1600.0))
     val_mensuelle_chef = float(salaires_config.get("Chef_CDI", 2100.0))
     val_mensuelle_ouv = float(salaires_config.get("Ouvrier_CDI", 1470.0))
     
-    # Règle Sim-TP : Salaire / 7 jours = Coût par jour
+    # Règle Sim-TP : 1 mois de paie = 1 semaine de jeu (7 jours). Coût par jour = Salaire / 7.
     px_cond = val_mensuelle_cond / 7.0
     px_chef = val_mensuelle_chef / 7.0
     px_ouvrier = val_mensuelle_ouv / 7.0
@@ -72,6 +72,7 @@ def afficher_onglet_suivi_contrats():
                 full_w_span = chip.find(class_='full-w')
                 if full_w_span:
                     text_spans = full_w_span.find_all('span')
+                    # 🎯 CORRECTIF EXTRACTION STOCKS : Extraction par index [0] et [1]
                     if len(text_spans) >= 2:
                         nom_mat_brut = text_spans[0].text.strip()
                         qte_brute = text_spans[1].text.strip()
@@ -122,15 +123,12 @@ def afficher_onglet_suivi_contrats():
                     if input_id:
                         id_contrat = input_id.get('value', 'Inconnu')
 
-                surface = "Inconnue"
                 materiaux_texte = "Aucun"
                 statut = "Non démarré"
                 
                 paragraphs = item.find_all('p')
                 for p in paragraphs:
                     text = p.text.strip()
-                    if "Surface du chantier" in text:
-                        surface = text.split(':')[-1].strip()
                     if "Matériaux nécessaires" in text:
                         materiaux_texte = text.split('Matériaux nécessaires :')[-1].strip()
 
@@ -138,17 +136,17 @@ def afficher_onglet_suivi_contrats():
                 if status_card:
                     statut = status_card.text.strip()
 
-                # --- 👥 1. MASSE SALARIALE CDI (DURÉE DU CONTRAT INITIAL EN JOURS) ---
-                duree_totale_jours = 1.0
-                chiffres_surface = re.findall(r"(\d+)", surface)
-                if chiffres_surface:
-                    val_surface = float(chiffres_surface[0])
-                    if "km" in surface.lower():
-                        duree_totale_jours = val_surface 
-                    elif "m2" in surface.lower() or "m²" in surface.lower():
-                        duree_totale_jours = max(1.0, math.ceil(val_surface / 100.0))
+                # --- 👥 1. MASSE SALARIALE SUR L'ÉTAPE DE 24H (JOURNÉE ENTAMÉE = DUE) ---
+                # Règle Sim-TP : L'étape dure 24h. S'il reste du temps, 1 jour de travail est facturé.
+                jours_dus = 1.0
+                match_jours = re.search(r"dans\s*(\d+)\s*jour", statut.lower())
+                if match_jours:
+                    jours_dus = max(1.0, math.ceil(float(match_jours.group(1))))
+                
+                if "0 jour" in statut.lower() and ("heure" in statut.lower() or "minute" in statut.lower()):
+                    jours_dus = 1.0
 
-                # Définition des structures RH d'étapes Sim-TP & Libellé textuel pour affichage
+                # Structure de l'équipe affectée selon le type de chantier
                 nb_cond, nb_chef, nb_ouv = 1.0, 0.0, 0.0
                 txt_equipe = "1 Cond."
                 if "tuyaux" in nom.lower() or "assainissement" in nom.lower():
@@ -158,8 +156,7 @@ def afficher_onglet_suivi_contrats():
                     nb_cond, nb_chef, nb_ouv = 1.0, 1.0, 3.0
                     txt_equipe = "1 Cond. / 1 Chef / 3 Ouv."
 
-                # Calcul (Somme des salaires journaliers des employés requis) * Jours totaux du contrat
-                jours_dus = math.ceil(duree_totale_jours)
+                # Calcul basé strictement sur l'étape de 24h en cours
                 cout_salaires_contrat = (
                     (nb_cond * px_cond) + (nb_chef * px_chef) + (nb_ouv * px_ouvrier)
                 ) * jours_dus
@@ -167,7 +164,6 @@ def afficher_onglet_suivi_contrats():
                 # --- 🧱 2. CALCUL DU COÛT DES MATÉRIAUX POUR L'ÉTAPE SUIVANTE ---
                 cout_mats_contrat = 0.0
                 if "aucun" not in materiaux_texte.lower():
-                    # Nettoyage pour les recherches regex insensibles aux accents
                     texte_clean = materiaux_texte.lower().replace("é", "e").replace("ô", "o").replace("è", "e")
                     for cle_reg, nom_officiel in traduction_cles.items():
                         if cle_reg in texte_clean:
@@ -179,14 +175,14 @@ def afficher_onglet_suivi_contrats():
                                 prix_u = float(prix_coops_mini.get(nom_officiel, 0.0))
                                 cout_mats_contrat += val_requis * prix_u
 
-                # Rentabilité nette finale
+                # Rentabilité nette de l'étape
                 marge_nette_prevue = revenu - cout_mats_contrat - cout_salaires_contrat
 
                 contrats_list.append({
                     "ID Contrat": id_contrat,
                     "Nom du Chantier": nom,
                     "Équipe Requise": txt_equipe,
-                    "Jours Dus": f"{jours_dus} j",
+                    "Jours Dus": f"{int(jours_dus)} j",
                     "Chiffre d'Affaires (€)": revenu,
                     "Coût Matériaux (€)": cout_mats_contrat,
                     "Masse Salariale (€)": cout_salaires_contrat,
@@ -215,20 +211,19 @@ def afficher_onglet_suivi_contrats():
                         "Coût Matériaux (€)": st.column_config.NumberColumn(format="%.0f €"),
                         "Masse Salariale (€)": st.column_config.NumberColumn(format="%.0f €"),
                         "Marge Nette (€)": st.column_config.NumberColumn(format="%.0f €"),
-                        # 🎯 CORRECTIF MULTILIGNE : st.column_config.TextColumn force le retour à la ligne automatique
                         "Matériaux Étape Suivante": st.column_config.TextColumn("Matériaux Étape Suivante", width="large"),
                         "Statut Actuel": st.column_config.TextColumn("Statut Actuel", width="large")
                     }
                 )
                 
-                # KPIs consolidés
+                # KPIs macro-économiques consolidés d'entreprise
                 c_total1, c_total2, c_total3, c_total4 = st.columns(4)
                 with c_total1:
                     st.metric(label="Chiffre d'Affaires Prévu", value=f"{total_ca:,.0f}".replace(",", " ") + " €")
                 with c_total2:
                     st.metric(label="Budget Matériaux Étape Suivante", value=f"{total_cout_mats:,.0f}".replace(",", " ") + " €", delta_color="inverse")
                 with c_total3:
-                    st.metric(label="Masse Salariale Globale CDI", value=f"{total_salaires:,.0f}".replace(",", " ") + " €", delta_color="inverse")
+                    st.metric(label="Masse Salariale Étape CDI", value=f"{total_salaires:,.0f}".replace(",", " ") + " €", delta_color="inverse")
                 with c_total4:
                     st.metric(label="Bénéfice Net Réel Estimé", value=f"{total_marge_nette:,.0f}".replace(",", " ") + " €")
 
@@ -305,4 +300,3 @@ def afficher_onglet_suivi_contrats():
 
         except Exception as e:
             st.error(f"❌ Erreur lors du parsing des fichiers : {e}")
-
