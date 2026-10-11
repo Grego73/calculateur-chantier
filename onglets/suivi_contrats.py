@@ -32,6 +32,7 @@ def afficher_onglet_suivi_contrats():
         )
 
     # --- DICTIONNAIRES DE PARSING ET DE TRADUCTION ---
+    # Réparation : Ajout de "tole" et "armature" pour assurer la détection complète du hangar
     traduction_cles = {
         "sable": "Sable", "terre": "Terre", "enrobe": "Enrobé", 
         "armature": "Armature", "tole": "Tôle", 
@@ -45,12 +46,11 @@ def afficher_onglet_suivi_contrats():
     
     # --- 👥 EXTRACTION SÉCURISÉE DES SALAIRES CDI ---
     salaires_config = db.charger_salaires_config()
-    
     val_mensuelle_cond = float(salaires_config.get("Conducteur_CDI", 1600.0))
     val_mensuelle_chef = float(salaires_config.get("Chef_CDI", 2100.0))
     val_mensuelle_ouv = float(salaires_config.get("Ouvrier_CDI", 1470.0))
     
-    # Règle Sim-TP : 1 mois de paie = 1 semaine de jeu (7 jours). Coût par jour = Salaire / 7.
+    # Règle Sim-TP : Salaire / 7 jours = Coût par jour
     px_cond = val_mensuelle_cond / 7.0
     px_chef = val_mensuelle_chef / 7.0
     px_ouvrier = val_mensuelle_ouv / 7.0
@@ -72,7 +72,6 @@ def afficher_onglet_suivi_contrats():
                 full_w_span = chip.find(class_='full-w')
                 if full_w_span:
                     text_spans = full_w_span.find_all('span')
-                    # 🎯 CORRECTIF DU BUG RESULSET : Extraction stricte par index de la liste
                     if len(text_spans) >= 2:
                         nom_mat_brut = text_spans[0].text.strip()
                         qte_brute = text_spans[1].text.strip()
@@ -149,12 +148,15 @@ def afficher_onglet_suivi_contrats():
                     elif "m2" in surface.lower() or "m²" in surface.lower():
                         duree_totale_jours = max(1.0, math.ceil(val_surface / 100.0))
 
-                # Structure de l'équipe affectée selon le type de chantier (Nombre d'employés réels)
+                # Définition des structures RH d'étapes Sim-TP & Libellé textuel pour affichage
                 nb_cond, nb_chef, nb_ouv = 1.0, 0.0, 0.0
+                txt_equipe = "1 Cond."
                 if "tuyaux" in nom.lower() or "assainissement" in nom.lower():
                     nb_cond, nb_chef, nb_ouv = 1.0, 1.0, 2.0
+                    txt_equipe = "1 Cond. / 1 Chef / 2 Ouv."
                 elif "hangar" in nom.lower() or "batiment" in nom.lower():
                     nb_cond, nb_chef, nb_ouv = 1.0, 1.0, 3.0
+                    txt_equipe = "1 Cond. / 1 Chef / 3 Ouv."
 
                 # Calcul (Somme des salaires journaliers des employés requis) * Jours totaux du contrat
                 jours_dus = math.ceil(duree_totale_jours)
@@ -165,10 +167,12 @@ def afficher_onglet_suivi_contrats():
                 # --- 🧱 2. CALCUL DU COÛT DES MATÉRIAUX POUR L'ÉTAPE SUIVANTE ---
                 cout_mats_contrat = 0.0
                 if "aucun" not in materiaux_texte.lower():
+                    # Nettoyage pour les recherches regex insensibles aux accents
+                    texte_clean = materiaux_texte.lower().replace("é", "e").replace("ô", "o").replace("è", "e")
                     for cle_reg, nom_officiel in traduction_cles.items():
-                        if cle_reg in materiaux_texte.lower():
+                        if cle_reg in texte_clean:
                             pattern = re.compile(rf"{cle_reg}.*?(\d[\d\s]*)", re.IGNORECASE)
-                            match = pattern.search(materiaux_texte.lower().replace("é", "e").replace("ô", "o"))
+                            match = pattern.search(texte_clean)
                             if match:
                                 val_requis = float(match.group(1).replace(" ", ""))
                                 besoins_cumules[nom_officiel] += val_requis
@@ -181,6 +185,8 @@ def afficher_onglet_suivi_contrats():
                 contrats_list.append({
                     "ID Contrat": id_contrat,
                     "Nom du Chantier": nom,
+                    "Équipe Requise": txt_equipe,
+                    "Jours Dus": f"{jours_dus} j",
                     "Chiffre d'Affaires (€)": revenu,
                     "Coût Matériaux (€)": cout_mats_contrat,
                     "Masse Salariale (€)": cout_salaires_contrat,
@@ -203,14 +209,19 @@ def afficher_onglet_suivi_contrats():
                     use_container_width=True, 
                     hide_index=True,
                     column_config={
+                        "Équipe Requise": st.column_config.TextColumn("Équipe Requise", width="medium"),
+                        "Jours Dus": st.column_config.TextColumn("Jours Dus", width="small"),
                         "Chiffre d'Affaires (€)": st.column_config.NumberColumn(format="%.0f €"),
                         "Coût Matériaux (€)": st.column_config.NumberColumn(format="%.0f €"),
                         "Masse Salariale (€)": st.column_config.NumberColumn(format="%.0f €"),
-                        "Marge Nette (€)": st.column_config.NumberColumn(format="%.0f €")
+                        "Marge Nette (€)": st.column_config.NumberColumn(format="%.0f €"),
+                        # 🎯 CORRECTIF MULTILIGNE : st.column_config.TextColumn force le retour à la ligne automatique
+                        "Matériaux Étape Suivante": st.column_config.TextColumn("Matériaux Étape Suivante", width="large"),
+                        "Statut Actuel": st.column_config.TextColumn("Statut Actuel", width="large")
                     }
                 )
-
-                # KPIs macro-économiques consolidés d'entreprise
+                
+                # KPIs consolidés
                 c_total1, c_total2, c_total3, c_total4 = st.columns(4)
                 with c_total1:
                     st.metric(label="Chiffre d'Affaires Prévu", value=f"{total_ca:,.0f}".replace(",", " ") + " €")
@@ -226,10 +237,10 @@ def afficher_onglet_suivi_contrats():
                 # ==========================================================================
                 st.markdown("---")
                 st.markdown("### 📊 Comparateur Logistique : Besoins Étape Suivante vs Stocks Disponibles")
-
+                
                 if not stocks_extraits:
                     st.info("💡 Pour activer la comparaison de votre stock réel (Aire) et calculer vos restes à charge, collez le code HTML de votre aire de stockage en haut à droite.")
-
+                
                 lignes_comparatif = []
                 cout_total_achat_coop = 0.0
 
@@ -237,7 +248,7 @@ def afficher_onglet_suivi_contrats():
                     besoin = besoins_cumules[mat_nom]
                     stock = stocks_disponibles[mat_nom]
                     ecart = stock - besoin
-
+                    
                     prix_unitaire_coop = float(prix_coops_mini.get(mat_nom, 0.0))
 
                     if besoin > 0 or stock > 0:
@@ -284,8 +295,7 @@ def afficher_onglet_suivi_contrats():
                         with col_res2:
                             manquants_check = df_comparatif[df_comparatif["Écart Restant"] < 0]
                             if not manquants_check.empty:
-                                w_err = "🚨 Des matériaux manquent pour ouvrir l'étape suivante ! Consultez la colonne 'Reste à Payer (€)'."
-                                st.error(w_err)
+                                st.error("🚨 Des matériaux manquent pour ouvrir l'étape suivante ! Consultez la colonne 'Reste à Payer (€)'.")
                             else:
                                 st.success("🎉 Vos stocks actuels couvrent à 100% vos besoins futurs. Aucun achat requis !")
                 else:
@@ -295,3 +305,4 @@ def afficher_onglet_suivi_contrats():
 
         except Exception as e:
             st.error(f"❌ Erreur lors du parsing des fichiers : {e}")
+
