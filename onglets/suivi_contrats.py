@@ -44,10 +44,8 @@ def afficher_onglet_suivi_contrats():
     prix_coops_mini = db.charger_materiaux_config()
     
     # --- 👥 EXTRACTION SÉCURISÉE DES SALAIRES CDI ---
-    # Utilisation de la fonction native de votre application pour éviter les crashs Firestore
     salaires_config = db.charger_salaires_config()
     
-    # Extraction des valeurs mensuelles brutes avec clés de secours si non configurées
     val_mensuelle_cond = float(salaires_config.get("Conducteur_CDI", 1600.0))
     val_mensuelle_chef = float(salaires_config.get("Chef_CDI", 2100.0))
     val_mensuelle_ouv = float(salaires_config.get("Ouvrier_CDI", 1470.0))
@@ -74,6 +72,7 @@ def afficher_onglet_suivi_contrats():
                 full_w_span = chip.find(class_='full-w')
                 if full_w_span:
                     text_spans = full_w_span.find_all('span')
+                    # 🎯 CORRECTIF DU BUG RESULSET : Extraction stricte par index de la liste
                     if len(text_spans) >= 2:
                         nom_mat_brut = text_spans[0].text.strip()
                         qte_brute = text_spans[1].text.strip()
@@ -140,7 +139,7 @@ def afficher_onglet_suivi_contrats():
                 if status_card:
                     statut = status_card.text.strip()
 
-                # --- 👥 1. MASSE SALARIALE CDI CORRIGÉE (DURÉE DU CONTRAT INITIAL EN JOURS) ---
+                # --- 👥 1. MASSE SALARIALE CDI (DURÉE DU CONTRAT INITIAL EN JOURS) ---
                 duree_totale_jours = 1.0
                 chiffres_surface = re.findall(r"(\d+)", surface)
                 if chiffres_surface:
@@ -157,7 +156,7 @@ def afficher_onglet_suivi_contrats():
                 elif "hangar" in nom.lower() or "batiment" in nom.lower():
                     nb_cond, nb_chef, nb_ouv = 1.0, 1.0, 3.0
 
-                # Calcul rigoureux : (Somme des salaires journaliers des employés requis) * Jours totaux du contrat
+                # Calcul (Somme des salaires journaliers des employés requis) * Jours totaux du contrat
                 jours_dus = math.ceil(duree_totale_jours)
                 cout_salaires_contrat = (
                     (nb_cond * px_cond) + (nb_chef * px_chef) + (nb_ouv * px_ouvrier)
@@ -285,7 +284,8 @@ def afficher_onglet_suivi_contrats():
                         with col_res2:
                             manquants_check = df_comparatif[df_comparatif["Écart Restant"] < 0]
                             if not manquants_check.empty:
-                                st.error("🚨 Des matériaux manquent pour ouvrir l'étape suivante ! Consultez la colonne 'Reste à Payer (€)'.")
+                                w_err = "🚨 Des matériaux manquent pour ouvrir l'étape suivante ! Consultez la colonne 'Reste à Payer (€)'."
+                                st.error(w_err)
                             else:
                                 st.success("🎉 Vos stocks actuels couvrent à 100% vos besoins futurs. Aucun achat requis !")
                 else:
