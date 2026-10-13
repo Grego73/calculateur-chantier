@@ -11,6 +11,7 @@ from onglets.ajouter_chantier import afficher_onglet_ajouter
 from onglets.historique import afficher_onglet_historique
 from onglets.suivi_contrats import afficher_onglet_suivi_contrats
 from onglets.marche_actuel import afficher_onglet_marche_actuel
+from onglets.consulter_modeles import afficher_onglet_consulter_modeles
 
 st.set_page_config(page_title="Gestion des Chantiers", page_icon="🏗️", layout="wide")
 st.title("Gestion et Rentabilité des Chantiers")
@@ -21,8 +22,9 @@ catalogue_engins = db.charger_catalogue_engins()
 types_engins = db.charger_types_engins_bruts()
 
 # 🔥 CORRECTIF : Déclaration stricte des 6 variables pour les 6 onglets créés
-onglet1, onglet2, onglet3, onglet4, onglet5, onglet6 = st.tabs([
-    "➕ Ajouter un Chantier", 
+onglet1, onglet2, onglet3, onglet4, onglet5, onglet6, onglet7= st.tabs([
+    "➕ Ajouter un Chantier",
+    "🗂️ Consulter les Modèles NoSQL"
     "📊 Historique & Classement",
     "📋 Contrats SIM-TP",
     "🌍 Marché des Coopératives",
@@ -34,18 +36,21 @@ with onglet1:
     afficher_onglet_ajouter(config_salaires, config_materiaux, catalogue_engins, types_engins)
 
 with onglet2:
-    afficher_onglet_historique()
+    afficher_onglet_consulter_modeles()
 
 with onglet3:
-    afficher_onglet_suivi_contrats()
+    afficher_onglet_historique()
 
 with onglet4:
-    afficher_onglet_marche_actuel()
+    afficher_onglet_suivi_contrats()
 
 with onglet5:
-    afficher_onglet_suivi_interne(config_salaires, catalogue_engins, config_materiaux)
+    afficher_onglet_marche_actuel()
 
 with onglet6:
+    afficher_onglet_suivi_interne(config_salaires, catalogue_engins, config_materiaux)
+
+with onglet7:
     afficher_onglet_direction(config_salaires, config_materiaux)
 
 # ==============================================================================
