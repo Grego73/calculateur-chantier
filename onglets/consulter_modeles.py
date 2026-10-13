@@ -1,4 +1,4 @@
-# Fichier complet, nettoyé, trié et indexé sur le ROI/jour : onglets/consulter_modeles.py
+# Fichier complet et certifié exact : onglets/consulter_modeles.py
 import streamlit as st
 import pandas as pd
 import math
@@ -23,8 +23,8 @@ def extraire_tarif_jour_cdi_firebase(poste):
     return secours.get(poste, 200.0)
 
 def afficher_onglet_consulter_modeles():
-    st.subheader("🗂️ Classement des Modèles NoSQL par ROI / Jour")
-    st.write("Consultez l'évaluation financière triée par ordre décroissant de rentabilité journalière.")
+    st.subheader("🗂️ Classement des Modèles NoSQL par Rentabilité Journalière")
+    st.write("Consultez les fiches techniques classées par ordre décroissant selon le gain net par jour réel.")
 
     # 1. Chargement des configurations cloud depuis database.py
     with st.spinner("Synchronisation des grilles et tarifs cloud..."):
@@ -51,7 +51,7 @@ def afficher_onglet_consulter_modeles():
     px_ouvrier = extraire_tarif_jour_cdi_firebase("Ouvrier")
 
     # ==============================================================================
-    # 🎯 PHASE 1 : PRÉ-CALCUL ET CLASSEMENT DÉCROISSANT DES MODÈLES PAR ROI/JOUR
+    # 🎯 PHASE 1 : PRÉ-CALCUL ET CLASSEMENT SELON VOTRE FORMULE FINANCIÈRE
     # ==============================================================================
     liste_chantiers_calcules = []
 
@@ -95,8 +95,11 @@ def afficher_onglet_consulter_modeles():
         marge_net = revenus - total_charges
         roi_global = (marge_net / total_charges * 100) if total_charges > 0 else 0.0
         
+        # Détermination précise du diviseur de temps (durée réelle cumulée)
         duree_totale_jours = jours_cumules if jours_cumules > 0 else float(j + (h/24.0) + (m/1440.0))
-        roi_par_jour = (roi_global / duree_totale_jours) if duree_totale_jours > 0 else roi_global
+        
+        # 🎯 APPLICATION DE VOTRE FORMULE UNIQUE : (CA - (RH + MATS)) / NB JOURS
+        roi_par_jour = (revenus - (cout_rh_total + cout_mats_total)) / duree_totale_jours if duree_totale_jours > 0 else 0.0
 
         liste_chantiers_calcules.append({
             "ch_id": ch_id,
@@ -115,7 +118,7 @@ def afficher_onglet_consulter_modeles():
             "duree_totale_jours": duree_totale_jours
         })
 
-    # Conversion en DataFrame pour appliquer un tri descendant strict sur le ROI / Jour
+    # Tri par ordre décroissant strict basé sur votre indicateur journalier
     if liste_chantiers_calcules:
         df_tri = pd.DataFrame(liste_chantiers_calcules)
         df_tri = df_tri.sort_values(by="roi_par_jour", ascending=False)
@@ -124,14 +127,14 @@ def afficher_onglet_consulter_modeles():
         liste_chantiers_ordonnes = []
 
     # ==============================================================================
-    # 🎯 PHASE 2 : RENDU RENDEMENT ET AFFICHAGE AVEC LE ROI/JOUR DANS LE TITRE
+    # 🎯 PHASE 2 : RENDU GRAPHIQUE ET RECONSTRUCTION DES ACCORDIONS
     # ==============================================================================
     for item in liste_chantiers_ordonnes:
         ch_data = item["ch_data"]
         nom_modele = ch_data.get("nom_modele", item["ch_id"])
         
-        # Formatage dynamique du titre de l'expander avec inclusion du ROI / Jour
-        titre_expander = f"🏗️ {nom_modele} — 💰 {item['revenus']:,.0f} € — ⏱️ {item['jours_globaux_indic']}j {item['heures_globales_indic']}h — ⚡ {item['roi_par_jour']:.2f} %/j".replace(",", " ")
+        # Titre dynamique incluant le gain net par jour calculé avec votre formule (€/j)
+        titre_expander = f"🏗️ {nom_modele} — 💰 {item['revenus']:,.0f} € — ⏱️ {item['jours_globaux_indic']}j — ⚡ {item['roi_par_jour']:,.0f} €/j".replace(",", " ")
         
         with st.expander(titre_expander, expanded=False):
             if not item["etapes"]:
@@ -174,7 +177,7 @@ def afficher_onglet_consulter_modeles():
                 c_rh, c_mats, c_engins = st.columns(3)
                 
                 with c_rh:
-                    st.markdown("**👥 Équipe (Taux CDI Réel) :**")
+                    st.markdown("**👥 Équipe (Taux Message CDI) :**")
                     st.markdown(f"- 🕹️ Cond : `{int(cond)}` *({px_cond:.2f}€/j)*")
                     st.markdown(f"- 🧑‍💼 Chef : `{int(chef)}` *({px_chef:.2f}€/j)*")
                     st.markdown(f"- 👷 Ouv : `{int(ouv)}` *({px_ouvrier:.2f}€/j)*")
@@ -211,7 +214,8 @@ def afficher_onglet_consulter_modeles():
             with cb3:
                 st.metric(label="📊 ROI Global", value=f"{item['roi_global']:.2f} %")
             with cb4:
-                st.metric(label="⚡ ROI / Jour", value=f"{item['roi_par_jour']:.2f} %/j")
+                # Affichage de la rentabilité quotidienne selon votre formule exacte en euros par jour
+                st.metric(label="⚡ Gain Net / Jour", value=f"{item['roi_par_jour']:,.0f} €/j".replace(",", " "))
 
             if item["marge_net"] >= 0:
                 st.success(f"🟢 **Rentabilité positive estimée :** Marge nette de **{item['marge_net']:,.2f} €** pour {item['duree_totale_jours']:.1f} jours d'activité.".replace(",", " "))
