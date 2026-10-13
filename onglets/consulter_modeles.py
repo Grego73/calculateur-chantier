@@ -1,4 +1,4 @@
-# Fichier complet et certifié exact : onglets/consulter_modeles.py
+# Fichier complet, nettoyé et aligné sur 4 colonnes d'en-tête : onglets/consulter_modeles.py
 import streamlit as st
 import pandas as pd
 import math
@@ -95,10 +95,7 @@ def afficher_onglet_consulter_modeles():
         marge_net = revenus - total_charges
         roi_global = (marge_net / total_charges * 100) if total_charges > 0 else 0.0
         
-        # Détermination précise du diviseur de temps (durée réelle cumulée)
         duree_totale_jours = jours_cumules if jours_cumules > 0 else float(j + (h/24.0) + (m/1440.0))
-        
-        # 🎯 APPLICATION DE VOTRE FORMULE UNIQUE : (CA - (RH + MATS)) / NB JOURS
         roi_par_jour = (revenus - (cout_rh_total + cout_mats_total)) / duree_totale_jours if duree_totale_jours > 0 else 0.0
 
         liste_chantiers_calcules.append({
@@ -106,8 +103,6 @@ def afficher_onglet_consulter_modeles():
             "ch_data": ch_data,
             "revenus": revenus,
             "jours_globaux_indic": j,
-            "heures_globales_indic": h,
-            "minutes_globales_indic": m,
             "etapes": etapes,
             "cumul_cout_rh": cout_rh_total,
             "cumul_cout_mats": cout_mats_total,
@@ -118,7 +113,6 @@ def afficher_onglet_consulter_modeles():
             "duree_totale_jours": duree_totale_jours
         })
 
-    # Tri par ordre décroissant strict basé sur votre indicateur journalier
     if liste_chantiers_calcules:
         df_tri = pd.DataFrame(liste_chantiers_calcules)
         df_tri = df_tri.sort_values(by="roi_par_jour", ascending=False)
@@ -127,82 +121,102 @@ def afficher_onglet_consulter_modeles():
         liste_chantiers_ordonnes = []
 
     # ==============================================================================
-    # 🎯 PHASE 2 : RENDU GRAPHIQUE ET RECONSTRUCTION DES ACCORDIONS
+    # 🎯 PHASE 2 : RENDU GRAPHIQUE ET EN-TÊTE SUR 4 COLONNES PARFAITEMENT ALIGNÉES
     # ==============================================================================
+    # En-tête des colonnes pour guider la lecture
+    st.markdown("<br>", unsafe_allow_html=True)
+    c_head1, c_head2, c_head3, c_head4 = st.columns([5, 2, 2, 3])
+    with c_head1: st.markdown("**🏗️ Intitulé du Modèle Ouvrage**")
+    with c_head2: st.markdown("**💰 Revenus**")
+    with c_head3: st.markdown("**⏱️ Durée**")
+    with c_head4: st.markdown("**⚡ Gain Net / Jour**")
+    st.markdown("<div style='border-bottom: 2px solid #31333F; margin-bottom: 10px;'></div>", unsafe_allow_html=True)
+
     for item in liste_chantiers_ordonnes:
         ch_data = item["ch_data"]
         nom_modele = ch_data.get("nom_modele", item["ch_id"])
         
-        # Titre dynamique incluant le gain net par jour calculé avec votre formule (€/j)
-        titre_expander = f"🏗️ {nom_modele} — 💰 {item['revenus']:,.0f} € — ⏱️ {item['jours_globaux_indic']}j — ⚡ {item['roi_par_jour']:,.0f} €/j".replace(",", " ")
-        
-        with st.expander(titre_expander, expanded=False):
-            if not item["etapes"]:
-                st.caption("⚪ Aucune étape technique enregistrée pour ce modèle.")
-                continue
-
-            st.markdown("##### 📋 Décomposition financière par étape technique (Table 2)")
+        # 🟢 Création du conteneur d'en-tête aligné sur 4 colonnes de proportions identiques
+        with st.container():
+            col1, col2, col3, col4 = st.columns([5, 2, 2, 3])
+            with col1:
+                st.markdown(f"**{nom_modele}**")
+            with col2:
+                st.markdown(f"💰 {item['revenus']:,.0f} €".replace(",", " "))
+            with col3:
+                st.markdown(f"⏱️ {int(item['duree_totale_jours'])} j")
+            with col4:
+                st.markdown(f"⚡ **{item['roi_par_jour']:,.0f} €/j**".replace(",", " "))
             
-            for etape in item["etapes"]:
-                num_e = etape.get("num_etape", 1)
-                nom_etape = etape.get("nom_etape", "Étape sans nom")
-                duree_j = float(etape.get("duree_jours", 1.0))
-                jours_forfait = float(math.ceil(duree_j))
-                
-                # --- CALCUL RH ---
-                cond = float(etape.get("jh_cond", 0.0))
-                chef = float(etape.get("jh_chef", 0.0))
-                ouv = float(etape.get("jh_ouvrier", 0.0))
-                cout_rh_etape = (cond * px_cond + chef * px_chef + ouv * px_ouvrier) * jours_forfait
-                
-                # --- CALCUL MATÉRIAUX ---
-                mats = etape.get("materiaux", {})
-                cout_mats_etape = 0.0
-                mats_affiches = []
-                
-                if isinstance(mats, dict):
-                    for mat_cle, qte in mats.items():
-                        qte_val = float(qte)
-                        if qte_val > 0:
-                            nom_officiel_db = traduction_mats.get(mat_cle, mat_cle.capitalize())
-                            prix_unitaire = float(MATERIAUX_DB.get(nom_officiel_db, 0.0))
-                            cout_ligne_mat = qte_val * prix_unitaire
-                            cout_mats_etape += cout_ligne_mat
-                            mats_affiches.append(f"- {nom_officiel_db} : `{int(qte_val)}` *({prix_unitaire:.0f} €/u = {cout_ligne_mat:,.0f} €)*")
+            # L'expander vide de titre sert de tiroir pour stocker le détail de la Table 2
+            with st.expander("Voir le détail technique des étapes et charges", expanded=False):
+                if not item["etapes"]:
+                    st.caption("⚪ Aucune étape technique enregistrée pour ce modèle.")
+                    continue
 
-                engins = etape.get("engins", [])
+                st.markdown("##### 📋 Décomposition financière par étape technique (Table 2)")
+                
+                for etape in item["etapes"]:
+                    num_e = etape.get("num_etape", 1)
+                    nom_etape = etape.get("nom_etape", "Étape sans nom")
+                    duree_j = float(etape.get("duree_jours", 1.0))
+                    jours_forfait = float(math.ceil(duree_j))
+                    
+                    # --- CALCUL RH ---
+                    cond = float(etape.get("jh_cond", 0.0))
+                    chef = float(etape.get("jh_chef", 0.0))
+                    ouv = float(etape.get("jh_ouvrier", 0.0))
+                    cout_rh_etape = (cond * px_cond + chef * px_chef + ouv * px_ouvrier) * jours_forfait
+                    
+                    # --- CALCUL MATÉRIAUX ---
+                    mats = etape.get("materiaux", {})
+                    cout_mats_etape = 0.0
+                    mats_affiches = []
+                    
+                    if isinstance(mats, dict):
+                        for mat_cle, qte in mats.items():
+                            qte_val = float(qte)
+                            if qte_val > 0:
+                                nom_officiel_db = traduction_mats.get(mat_cle, mat_cle.capitalize())
+                                prix_unitaire = float(MATERIAUX_DB.get(nom_officiel_db, 0.0))
+                                cout_ligne_mat = qte_val * prix_unitaire
+                                cout_mats_etape += cout_ligne_mat
+                                mats_affiches.append(f"- {nom_officiel_db} : `{int(qte_val)}` *({prix_unitaire:.0f} €/u = {cout_ligne_mat:,.0f} €)*")
 
-                st.markdown(f"**🔹 Étape {num_e:02d} : {nom_etape}** *({duree_j} jour(s) réel(s) ➔ {int(jours_forfait)}j forfaitisés)*")
-                
-                c_rh, c_mats, c_engins = st.columns(3)
-                
-                with c_rh:
-                    st.markdown("**👥 Équipe (Taux Message CDI) :**")
-                    st.markdown(f"- 🕹️ Cond : `{int(cond)}` *({px_cond:.2f}€/j)*")
-                    st.markdown(f"- 🧑‍💼 Chef : `{int(chef)}` *({px_chef:.2f}€/j)*")
-                    st.markdown(f"- 👷 Ouv : `{int(ouv)}` *({px_ouvrier:.2f}€/j)*")
-                    st.markdown(f"💰 **Masse Salariale Étape :** `{cout_rh_etape:,.2f} €`".replace(",", " "))
-                
-                with c_mats:
-                    st.markdown("**🧱 Matériaux Requis :**")
-                    if mats_affiches:
-                        for item_txt in mats_affiches:
-                            st.markdown(item_txt.replace(",", " "))
-                        st.markdown(f"💰 **Total Matériaux Étape :** `{cout_mats_etape:,.0f} €`".replace(",", " "))
-                    else:
-                        st.caption("Aucun matériau requis (0 €)")
+                    engins = etape.get("engins", [])
 
-                with c_engins:
-                    st.markdown("**🚜 Flotte d'engins requis :**")
-                    if engins:
-                        for eng in engins:
-                            st.markdown(f"- {eng.get('type')} `({eng.get('niveau')})`")
-                    else:
-                        st.caption("Aucun engin requis")
-                
-                total_etape = cout_rh_etape + cout_mats_etape
-                st.markdown(f"➡️ **Coût Consolidé Étape {num_e:02d} :** `{total_etape:,.2f} €`".replace(",", " "))
-                st.markdown("<div style='border-bottom: 1px dashed #dedede; margin: 15px 0;'></div>", unsafe_allow_html=True)
+                    st.markdown(f"**🔹 Étape {num_e:02d} : {nom_etape}** *({duree_j} jour(s) réel(s) ➔ {int(jours_forfait)}j forfaitisés)*")
+                    
+                    c_rh, c_mats, c_engins = st.columns(3)
+                    
+                    with c_rh:
+                        st.markdown("**👥 Équipe (Taux Message CDI) :**")
+                        st.markdown(f"- 🕹️ Cond : `{int(cond)}` *({px_cond:.2f}€/j)*")
+                        st.markdown(f"- 🧑‍💼 Chef : `{int(chef)}` *({px_chef:.2f}€/j)*")
+                        st.markdown(f"- 👷 Ouv : `{int(ouv)}` *({px_ouvrier:.2f}€/j)*")
+                        st.markdown(f"💰 **Masse Salariale Étape :** `{cout_rh_etape:,.2f} €`".replace(",", " "))
+                    
+                    with c_mats:
+                        st.markdown("**🧱 Matériaux Requis :**")
+                        if mats_affiches:
+                            for item_txt in mats_affiches:
+                                st.markdown(item_txt.replace(",", " "))
+                            st.markdown(f"💰 **Total Matériaux Étape :** `{cout_mats_etape:,.0f} €`".replace(",", " "))
+                        else:
+                        else:
+                            st.caption("Aucun matériau requis (0 €)")
+
+                    with c_engins:
+                        st.markdown("**🚜 Flotte d'engins requis :**")
+                        if engins:
+                            for eng in engins:
+                                st.markdown(f"- {eng.get('type')} `({eng.get('niveau')})`")
+                        else:
+                            st.caption("Aucun engin requis")
+                    
+                    total_etape = cout_rh_etape + cout_mats_etape
+                    st.markdown(f"➡️ **Coût Consolidé Étape {num_e:02d} :** `{total_etape:,.2f} €`".replace(",", " "))
+                    st.markdown("<div style='border-bottom: 1px dashed #dedede; margin: 15px 0;'></div>", unsafe_allow_html=True)
 
             # --- SYNTHÈSE GLOBALE DU MODÈLE DE CHANTIER ---
             st.markdown("##### 📊 Bilan Budgétaire Prévisionnel du Modèle Ouvrage")
@@ -214,10 +228,12 @@ def afficher_onglet_consulter_modeles():
             with cb3:
                 st.metric(label="📊 ROI Global", value=f"{item['roi_global']:.2f} %")
             with cb4:
-                # Affichage de la rentabilité quotidienne selon votre formule exacte en euros par jour
                 st.metric(label="⚡ Gain Net / Jour", value=f"{item['roi_par_jour']:,.0f} €/j".replace(",", " "))
 
             if item["marge_net"] >= 0:
                 st.success(f"🟢 **Rentabilité positive estimée :** Marge nette de **{item['marge_net']:,.2f} €** pour {item['duree_totale_jours']:.1f} jours d'activité.".replace(",", " "))
             else:
                 st.error(f"🔴 **Modèle déficitaire :** Perte sèche évaluée à **{abs(item['marge_net']):,.2f} €**.".replace(",", " "))
+        
+        st.markdown("<div style='border-bottom: 2px solid #31333F; margin-top: 15px; margin-bottom: 15px;'></div>", unsafe_allow_html=True)
+
