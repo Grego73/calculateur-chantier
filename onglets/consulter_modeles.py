@@ -1,4 +1,4 @@
-# Fichier complet, nettoyé et indexé sur les tarifs CDI et Matériaux NoSQL : onglets/consulter_modeles.py
+# Fichier complet, nettoyé et indexé avec le ROI/jour : onglets/consulter_modeles.py
 import streamlit as st
 import pandas as pd
 import math
@@ -66,6 +66,7 @@ def afficher_onglet_consulter_modeles():
         # Compteurs pour la synthèse générale du modèle actif
         cumul_cout_rh_chantier = 0.0
         cumul_cout_mats_chantier = 0.0
+        jours_totaux_calcul_etapes = 0.0
 
         titre_expander = f"🏗️ {nom_modele} — 💰 {revenus:,.0f} € — ⏱️ {j}j {h}h {m}m ({len(etapes)} étapes)".replace(",", " ")
         
@@ -80,6 +81,7 @@ def afficher_onglet_consulter_modeles():
                 num_e = etape.get("num_etape", 1)
                 nom_etape = etape.get("nom_etape", "Étape sans nom")
                 duree_j = float(etape.get("duree_jours", 1.0))
+                jours_totaux_calcul_etapes += duree_j
                 
                 # Règle de calcul Sim-TP : application forfaitaire au jour supérieur pour l'étape
                 jours_forfait = float(math.ceil(duree_j))
@@ -102,7 +104,6 @@ def afficher_onglet_consulter_modeles():
                         qte_val = float(qte)
                         if qte_val > 0:
                             nom_officiel_db = traduction_mats.get(mat_cle, mat_cle.capitalize())
-                            # Lecture en direct de la valeur brute stockée sur configuration_materiaux/catalogue
                             prix_unitaire = float(MATERIAUX_DB.get(nom_officiel_db, 0.0))
                             cout_ligne_mat = qte_val * prix_unitaire
                             cout_mats_etape += cout_ligne_mat
@@ -145,22 +146,31 @@ def afficher_onglet_consulter_modeles():
                 st.markdown("<div style='border-bottom: 1px dashed #dedede; margin: 15px 0;'></div>", unsafe_allow_html=True)
 
             # ==============================================================================
-            # 🎯 SECTION SUPPLÉMENTAIRE : BILAN BUDGÉTAIRE ET MARGE THÉORIQUE DU MODÈLE
+            # 🎯 SECTION MIS À JOUR : BILAN BUDGÉTAIRE AVEC ANALYSE ROI / JOUR
             # ==============================================================================
             total_charges_chantier = cumul_cout_rh_chantier + cumul_cout_mats_chantier
             marge_net_theorique = revenus - total_charges_chantier
+            
+            # Calculs des ROI de l'activité
             roi_theorique = (marge_net_theorique / total_charges_chantier * 100) if total_charges_chantier > 0 else 0.0
+            
+            # Utilisation de la durée cumulée des étapes (ou fallback de sécurité sur l'en-tête)
+            duree_totale_jours = jours_totaux_calcul_etapes if jours_totaux_calcul_etapes > 0 else float(j + (h/24.0) + (m/1440.0))
+            roi_par_jour_theorique = (roi_theorique / duree_totale_jours) if duree_totale_jours > 0 else roi_theorique
 
             st.markdown("##### 📊 Bilan Budgétaire Prévisionnel du Modèle Ouvrage")
-            cb1, cb2, cb3 = st.columns(3)
+            cb1, cb2, cb3, cb4 = st.columns(4)
             with cb1:
                 st.metric(label="👥 Masse Salariale CDI Totale", value=f"{cumul_cout_rh_chantier:,.2f} €".replace(",", " "))
             with cb2:
                 st.metric(label="🧱 Budget Matériaux Global", value=f"{cumul_cout_mats_chantier:,.2f} €".replace(",", " "))
             with cb3:
-                st.metric(label="📉 Coûts Directs Cumulés", value=f"{total_charges_chantier:,.2f} €".replace(",", " "))
+                st.metric(label="📊 ROI Global", value=f"{roi_theorique:.2f} %")
+            with cb4:
+                # ⚙️ AJOUT DE LA METRIC DU ROI / JOUR
+                st.metric(label="⚡ ROI / Jour", value=f"{roi_par_jour_theorique:.2f} %/j")
 
             if marge_net_theorique >= 0:
-                st.success(f"🟢 **Rentabilité positive estimée :** Marge nette de **{marge_net_theorique:,.2f} €** *(ROI Global : {roi_theorique:.2f} %)*".replace(",", " "))
+                st.success(f"🟢 **Rentabilité positive estimée :** Marge nette de **{marge_net_theorique:,.2f} €** pour {duree_totale_jours:.1f} jours d'activité.".replace(",", " "))
             else:
-                st.error(f"🔴 **Modèle déficitaire :** Perte sèche évaluée à **{abs(marge_net_theorique):,.2f} €** *(ROI Global : {roi_theorique:.2f} %)*".replace(",", " "))
+                st.error(f"🔴 **Modèle déficitaire :** Perte sèche évaluée à **{abs(marge_net_theorique):,.2f} €**.".replace(",", " "))
