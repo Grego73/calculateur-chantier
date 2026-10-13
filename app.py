@@ -24,7 +24,7 @@ types_engins = db.charger_types_engins_bruts()
 # 🔥 CORRECTIF : Déclaration stricte des 6 variables pour les 6 onglets créés
 onglet1, onglet2, onglet3, onglet4, onglet5, onglet6, onglet7= st.tabs([
     "➕ Ajouter un Chantier",
-    "🗂️ Consulter les Modèles NoSQL"
+    "🗂️ Consulter les Modèles NoSQL",
     "📊 Historique & Classement",
     "📋 Contrats SIM-TP",
     "🌍 Marché des Coopératives",
