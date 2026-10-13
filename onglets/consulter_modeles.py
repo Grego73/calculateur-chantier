@@ -1,4 +1,4 @@
-# Fichier complet, nettoyé et indexé avec le ROI/jour : onglets/consulter_modeles.py
+# Fichier complet, nettoyé, trié et indexé sur le ROI/jour : onglets/consulter_modeles.py
 import streamlit as st
 import pandas as pd
 import math
@@ -19,12 +19,12 @@ def extraire_tarif_jour_cdi_firebase(poste):
     except Exception:
         pass
     
-    secours = {"Conducteur": 244.91, "Chef": 300.0, "Ouvrier": 210.0}
+    secours = {"Conducteur": 244.91, "Chef": 239.45, "Ouvrier": 256.00}
     return secours.get(poste, 200.0)
 
 def afficher_onglet_consulter_modeles():
-    st.subheader("🗂️ Catalogue des Modèles NoSQL — Rentabilité Théorique Complète")
-    st.write("Consultez l'évaluation financière en direct basée sur la grille CDI active et le catalogue des matériaux du calculateur.")
+    st.subheader("🗂️ Classement des Modèles NoSQL par ROI / Jour")
+    st.write("Consultez l'évaluation financière triée par ordre décroissant de rentabilité journalière.")
 
     # 1. Chargement des configurations cloud depuis database.py
     with st.spinner("Synchronisation des grilles et tarifs cloud..."):
@@ -50,7 +50,11 @@ def afficher_onglet_consulter_modeles():
     px_chef = extraire_tarif_jour_cdi_firebase("Chef")
     px_ouvrier = extraire_tarif_jour_cdi_firebase("Ouvrier")
 
-    # 3. Rendu récursif des chantiers
+    # ==============================================================================
+    # 🎯 PHASE 1 : PRÉ-CALCUL ET CLASSEMENT DÉCROISSANT DES MODÈLES PAR ROI/JOUR
+    # ==============================================================================
+    liste_chantiers_calcules = []
+
     for ch_id, ch_data in catalogue_chantiers.items():
         nom_modele = ch_data.get("nom_modele", ch_id)
         
@@ -63,38 +67,92 @@ def afficher_onglet_consulter_modeles():
         m = ch_data.get("minutes_globales", 0)
         etapes = ch_data.get("etapes_techniques", [])
 
-        # Compteurs pour la synthèse générale du modèle actif
-        cumul_cout_rh_chantier = 0.0
-        cumul_cout_mats_chantier = 0.0
-        jours_totaux_calcul_etapes = 0.0
+        cout_rh_total = 0.0
+        cout_mats_total = 0.0
+        jours_cumules = 0.0
 
-        titre_expander = f"🏗️ {nom_modele} — 💰 {revenus:,.0f} € — ⏱️ {j}j {h}h {m}m ({len(etapes)} étapes)".replace(",", " ")
+        for etape in etapes:
+            duree_j = float(etape.get("duree_jours", 1.0))
+            jours_cumules += duree_j
+            jours_forfait = float(math.ceil(duree_j))
+            
+            cond = float(etape.get("jh_cond", 0.0))
+            chef = float(etape.get("jh_chef", 0.0))
+            ouv = float(etape.get("jh_ouvrier", 0.0))
+            
+            cout_rh_total += (cond * px_cond + chef * px_chef + ouv * px_ouvrier) * jours_forfait
+            
+            mats = etape.get("materiaux", {})
+            if isinstance(mats, dict):
+                for mat_cle, qte in mats.items():
+                    qte_val = float(qte)
+                    if qte_val > 0:
+                        nom_officiel_db = traduction_mats.get(mat_cle, mat_cle.capitalize())
+                        prix_unitaire = float(MATERIAUX_DB.get(nom_officiel_db, 0.0))
+                        cout_mats_total += (qte_val * prix_unitaire)
+
+        total_charges = cout_rh_total + cout_mats_total
+        marge_net = revenus - total_charges
+        roi_global = (marge_net / total_charges * 100) if total_charges > 0 else 0.0
+        
+        duree_totale_jours = jours_cumules if jours_cumules > 0 else float(j + (h/24.0) + (m/1440.0))
+        roi_par_jour = (roi_global / duree_totale_jours) if duree_totale_jours > 0 else roi_global
+
+        liste_chantiers_calcules.append({
+            "ch_id": ch_id,
+            "ch_data": ch_data,
+            "revenus": revenus,
+            "jours_globaux_indic": j,
+            "heures_globales_indic": h,
+            "minutes_globales_indic": m,
+            "etapes": etapes,
+            "cumul_cout_rh": cout_rh_total,
+            "cumul_cout_mats": cout_mats_total,
+            "total_charges": total_charges,
+            "marge_net": marge_net,
+            "roi_global": roi_global,
+            "roi_par_jour": roi_par_jour,
+            "duree_totale_jours": duree_totale_jours
+        })
+
+    # Conversion en DataFrame pour appliquer un tri descendant strict sur le ROI / Jour
+    if liste_chantiers_calcules:
+        df_tri = pd.DataFrame(liste_chantiers_calcules)
+        df_tri = df_tri.sort_values(by="roi_par_jour", ascending=False)
+        liste_chantiers_ordonnes = df_tri.to_dict(orient="records")
+    else:
+        liste_chantiers_ordonnes = []
+
+    # ==============================================================================
+    # 🎯 PHASE 2 : RENDU RENDEMENT ET AFFICHAGE AVEC LE ROI/JOUR DANS LE TITRE
+    # ==============================================================================
+    for item in liste_chantiers_ordonnes:
+        ch_data = item["ch_data"]
+        nom_modele = ch_data.get("nom_modele", item["ch_id"])
+        
+        # Formatage dynamique du titre de l'expander avec inclusion du ROI / Jour
+        titre_expander = f"🏗️ {nom_modele} — 💰 {item['revenus']:,.0f} € — ⏱️ {item['jours_globaux_indic']}j {item['heures_globales_indic']}h — ⚡ {item['roi_par_jour']:.2f} %/j".replace(",", " ")
         
         with st.expander(titre_expander, expanded=False):
-            if not etapes:
+            if not item["etapes"]:
                 st.caption("⚪ Aucune étape technique enregistrée pour ce modèle.")
                 continue
 
             st.markdown("##### 📋 Décomposition financière par étape technique (Table 2)")
             
-            for etape in etapes:
+            for etape in item["etapes"]:
                 num_e = etape.get("num_etape", 1)
                 nom_etape = etape.get("nom_etape", "Étape sans nom")
                 duree_j = float(etape.get("duree_jours", 1.0))
-                jours_totaux_calcul_etapes += duree_j
-                
-                # Règle de calcul Sim-TP : application forfaitaire au jour supérieur pour l'étape
                 jours_forfait = float(math.ceil(duree_j))
                 
-                # --- CALCUL RH COMPOSÉ CDI ---
+                # --- CALCUL RH ---
                 cond = float(etape.get("jh_cond", 0.0))
                 chef = float(etape.get("jh_chef", 0.0))
                 ouv = float(etape.get("jh_ouvrier", 0.0))
-                
                 cout_rh_etape = (cond * px_cond + chef * px_chef + ouv * px_ouvrier) * jours_forfait
-                cumul_cout_rh_chantier += cout_rh_etape
                 
-                # --- CALCUL MATÉRIAUX COMPOSÉ ---
+                # --- CALCUL MATÉRIAUX ---
                 mats = etape.get("materiaux", {})
                 cout_mats_etape = 0.0
                 mats_affiches = []
@@ -107,10 +165,8 @@ def afficher_onglet_consulter_modeles():
                             prix_unitaire = float(MATERIAUX_DB.get(nom_officiel_db, 0.0))
                             cout_ligne_mat = qte_val * prix_unitaire
                             cout_mats_etape += cout_ligne_mat
-                            
-                            mats_affiches.append(f"- {nom_officiel_db} : `{int(qte_val)}` *({prix_unitaire:.0f} €/unités = {cout_ligne_mat:,.0f} €)*")
+                            mats_affiches.append(f"- {nom_officiel_db} : `{int(qte_val)}` *({prix_unitaire:.0f} €/u = {cout_ligne_mat:,.0f} €)*")
 
-                cumul_cout_mats_chantier += cout_mats_etape
                 engins = etape.get("engins", [])
 
                 st.markdown(f"**🔹 Étape {num_e:02d} : {nom_etape}** *({duree_j} jour(s) réel(s) ➔ {int(jours_forfait)}j forfaitisés)*")
@@ -145,32 +201,19 @@ def afficher_onglet_consulter_modeles():
                 st.markdown(f"➡️ **Coût Consolidé Étape {num_e:02d} :** `{total_etape:,.2f} €`".replace(",", " "))
                 st.markdown("<div style='border-bottom: 1px dashed #dedede; margin: 15px 0;'></div>", unsafe_allow_html=True)
 
-            # ==============================================================================
-            # 🎯 SECTION MIS À JOUR : BILAN BUDGÉTAIRE AVEC ANALYSE ROI / JOUR
-            # ==============================================================================
-            total_charges_chantier = cumul_cout_rh_chantier + cumul_cout_mats_chantier
-            marge_net_theorique = revenus - total_charges_chantier
-            
-            # Calculs des ROI de l'activité
-            roi_theorique = (marge_net_theorique / total_charges_chantier * 100) if total_charges_chantier > 0 else 0.0
-            
-            # Utilisation de la durée cumulée des étapes (ou fallback de sécurité sur l'en-tête)
-            duree_totale_jours = jours_totaux_calcul_etapes if jours_totaux_calcul_etapes > 0 else float(j + (h/24.0) + (m/1440.0))
-            roi_par_jour_theorique = (roi_theorique / duree_totale_jours) if duree_totale_jours > 0 else roi_theorique
-
+            # --- SYNTHÈSE GLOBALE DU MODÈLE DE CHANTIER ---
             st.markdown("##### 📊 Bilan Budgétaire Prévisionnel du Modèle Ouvrage")
             cb1, cb2, cb3, cb4 = st.columns(4)
             with cb1:
-                st.metric(label="👥 Masse Salariale CDI Totale", value=f"{cumul_cout_rh_chantier:,.2f} €".replace(",", " "))
+                st.metric(label="👥 Masse Salariale CDI Totale", value=f"{item['cumul_cout_rh']:,.2f} €".replace(",", " "))
             with cb2:
-                st.metric(label="🧱 Budget Matériaux Global", value=f"{cumul_cout_mats_chantier:,.2f} €".replace(",", " "))
+                st.metric(label="🧱 Budget Matériaux Global", value=f"{item['cumul_cout_mats']:,.2f} €".replace(",", " "))
             with cb3:
-                st.metric(label="📊 ROI Global", value=f"{roi_theorique:.2f} %")
+                st.metric(label="📊 ROI Global", value=f"{item['roi_global']:.2f} %")
             with cb4:
-                # ⚙️ AJOUT DE LA METRIC DU ROI / JOUR
-                st.metric(label="⚡ ROI / Jour", value=f"{roi_par_jour_theorique:.2f} %/j")
+                st.metric(label="⚡ ROI / Jour", value=f"{item['roi_par_jour']:.2f} %/j")
 
-            if marge_net_theorique >= 0:
-                st.success(f"🟢 **Rentabilité positive estimée :** Marge nette de **{marge_net_theorique:,.2f} €** pour {duree_totale_jours:.1f} jours d'activité.".replace(",", " "))
+            if item["marge_net"] >= 0:
+                st.success(f"🟢 **Rentabilité positive estimée :** Marge nette de **{item['marge_net']:,.2f} €** pour {item['duree_totale_jours']:.1f} jours d'activité.".replace(",", " "))
             else:
-                st.error(f"🔴 **Modèle déficitaire :** Perte sèche évaluée à **{abs(marge_net_theorique):,.2f} €**.".replace(",", " "))
+                st.error(f"🔴 **Modèle déficitaire :** Perte sèche évaluée à **{abs(item['marge_net']):,.2f} €**.".replace(",", " "))
