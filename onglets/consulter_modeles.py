@@ -123,16 +123,16 @@ def afficher_onglet_consulter_modeles():
     # ==============================================================================
     # 🎯 PHASE 2 : RENDU GRAPHIQUE ET EN-TÊTE SUR 4 COLONNES PARFAITEMENT ALIGNÉES
     # ==============================================================================
-    # En-tête des colonnes pour guider la lecture
-    st.markdown("<br>", unsafe_allow_html=True)
-    c_head1, c_head2, c_head3, c_head4 = st.columns([5, 2, 2, 3])
-    with c_head1: st.markdown("**🏗️ Intitulé du Modèle Ouvrage**")
-    with c_head2: st.markdown("**💰 Revenus**")
-    with c_head3: st.markdown("**⏱️ Durée**")
-    with c_head4: st.markdown("**⚡ Gain Net / Jour**")
+
     st.markdown("<div style='border-bottom: 2px solid #31333F; margin-bottom: 10px;'></div>", unsafe_allow_html=True)
 
     for item in liste_chantiers_ordonnes:
+        st.markdown("<br>", unsafe_allow_html=True)
+        c_head1, c_head2, c_head3, c_head4 = st.columns([5, 2, 2, 3])
+        with c_head1: st.markdown("**🏗️ Intitulé du Modèle Ouvrage**")
+        with c_head2: st.markdown("**💰 Revenus**")
+        with c_head3: st.markdown("**⏱️ Durée**")
+        with c_head4: st.markdown("**⚡ Gain Net / Jour**")
         ch_data = item["ch_data"]
         nom_modele = ch_data.get("nom_modele", item["ch_id"])
         
