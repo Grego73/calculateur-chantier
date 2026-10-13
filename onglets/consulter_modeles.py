@@ -203,7 +203,6 @@ def afficher_onglet_consulter_modeles():
                                 st.markdown(item_txt.replace(",", " "))
                             st.markdown(f"💰 **Total Matériaux Étape :** `{cout_mats_etape:,.0f} €`".replace(",", " "))
                         else:
-                        else:
                             st.caption("Aucun matériau requis (0 €)")
 
                     with c_engins:
@@ -236,4 +235,3 @@ def afficher_onglet_consulter_modeles():
                 st.error(f"🔴 **Modèle déficitaire :** Perte sèche évaluée à **{abs(item['marge_net']):,.2f} €**.".replace(",", " "))
         
         st.markdown("<div style='border-bottom: 2px solid #31333F; margin-top: 15px; margin-bottom: 15px;'></div>", unsafe_allow_html=True)
-
