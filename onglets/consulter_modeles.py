@@ -140,7 +140,7 @@ def afficher_onglet_consulter_modeles():
         with st.container():
             col1, col2, col3, col4 = st.columns([5, 2, 2, 3])
             with col1:
-                st.markdown(f"**{nom_modele}**")
+                st.markdown(f"### {nom_modele}")
             with col2:
                 st.markdown(f"💰 {item['revenus']:,.0f} €".replace(",", " "))
             with col3:
