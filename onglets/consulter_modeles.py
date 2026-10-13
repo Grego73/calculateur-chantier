@@ -142,11 +142,11 @@ def afficher_onglet_consulter_modeles():
             with col1:
                 st.markdown(f"#### {nom_modele}")
             with col2:
-                st.markdown(f"####💰 {item['revenus']:,.0f} €".replace(",", " "))
+                st.markdown(f"#### {item['revenus']:,.0f} €".replace(",", " "))
             with col3:
-                st.markdown(f"####⏱️ {int(item['duree_totale_jours'])} j")
+                st.markdown(f"#### {int(item['duree_totale_jours'])} j")
             with col4:
-                st.markdown(f"####⚡ **{item['roi_par_jour']:,.0f} €/j**".replace(",", " "))
+                st.markdown(f"#### **{item['roi_par_jour']:,.0f} €/j**".replace(",", " "))
             
             # L'expander vide de titre sert de tiroir pour stocker le détail de la Table 2
             with st.expander("Voir le détail technique des étapes et charges", expanded=False):
