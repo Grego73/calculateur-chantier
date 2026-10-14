@@ -229,9 +229,28 @@ def afficher_onglet_consulter_modeles():
             with cb4:
                 st.metric(label="⚡ Gain Net / Jour", value=f"{item['roi_par_jour']:,.0f} €/j".replace(",", " "))
 
-            if item["marge_net"] >= 0:
-                st.success(f"🟢 **Rentabilité positive estimée :** Marge nette de **{item['marge_net']:,.2f} €** pour {item['duree_totale_jours']:.1f} jours d'activité.".replace(",", " "))
-            else:
-                st.error(f"🔴 **Modèle déficitaire :** Perte sèche évaluée à **{abs(item['marge_net']):,.2f} €**.".replace(",", " "))
+            st.markdown("<br>", unsafe_allow_html=True)
+            col_alerte1, col_alerte2 = st.columns(2)
+
+            # Colonne 1 : Rentabilité Financière (Actuelle)
+            with col_alerte1:
+                if item["marge_net"] >= 0:
+                    st.success(f"🟢 **Rentabilité positive estimée :** Marge nette de **{item['marge_net']:,.2f} €** pour {item['duree_totale_jours']:.1f} jours d'activité.".replace(",", " "))
+                else:
+                    st.error(f"🔴 **Modèle déficitaire :** Perte sèche évaluée à **{abs(item['marge_net']):,.2f} €**.".replace(",", " "))
+
+            # Colonne 2 : Comparaison des Temps (Précise)
+            with col_alerte2:
+                temps_chantier = float(item["jours_globaux_indic"])
+                temps_etapes = float(item["duree_totale_jours"])
+                
+                if temps_etapes < temps_chantier:
+                    st.success(f"🟢 **Planning optimisé :** Le cumul des étapes ({temps_etapes:.1f} j) est **inférieur** au temps global ({temps_chantier:.1f} j).")
+                
+                elif temps_etapes == temps_chantier:
+                    st.success(f"🔵 **Planning parfait :** Le cumul des étapes ({temps_etapes:.1f} j) est **égal** au temps global ({temps_chantier:.1f} j).")
+                
+                else:  # temps_etapes > temps_chantier
+                    st.error(f"🔴 **Alerte Temps :** Le cumul des étapes ({temps_etapes:.1f} j) est **supérieur** au temps global ({temps_chantier:.1f} j).")
         
         st.markdown("<div style='border-bottom: 2px solid #31333F; margin-top: 15px; margin-bottom: 15px;'></div>", unsafe_allow_html=True)
