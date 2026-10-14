@@ -8,7 +8,7 @@ from onglets.suivi_interne.tab_marche import afficher_tab_marche
 from onglets.suivi_interne.tab_parseur import afficher_tab_parseur
 from onglets.suivi_interne.tab_gestion import afficher_tab_gestion
 from .tab_diagnostic import afficher_tab_diagnostic
-from .tab_import_html import afficher_tab_import_html
+from onglets.suivi_interne.tab_import_html import afficher_tab_import_html
 
 
 def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
@@ -61,7 +61,7 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
     titres_onglets = [
         "🏆 Parts & Bénéfices de la Coop", 
         "🌍 Marché Global", 
-        "📋 🔄 Importer l'Inventaire",
+        "💰 Évaluation des Stocks",
         "📥 Déposer l'Historique du Jeu", 
         "⚙️ Gérer les Droits & Associés"
         
