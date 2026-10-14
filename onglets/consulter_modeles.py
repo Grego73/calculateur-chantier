@@ -248,8 +248,16 @@ def afficher_onglet_consulter_modeles():
                     st.success(f"🟢 **Planning optimisé :** Le cumul des étapes ({temps_etapes:.1f} j) est **inférieur** au temps global ({temps_chantier:.1f} j).")
                 
                 elif temps_etapes == temps_chantier:
-                    st.success(f"🔵 **Planning parfait :** Le cumul des étapes ({temps_etapes:.1f} j) est **égal** au temps global ({temps_chantier:.1f} j).")
-                
+                    # Style HTML qui calque fidèlement l'opacité et l'intensité des blocs vert/rouge du thème sombre
+                    st.markdown(
+                        f"""
+                        <div style="background-color: rgba(28, 127, 238, 0.15); color: rgb(100, 180, 255); padding: 16px; border-radius: 0.5rem; border: 1px solid rgba(28, 127, 238, 0.3); font-size: 1rem;">
+                            🔵 <b>Planning parfait :</b> Le cumul des étapes ({temps_etapes:.1f} j) est <b>égal</b> au temps global ({temps_chantier:.1f} j).
+                        </div>
+                        """, 
+                        unsafe_allow_html=True
+                    )
+                    
                 else:  # temps_etapes > temps_chantier
                     st.error(f"🔴 **Alerte Temps :** Le cumul des étapes ({temps_etapes:.1f} j) est **supérieur** au temps global ({temps_chantier:.1f} j).")
         
