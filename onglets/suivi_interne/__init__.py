@@ -8,7 +8,7 @@ from onglets.suivi_interne.tab_marche import afficher_tab_marche
 from onglets.suivi_interne.tab_parseur import afficher_tab_parseur
 from onglets.suivi_interne.tab_gestion import afficher_tab_gestion
 from .tab_diagnostic import afficher_tab_diagnostic
-from onglets.suivi_interne.tab_import_html import afficher_tab_import_html
+from onglets.suivi_interne.tab_stock import afficher_tab_stock
 
 
 def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
@@ -118,7 +118,7 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
         afficher_tab_marche(liste_flux, membres_inscrits)
 
     with liste_onglets_st[2]:
-    afficher_tab_import_html(nom_coop_active)
+        afficher_tab_stock(nom_coop_active)
         
     with liste_onglets_st[3]:
         afficher_tab_parseur(nom_coop_active, membres_inscrits, joueur_actif, liste_flux)
