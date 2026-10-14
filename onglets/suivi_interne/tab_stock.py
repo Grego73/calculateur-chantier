@@ -44,18 +44,35 @@ def extraire_donnees_html(html_content):
         })
     return donnees_mats
 
-def simplifier_texte(texte):
-    """Supprime les accents, les majuscules et les espaces pour blinder les comparaisons (ex: 'Enrobé' -> 'enrobe')."""
+def identifier_cle_unique(texte):
+    """
+    Fonction universelle de nettoyage. Elle convertit n'importe quel texte (HTML ou Firestore)
+    en sa clé technique en cherchant sa racine, peu importe les accents, pluriels ou casses.
+    """
     if not texte:
-        return ""
-    texte = str(texte).lower().strip()
-    # Supprime informatiquement tous les accents de la chaîne
-    texte = ''.join(c for c in unicodedata.normalize('NFD', texte) if unicodedata.category(c) != 'Mn')
-    # Remplacement de sécurité si le terme varie
-    return texte.replace(" ", "")
+        return "inconnu"
+    
+    # 1. Nettoyage de base : tout en minuscules, sans accents, sans espaces
+    texte_nettoye = str(texte).lower().strip()
+    texte_nettoye = ''.join(c for c in unicodedata.normalize('NFD', texte_nettoye) if unicodedata.category(c) != 'Mn')
+    texte_nettoye = texte_nettoye.replace(" ", "")
+
+    # 2. Cartographie par détection de racine
+    if "sable" in texte_nettoye: return "sable"
+    if "beton" in texte_nettoye: return "beton"
+    if "poutre" in texte_nettoye: return "poutres"
+    if "enrob" in texte_nettoye: return "enrobe"
+    if "armatur" in texte_nettoye: return "armature"
+    if "tole" in texte_nettoye: return "tole"
+    if "pannea" in texte_nettoye: return "panneaux"
+    if "canalisa" in texte_nettoye: return "canalisations"
+    if "tuyau" in texte_nettoye: return "tuyaux"
+    if "terre" in texte_nettoye: return "terre"
+    
+    return texte_nettoye
 
 def analyser_consommation_periode(liste_flux_bruts):
-    """Analyse les volumes vendus sur la période en cours avec une correspondance insensible aux accents/casse."""
+    """Analyse les volumes vendus sur la période en cours avec le nettoyage universel."""
     conso_totale = {}
     
     date_repere_str = st.session_state.get("point_reprise_date_compta", "01/08/2026")
@@ -88,9 +105,9 @@ def analyser_consommation_periode(liste_flux_bruts):
             mats_dict = f.get("materiaux", {})
             if isinstance(mats_dict, dict):
                 for m_k, m_v in mats_dict.items():
-                    # 🎯 Utilisation de la clé simplifiée sans accent ni majuscule
-                    cle_normalisee = simplifier_texte(m_k)
-                    conso_totale[cle_normalisee] = conso_totale.get(cle_normalisee, 0.0) + float(m_v)
+                    # 🎯 Nettoyage de la clé Firestore via la fonction universelle
+                    cle_nosql = identifier_cle_unique(m_k)
+                    conso_totale[cle_nosql] = conso_totale.get(cle_nosql, 0.0) + float(m_v)
                     
     return conso_totale, jours_ecoules
 
@@ -102,7 +119,7 @@ def afficher_tab_stock(nom_coop_active, liste_flux_bruts=None):
         "Collez le code HTML de votre page de coopérative ici :", 
         height=120, 
         placeholder="<!DOCTYPE html> ...",
-        key="area_import_html_coop_predict_v7"
+        key="area_import_html_coop_predict_v9"
     )
     
     if html_brut.strip():
@@ -122,14 +139,14 @@ def afficher_tab_stock(nom_coop_active, liste_flux_bruts=None):
             with c_val2:
                 st.metric("📦 Volume Global Entreposé", f"{int(volume_total):,}".replace(",", " ") + " u / t")
                 
-            # --- 🔮 CALCUL PRÉDICTIF SYNC ---
+            # --- 🔮 CALCUL PRÉDICTIF NETTOYÉ ---
             st.markdown("---")
-            st.markdown("##### 🔮 Analyse Prédictive d'Épuisement (Insensible aux accents et à la casse)")
+            st.markdown("##### 🔮 Analyse Prédictive d'Épuisement (Moteur Anti-Erreurs de Casse)")
             
             historique_ventes, jours_observes = analyser_consommation_periode(liste_flux_bruts)
             
             date_repere_active = st.session_state.get("point_reprise_date_compta", "01/08/2026")
-            st.info(f"📊 Analyse lissée sur **{jours_observes} jours** (Période actuelle démarrée le **{date_repere_active}**).")
+            st.info(f"📊 Analyse synchronisée sur **{jours_observes} jours** écoulés depuis votre repère comptable.")
             
             lignes_predictions = []
             for _, row in df_inventaire.iterrows():
@@ -137,9 +154,9 @@ def afficher_tab_stock(nom_coop_active, liste_flux_bruts=None):
                 stock_actuel = row["Quantité en Stock"]
                 unite_mat = row["Unité"]
                 
-                # 🎯 Recherche par clé normalisée (ex: recherche 'enrobe' au lieu de 'Enrobé')
-                cle_recherche = simplifier_texte(mat)
-                total_vendu = historique_ventes.get(cle_recherche, 0.0)
+                # 🎯 Nettoyage du nom HTML via la même fonction universelle
+                cle_commune = identifier_cle_unique(mat)
+                total_vendu = historique_ventes.get(cle_commune, 0.0)
                 conso_journaliere = round(total_vendu / jours_observes, 1)
                 
                 # Calcul de l'autonomie restante
