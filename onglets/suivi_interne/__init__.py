@@ -7,7 +7,9 @@ from .tab_distribution import afficher_tab_distribution
 from onglets.suivi_interne.tab_marche import afficher_tab_marche
 from onglets.suivi_interne.tab_parseur import afficher_tab_parseur
 from onglets.suivi_interne.tab_gestion import afficher_tab_gestion
-from .tab_diagnostic import afficher_tab_diagnostic  # <-- NOUVEL IMPORT
+from .tab_diagnostic import afficher_tab_diagnostic
+from .tab_import_html import afficher_tab_import_html
+
 
 def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
     if "auth_suivi_coop" not in st.session_state:
@@ -57,10 +59,12 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
     
     # Construction dynamique de la liste des onglets selon le grade
     titres_onglets = [
-        "🏆 1. Parts & Bénéfices de la Coop", 
-        "🌍 2. Marché Global", 
+        "🏆 Parts & Bénéfices de la Coop", 
+        "🌍 Marché Global", 
+        "📋 🔄 Importer l'Inventaire",
         "📥 Déposer l'Historique du Jeu", 
         "⚙️ Gérer les Droits & Associés"
+        
     ]
     # Si le joueur est Niveau 3, on rajoute l'onglet diagnostic secret
     if niveau_actuel >= 3:
@@ -112,14 +116,17 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
         
     with liste_onglets_st[1]:
         afficher_tab_marche(liste_flux, membres_inscrits)
-        
+
     with liste_onglets_st[2]:
-        afficher_tab_parseur(nom_coop_active, membres_inscrits, joueur_actif, liste_flux)
+    afficher_tab_import_html(nom_coop_active)
         
     with liste_onglets_st[3]:
+        afficher_tab_parseur(nom_coop_active, membres_inscrits, joueur_actif, liste_flux)
+        
+    with liste_onglets_st[4]:
         afficher_tab_gestion(nom_coop_active, joueur_actif, niveau_actuel, membres_inscrits, coop_snap)
 
     # Si le joueur est Niveau 3, on peuple le 5ème onglet
     if niveau_actuel >= 3:
-        with liste_onglets_st[4]:
+        with liste_onglets_st[5]:
             afficher_tab_diagnostic(nom_coop_active)
