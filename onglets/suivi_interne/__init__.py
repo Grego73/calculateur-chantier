@@ -116,8 +116,8 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
     with liste_onglets_st[1]:
         afficher_tab_marche(liste_flux, membres_inscrits)
 
-    with liste_onglets_st[2]:
-        afficher_tab_stock(nom_coop_active)
+    with liste_onglets_st[2]:  # Utilisez l'index exact de votre onglet de stock
+        afficher_tab_stock(nom_coop_active, liste_flux_bruts)
         
     with liste_onglets_st[3]:
         afficher_tab_parseur(nom_coop_active, membres_inscrits, joueur_actif, liste_flux)
@@ -126,6 +126,6 @@ def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
         afficher_tab_gestion(nom_coop_active, joueur_actif, niveau_actuel, membres_inscrits, coop_snap)
 
     # Si le joueur est Niveau 3, on peuple le 5ème onglet
-    if niveau_actuel >= 3:
+    if niveau_actuel >= 5:
         with liste_onglets_st[5]:
             afficher_tab_diagnostic(nom_coop_active)
