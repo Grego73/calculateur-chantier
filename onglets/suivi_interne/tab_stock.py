@@ -51,7 +51,7 @@ def identifier_cle_unique(texte):
         return "inconnu"
     
     texte_nettoye = str(texte).lower().strip()
-    texte_nettoye = ''.join(c for c in unicodedata.normalize('NFD', texte_nettoye) if unicodedata.category(c) != 'Mn')
+    texte_nettoye = ''.join(c for c in unicodedata.normalize('NFD', text_nettoye) if unicodedata.category(c) != 'Mn')
     texte_nettoye = texte_nettoye.replace(" ", "")
 
     if "sable" in texte_nettoye: return "sable"
@@ -67,21 +67,15 @@ def identifier_cle_unique(texte):
     
     return texte_nettoye
 
-
 def analyser_consommation_periode(liste_flux_bruts):
-    """
-    Analyse les volumes vendus sur la période en cours.
-    🎯 Uniquement basé sur ACHAT_INTERNE et ACHAT_EXTERNE (les réapprovisionnements sont exclus).
-    """
+    """Analyse les volumes vendus sur la période en cours (Achats uniquement)."""
     conso_totale = {}
-    
     date_repere_str = st.session_state.get("point_reprise_date_compta", "01/08/2026")
     try:
         date_limite_cle = int("".join(reversed(date_repere_str.split("/"))))
         date_repere_dt = datetime.strptime(date_repere_str, "%d/%m/%Y")
         jours_ecoules = (datetime.now() - date_repere_dt).days
-        if jours_ecoules <= 0:
-            jours_ecoules = 1
+        if jours_ecoules <= 0: jours_ecoules = 1
     except Exception:
         date_limite_cle = 20260801
         jours_ecoules = 7
@@ -91,17 +85,12 @@ def analyser_consommation_periode(liste_flux_bruts):
         
     for f in liste_flux_bruts:
         t_mouv = str(f.get("type", "")).strip()
-        
-        # 🎯 Filtrage strict sur les ACHATS uniquement
         if t_mouv in ["ACHAT_INTERNE", "ACHAT_EXTERNE"]:
             d_txt = str(f.get("date_jeu", "01/01/2000")).strip()
-            
             try:
                 cle_doc_actuel = int("".join(reversed(d_txt.split("/"))))
-                if cle_doc_actuel < date_limite_cle:
-                    continue 
-            except Exception:
-                pass
+                if cle_doc_actuel < date_limite_cle: continue 
+            except Exception: pass
                 
             mats_dict = f.get("materiaux", {})
             if isinstance(mats_dict, dict):
@@ -111,15 +100,116 @@ def analyser_consommation_periode(liste_flux_bruts):
                     
     return conso_totale, jours_ecoules
 
+def exécuter_mise_a_jour_globale_html(html_content, nom_coop_active, df_inventaire, valeur_totale_marchandises, volume_total):
+    """
+    Exécute en une seule transaction : la sauvegarde de l'inventaire réel 
+    ET l'extraction anti-doublon du fil d'événements (Achats + Réapprovisionnements).
+    """
+    soup = BeautifulSoup(html_content, 'html.parser')
+    col_ref = db.db.collection("cooperatives").document(nom_coop_active).collection("comptabilite_interne")
+    
+    compteur_inserts = 0
+    compteur_doublons = 0
+    
+    # 🎯 1. EXTRACTION ET TRAITEMENT DU FIL DES ÉVÉNEMENTS (ACHATS + REAPPRO)
+    liste_items = soup.find_all('li', class_=re.compile(r'collection-item'))
+    
+    for item in liste_items:
+        span_time = item.find('span', class_='min-text')
+        if not span_time: continue
+        txt_time = span_time.text.strip()
+        
+        match_time = re.search(r'Le\s*([\d/]+)\s*à\s*([\d:]+)', txt_time)
+        if not match_time: continue
+        date_jeu = match_time.group(1)
+        heure_jeu = match_time.group(2)
+        
+        span_time.extract() # Isole le texte de l'action
+        txt_action = item.text.strip()
+        
+        type_mouv = None
+        joueur = None
+        materiaux_dict = {}
+        
+        # Détection Réapprovisionnement
+        if "réapprovisionne de" in txt_action:
+            type_mouv = "REAPPROVISIONNEMENT"
+            match_reappro = re.search(r'^([^\s]+)\s*réapprovisionne de\s*([\d\s]+)\s*(?:tonne\(s\)|unité\(s\))\s*de\s*(.+)$', txt_action)
+            if match_reappro:
+                joueur = match_reappro.group(1)
+                qte = int(match_reappro.group(2).replace(' ', ''))
+                mat_nom = match_reappro.group(3).strip()
+                materiaux_dict[identifier_cle_unique(mat_nom)] = qte
+                
+        # Détection Achats
+        elif "a acheté" in txt_action:
+            match_achat = re.search(r'^([^\s]+)\s*a acheté\s*([\d\s]+)\s*(?:tonnes|unités)\s*de\s*(.+)$', txt_action)
+            if match_achat:
+                joueur = match_achat.group(1)
+                qte = int(match_achat.group(2).replace(' ', ''))
+                mat_nom = match_achat.group(3).strip()
+                materiaux_dict[identifier_cle_unique(mat_nom)] = qte
+                
+                coop_snap = db.db.collection("cooperatives").document(nom_coop_active).get().to_dict() or {}
+                type_mouv = "ACHAT_INTERNE" if joueur in coop_snap.get("membres", []) else "ACHAT_EXTERNE"
+
+        if not type_mouv or not joueur: continue
+            
+        # Construction de la clé de document unique anti-doublon pour le fil de jeu
+        date_cle = "".join(reversed(date_jeu.split("/")))
+        heure_cle = heure_jeu.replace(":", "")
+        mat_cle = list(materiaux_dict.keys())[0] if materiaux_dict else "vide"
+        id_unique_log = f"log_jeu_{date_cle}_{heure_cle}_{joueur.lower()}_{type_mouv.lower()}_{mat_cle}"
+        
+        doc_existe = col_ref.document(id_unique_log).get().exists
+        
+        donnees_log = {
+            "type": type_mouv,
+            "date_jeu": date_jeu,
+            "heure_jeu": heure_jeu,
+            "joueur": joueur,
+            "materiaux": materiaux_dict,
+            "timestamp_enregistrement": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        
+        col_ref.document(id_unique_log).set(donnees_log)
+        if doc_existe: compteur_doublons += 1
+        else: compteur_inserts += 1
+
+    # 🎯 2. SAUVEGARDER L'INVENTAIRE RÉEL COMPLET DANS FIRESTORE
+    dictionnaire_stocks_nosql = {}
+    dictionnaire_prix_nosql = {}
+    for _, row in df_inventaire.iterrows():
+        cle_technique = identifier_cle_unique(row["Matériau"])
+        dictionnaire_stocks_nosql[f"stock_{cle_technique}"] = int(row["Quantité en Stock"])
+        dictionnaire_prix_nosql[f"prix_{cle_technique}"] = float(row["Prix Unitaire (€)"])
+    
+    maintenant = datetime.now()
+    id_document_snapshot = f"snapshot_stock_{maintenant.strftime('%Y%m%d_%H%M%S')}"
+    
+    donnees_snapshot = {
+        "type": "SNAPSHOT_STOCK",
+        "date_jeu": maintenant.strftime("%d/%m/%Y"),
+        "heure_jeu": maintenant.strftime("%H:%M"),
+        "valeur_totale_stock": int(valeur_totale_marchandises),
+        "volume_total_stock": int(volume_total),
+        "details_quantites": dictionnaire_stocks_nosql,
+        "details_prix": dictionnaire_prix_nosql,
+        "timestamp_enregistrement": maintenant.strftime("%Y-%m-%d %H:%M:%S")
+    }
+    
+    col_ref.document(id_document_snapshot).set(donnees_snapshot)
+    db.enregistrer_log(type_action="INVENTAIRE_GLOBAL", details=f"Mise à jour : {compteur_inserts} logs synchronisés. Valeur stock : {int(valeur_totale_marchandises):,} €.")
+    
+    return compteur_inserts, compteur_doublons
+
 def afficher_tab_stock(nom_coop_active, liste_flux_bruts=None):
     st.markdown("#### 🌍 Évaluation de la Valeur & Prévision des Besoins")
-    st.caption("Collez le code source HTML de votre page de jeu pour auditer l'inventaire et sauvegarder la valeur de votre actif.")
+    st.caption("Collez le code HTML de votre page pour enregistrer simultanément vos stocks réels et synchroniser l'historique sans doublon.")
     
     html_brut = st.text_area(
         "Collez le code HTML de votre page de coopérative ici :", 
-        height=120, 
-        placeholder="<!DOCTYPE html> ...",
-        key="area_import_html_coop_predict_v13"
+        height=120, placeholder="<!DOCTYPE html> ...", key="area_import_html_coop_predict_v14"
     )
     
     if html_brut.strip():
@@ -127,59 +217,31 @@ def afficher_tab_stock(nom_coop_active, liste_flux_bruts=None):
         
         if resultats:
             df_inventaire = pd.DataFrame(resultats)
-            
-            # --- 📈 FINANCES GLOBALES ---
             valeur_totale_marchandises = df_inventaire["Valeur du Stock (€)"].sum()
             volume_total = df_inventaire["Quantité en Stock"].sum()
             
             st.markdown("---")
             c_val1, c_val2 = st.columns(2)
-            with c_val1:
-                st.metric("🔥 Valeur Estimée des Stocks", f"{int(valeur_totale_marchandises):,}".replace(",", " ") + " €")
-            with c_val2:
-                st.metric("📦 Volume Global Entreposé", f"{int(volume_total):,}".replace(",", " ") + " u / t")
+            with c_val1: st.metric("🔥 Valeur Estimée des Stocks", f"{int(valeur_totale_marchandises):,}".replace(",", " ") + " €")
+            with c_val2: st.metric("📦 Volume Global Entreposé", f"{int(volume_total):,}".replace(",", " ") + " u / t")
             
-            # --- 💾 ENREGISTRER DANS FIRESTORE ---
+            # ==================================================================
+            # 🎯 💾 LE BOUTON UNIQUE DE MISE À JOUR COMPLÈTE
+            # ==================================================================
             st.write("")
-            if st.button("💾 ENREGISTRER CET INVENTAIRE DANS FIRESTORE", type="primary", use_container_width=True):
-                with st.spinner("Mise à jour de la base de données..."):
-                    try:
-                        dictionnaire_stocks_nosql = {}
-                        dictionnaire_prix_nosql = {}
-                        
-                        for _, row in df_inventaire.iterrows():
-                            cle_technique = identifier_cle_unique(row["Matériau"])
-                            dictionnaire_stocks_nosql[f"stock_{cle_technique}"] = int(row["Quantité en Stock"])
-                            dictionnaire_prix_nosql[f"prix_{cle_technique}"] = float(row["Prix Unitaire (€)"])
-                        
-                        maintenant = datetime.now()
-                        id_document = f"snapshot_stock_{maintenant.strftime('%Y%m%d_%H%M%S')}"
-                        
-                        donnees_a_sauvegarder = {
-                            "type": "SNAPSHOT_STOCK",
-                            "date_jeu": maintenant.strftime("%d/%m/%Y"),
-                            "heure_jeu": maintenant.strftime("%H:%M"),
-                            "valeur_totale_stock": valeur_totale_marchandises,
-                            "volume_total_stock": volume_total,
-                            "details_quantites": dictionnaire_stocks_nosql,
-                            "details_prix": dictionnaire_prix_nosql,
-                            "timestamp_enregistrement": maintenant.strftime("%Y-%m-%d %H:%M:%S")
-                        }
-                        
-                        db.db.collection("cooperatives").document(nom_coop_active).collection("comptabilite_interne").document(id_document).set(donnees_a_sauvegarder)
-                        db.enregistrer_log(type_action="INVENTAIRE", details=f"Mise à jour complète des stocks. Valeur totale arrêtée à {int(valeur_totale_marchandises):,} €.")
-                        
-                        st.success("🟢 L'inventaire réel et sa valeur globale ont été figés avec succès dans Firestore !")
-                        st.cache_data.clear()
-                        db.charger_flux_coop_cache.clear()
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"❌ Erreur lors de l'écriture Firestore : {e}")
+            if st.button("⚡ TOUT METTRE À JOUR (STOCKS + HISTORIQUE DE REAPPRO RÉEL)", type="primary", use_container_width=True):
+                with st.spinner("Mise à jour globale et traitement anti-doublon en cours..."):
+                    logs_inseres, doublons_bloques = exécuter_mise_a_jour_globale_html(
+                        html_brut, nom_coop_active, df_inventaire, valeur_totale_marchandises, volume_total
+                    )
+                st.success(f"💥 Traitement réussi ! Inventaire enregistré, **{logs_inseres}** nouveaux logs ajoutés, **{doublons_bloques}** doublons rejetés.")
+                st.cache_data.clear()
+                db.charger_flux_coop_cache.clear()
+                st.rerun()
             st.markdown("---")
                 
             # --- 🔮 CALCUL PRÉDICTIF SUR LES ACHATS ---
             st.markdown("##### 🔮 Ordre d'Urgence des Réapprovisionnements (Basé sur le rythme des achats)")
-            
             historique_ventes, jours_observes = analyser_consommation_periode(liste_flux_bruts)
             date_repere_active = st.session_state.get("point_reprise_date_compta", "01/08/2026")
             st.caption(f"Moyenne journalière des achats calculée sur {jours_observes} jours écoulés depuis le {date_repere_active}.")
@@ -204,56 +266,41 @@ def afficher_tab_stock(nom_coop_active, liste_flux_bruts=None):
                     a_commander = 0
                     cle_tri_autonomie = 8888.0
                 
-                if jours_autonomie <= 1.5:
-                    statut_alerte = "🚨 Rupture Imminente (< 1.5j)"
-                elif jours_autonomie <= 4.0:
-                    statut_alerte = "⚠️ Stock Faible (< 4j)"
-                elif jours_autonomie == 999.0:
-                    statut_alerte = "💤 Dormant (Aucun achat)"
-                else:
-                    statut_alerte = "🟢 Confortable"
+                if jours_autonomie <= 1.5: statut_alerte = "🚨 Rupture Imminente (< 1.5j)"
+                elif jours_autonomie <= 4.0: statut_alerte = "⚠️ Stock Faible (< 4j)"
+                elif jours_autonomie == 999.0: statut_alerte = "💤 Dormant (Aucun achat)"
+                else: statut_alerte = "🟢 Confortable"
                     
                 lignes_predictions.append({
-                    "Ressource": mat,
+                    "Ressource": mat, 
                     "Stock Actuel": stock_actuel,
-                    "Ventes Moyennes (/jour)": conso_journaliere,
+                    "Ventes Moyennes (/jour)": conso_journaliere, 
                     "Autonomie Restante": "Infini" if jours_autonomie == 999.0 else f"{jours_autonomie} j",
-                    "🚨 Urgence": statut_alerte,
+                    "🚨 Urgence": statut_alerte, 
                     "🧱 Commande Recommandée": f"{a_commander} {unite_mat}" if a_commander > 0 else "Rien à prévoir",
                     "_tri_technique": cle_tri_autonomie
                 })
-            df_predictif = pd.DataFrame(lignes_predictions)
+                
+            df_predictif = pd.DataFrame(lignes_predictions).sort_values(by="_tri_technique", ascending=True)
             
-            # 🎯 CLASSEMENT SYSTÉMATIQUE : Du stock le plus critique au plus confortable
-            df_predictif = df_predictif.sort_values(by="_tri_technique", ascending=True)
-            
-            # Rendu du tableau prédictif principal trié par urgence
             st.dataframe(
-                df_predictif,
-                use_container_width=True,
-                hide_index=True,
+                df_predictif, use_container_width=True, hide_index=True,
                 column_config={
-                    "Stock Actuel": st.column_config.NumberColumn("En Stock", format="%d"),
-                    "Ventes Moyennes (/jour)": st.column_config.NumberColumn("Achats/jour", format="%.1f"),
-                    "🚨 Urgence": st.column_config.TextColumn("🚨 État Critique"),
-                    "🧱 Commande Recommandée": st.column_config.TextColumn("🧱 Commande Conseil"),
-                    "_tri_technique": None  # Masque complètement la colonne technique de tri à l'affichage
+                    "Stock Actuel": st.column_config.NumberColumn("En Stock", format="%d"), 
+                    "Ventes Moyennes (/jour)": st.column_config.NumberColumn("Achats/jour", format="%.1f"), 
+                    "_tri_technique": None
                 }
             )
             
-            # --- 📋 GRAND LIVRE DE L'INVENTAIRE COMPTABLE ---
+            # --- 📋 INVENTAIRE COMPTABLE ---
             st.markdown("---")
             st.markdown("##### 📋 Liste des prix & valeurs de l'inventaire")
             st.dataframe(
-                df_inventaire, 
-                use_container_width=True, 
-                hide_index=True,
+                df_inventaire, use_container_width=True, hide_index=True,
                 column_config={
-                    "Matériau": st.column_config.TextColumn("🧱 Ressource"),
-                    "Quantité en Stock": st.column_config.NumberColumn("Quantité", format="%d"),
-                    "Unité": st.column_config.TextColumn("📦 Type"),
-                    "Prix Unitaire (€)": st.column_config.NumberColumn("Prix Vente Fixé", format="%d €"),
-                    "Valeur du Stock (€)": st.column_config.NumberColumn("Valeur Évaluée", format="%d €"),
+                    "Quantité en Stock": st.column_config.NumberColumn("Quantité", format="%d"), 
+                    "Prix Unitaire (€)": st.column_config.NumberColumn("Prix Vente Fixé", format="%d €"), 
+                    "Valeur du Stock (€)": st.column_config.NumberColumn("Valeur Évaluée", format="%d €")
                 }
             )
         else:
