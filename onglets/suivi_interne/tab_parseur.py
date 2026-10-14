@@ -1,10 +1,9 @@
 import streamlit as st
 import pandas as pd
 import database as db
-import re
 from datetime import datetime
 from coops.parseur import analyser_historique_brut
-from .tab_stock import identifier_cle_unique  # 🎯 On récupère notre nettoyeur universel
+from .tab_stock import identifier_cle_unique  # Extraction du nettoyeur universel
 
 def mettre_a_jour_stock_reappro_firestore(nom_coop_active, materiaux_reappro):
     """
@@ -24,13 +23,13 @@ def mettre_a_jour_stock_reappro_firestore(nom_coop_active, materiaux_reappro):
             dernier_snapshot = doc.to_dict()
             break
             
-        # Si aucun snapshot n'existe encore, on démarre à zéro
-        if not d_snap := dernier_snapshot:
+        # 🎯 CORRECTION SYNTAXE SÉCURISÉE : Initialisation des dictionnaires si la base est vide
+        if dernier_snapshot is None:
             details_quantites = {}
             details_prix = {}
         else:
-            details_quantites = d_snap.get("details_quantites", {})
-            details_prix = d_snap.get("details_prix", {})
+            details_quantites = dernier_snapshot.get("details_quantites", {})
+            details_prix = dernier_snapshot.get("details_prix", {})
             
         # 2. On ajoute les nouvelles quantités réapprovisionnées au stock existant
         for mat_nom, qte in materiaux_reappro.items():
@@ -84,7 +83,7 @@ def afficher_tab_parseur(nom_coop_active, membres_inscrits, joueur_actif, liste_
             # Enregistrement classique dans la base de l'historique brut
             db.enregistrer_ligne_historique_brute(nom_coop_active, mv["date"], mv["heure"], mv["acteur"], mv["type"], mv["materiaux"])
             
-            # 🎯 Détection du réapprovisionnement pour ajuster le stock réel en direct
+            # Détection du réapprovisionnement pour ajuster le stock réel en direct
             if str(mv["type"]).strip() == "REAPPROVISIONNEMENT" and mv["materiaux"]:
                 mettre_a_jour_stock_reappro_firestore(nom_coop_active, mv["materiaux"])
                 compteur_reappro += 1
@@ -140,4 +139,4 @@ def afficher_tab_parseur(nom_coop_active, membres_inscrits, joueur_actif, liste_
                 )
             else: st.info("💡 Aucun log d'événement de matériel n'est enregistré pour le moment.")
         except Exception as e: st.caption(f"ℹ️ Impossible de mettre en forme le flux récent ({e}).")
-    else: st.info("💡 L'historique de cette coopérative est vierge pour le moment.")
+    else: st.info("💡 L'historique de cette coopérative is vierge pour le moment.")
