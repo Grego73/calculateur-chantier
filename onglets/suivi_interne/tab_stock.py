@@ -51,7 +51,7 @@ def extraire_donnees_html(html_content):
         
     return donnees_mats
 
-def afficher_tab_import_html(nom_coop_active):
+def afficher_tab_stock(nom_coop_active):
     st.markdown("#### 🌍 Évaluation de la Valeur Réelle des Stocks")
     st.caption("Collez le code source HTML de la page de votre coopérative pour calculer instantanément la valeur financière totale de vos marchandises stockées.")
     
