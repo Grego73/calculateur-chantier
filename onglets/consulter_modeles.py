@@ -269,7 +269,12 @@ def afficher_onglet_consulter_modeles():
 
             # --- S'affiche sur toute la largeur de la ligne uniquement si activé ---
             if afficher_notification_temps:
-                
-                st.caption("ℹ️ *Attention : Le gain net journalier et les calculs financiers sont adaptés et indexés sur la durée réelle cumulée des étapes.*")
-
+                st.markdown(
+                    """
+                    <div style="text-align: center; color: rgba(250, 250, 250, 0.6); font-size: 0.85rem; margin-top: 15px; font-style: italic;">
+                        ℹ️ Attention : Le gain net journalier et les calculs financiers sont adaptés et indexés sur la durée réelle cumulée des étapes.
+                    </div>
+                    """, 
+                    unsafe_allow_html=True
+                )
         st.markdown("<div style='border-bottom: 2px solid #31333F; margin-top: 15px; margin-bottom: 15px;'></div>", unsafe_allow_html=True)
