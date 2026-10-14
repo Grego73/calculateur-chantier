@@ -10,7 +10,6 @@ from onglets.suivi_interne.tab_gestion import afficher_tab_gestion
 from .tab_diagnostic import afficher_tab_diagnostic
 from onglets.suivi_interne.tab_stock import afficher_tab_stock
 
-
 def afficher_onglet_suivi_interne(SALAIRES_DB, CATALOGUE_ENGINS, MATERIAUX_DB):
     if "auth_suivi_coop" not in st.session_state:
         st.session_state["auth_suivi_coop"] = None
