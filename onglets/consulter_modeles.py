@@ -229,8 +229,12 @@ def afficher_onglet_consulter_modeles():
             with cb4:
                 st.metric(label="⚡ Gain Net / Jour", value=f"{item['roi_par_jour']:,.0f} €/j".replace(",", " "))
 
+            # --- CODE MODIFIÉ AVEC DÉCLENCHEUR POUR TOUTE LA LIGNE DU BAS ---
             st.markdown("<br>", unsafe_allow_html=True)
             col_alerte1, col_alerte2 = st.columns(2)
+
+            # Variable de déclenchement (définie par défaut à False)
+            afficher_notification_temps = False
 
             # Colonne 1 : Rentabilité Financière (Actuelle)
             with col_alerte1:
@@ -239,17 +243,16 @@ def afficher_onglet_consulter_modeles():
                 else:
                     st.error(f"🔴 **Modèle déficitaire :** Perte sèche évaluée à **{abs(item['marge_net']):,.2f} €**.".replace(",", " "))
 
-            # Colonne 2 : Comparaison des Temps (Précise)
+            # Colonne 2 : Comparaison des Temps (Vert, Bleu Harmonisé, Rouge)
             with col_alerte2:
                 temps_chantier = float(item["jours_globaux_indic"])
                 temps_etapes = float(item["duree_totale_jours"])
                 
                 if temps_etapes < temps_chantier:
                     st.success(f"🟢 **Planning optimisé :** Le cumul des étapes ({temps_etapes:.1f} j) est **inférieur** au temps global ({temps_chantier:.1f} j).")
-                    st.caption("ℹ️ *Attention : Le gain net journalier et les calculs financiers sont indexés sur la durée réelle cumulée des étapes techniques.*")
+                    afficher_notification_temps = True  # Déclenchement activé
                 
                 elif temps_etapes == temps_chantier:
-                    # Style HTML qui calque fidèlement l'opacité et l'intensité des blocs vert/rouge du thème sombre
                     st.markdown(
                         f"""
                         <div style="background-color: rgba(28, 127, 238, 0.15); color: rgb(100, 180, 255); padding: 16px; border-radius: 0.5rem; border: 1px solid rgba(28, 127, 238, 0.3); font-size: 1rem;">
@@ -258,9 +261,15 @@ def afficher_onglet_consulter_modeles():
                         """, 
                         unsafe_allow_html=True
                     )
-                    
+                    # Reste à False, car le temps est égal
+                
                 else:  # temps_etapes > temps_chantier
                     st.error(f"🔴 **Alerte Temps :** Le cumul des étapes ({temps_etapes:.1f} j) est **supérieur** au temps global ({temps_chantier:.1f} j).")
-                    st.caption("ℹ️ *Attention : Le gain net journalier et les calculs financiers sont indexés sur la durée réelle cumulée des étapes techniques.*")
+                    afficher_notification_temps = True  # Déclenchement activé
+
+            # --- S'affiche sur toute la largeur de la ligne uniquement si activé ---
+            if afficher_notification_temps:
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.caption("ℹ️ *Attention : Le gain net journalier et les calculs financiers sont adaptés et indexés sur la durée réelle cumulée des étapes.*")
 
         st.markdown("<div style='border-bottom: 2px solid #31333F; margin-top: 15px; margin-bottom: 15px;'></div>", unsafe_allow_html=True)
