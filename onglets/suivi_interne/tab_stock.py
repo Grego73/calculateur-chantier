@@ -5,12 +5,12 @@ import re
 
 def extraire_donnees_html(html_content):
     """
-    Analyse le code HTML du jeu Sim-TP pour en extraire les stocks et les prix.
+    Analyse le code HTML de Sim-TP pour extraire les matériaux, stocks et prix.
     """
     soup = BeautifulSoup(html_content, 'html.parser')
     donnees_mats = []
     
-    # 🎯 On cible toutes les cartes de projet de matériaux (cm33-card-project)
+    # Ciblage de toutes les cartes de matériaux du jeu
     cartes_materiaux = soup.find_all('div', class_=re.compile(r'cm33-card-project'))
     
     for carte in cartes_materiaux:
@@ -20,18 +20,16 @@ def extraire_donnees_html(html_content):
             continue
         nom_mat = div_nom.text.strip()
         
-        # 2. Extraction de la quantité en stock via le texte de progression
+        # 2. Extraction du volume en stock
         span_prog = carte.find('span', class_=re.compile(r'cm33-cp-pct'))
         stock_val = 0
         if span_prog:
             texte_stock = span_prog.text
-            # Recherche de la suite de chiffres (ex: "2350 tonne(s)" ou "1139 unité(s)")
             match_stock = re.search(r'En stock\s*:\s*([\d\s]+)', texte_stock)
             if match_stock:
-                # Nettoyage des espaces pour les grands nombres (ex: "5 000" -> 5000)
                 stock_val = int(match_stock.group(1).replace(' ', ''))
         
-        # 3. Extraction de la valeur / prix de vente configuré
+        # 3. Extraction du prix de vente unitaire
         input_prix = carte.find('input', attrs={'name': 'prix'})
         prix_val = 0
         if input_prix and input_prix.has_attr('value'):
@@ -40,63 +38,76 @@ def extraire_donnees_html(html_content):
             except ValueError:
                 pass
                 
+        # Unités de mesure pour l'affichage propre
+        unite = "u" if nom_mat in ["Armature métallique", "Plaque de tôle ondulée", "Panneaux signalisation", "Tuyaux d'eau standards", "Canalisations eaux usées", "Poutres en acier"] else "t"
+                
         donnees_mats.append({
             "Matériau": nom_mat,
             "Quantité en Stock": stock_val,
-            "Prix Actuel (€)": prix_val,
-            "Valeur Totale (€)": int(stock_val * prix_val)
+            "Unité": unite,
+            "Prix Unitaire (€)": prix_val,
+            "Valeur du Stock (€)": int(stock_val * prix_val)
         })
         
     return donnees_mats
 
 def afficher_tab_import_html(nom_coop_active):
-    st.markdown("#### 📥 Importation de l'inventaire en direct depuis Sim-TP")
-    st.caption("Alimentez l'état des stocks réels de votre coopérative en y collant le code source de votre page de jeu.")
+    st.markdown("#### 🌍 Évaluation de la Valeur Réelle des Stocks")
+    st.caption("Collez le code source HTML de la page de votre coopérative pour calculer instantanément la valeur financière totale de vos marchandises stockées.")
     
-    # Zone de saisie pour coller l'HTML brut
+    # Zone de collage de l'HTML
     html_brut = st.text_area(
-        "Collez l'intégralité du code HTML (Ctrl+A puis Ctrl+C sur Sim-TP) :", 
-        height=250, 
+        "Collez le code HTML de votre page ici (Ctrl+A puis Ctrl+C sur le jeu) :", 
+        height=150, 
         placeholder="<!DOCTYPE html> ...",
-        key="area_import_html_coop"
+        key="area_import_html_coop_v2"
     )
     
-    if st.button("🚀 ANALYSER ET METTRE À JOUR L'INVENTAIRE", type="primary", use_container_width=True):
-        if html_brut.strip():
-            with st.spinner("Analyse du DOM HTML en cours..."):
-                resultats = extraire_donnees_html(html_brut)
-                
-            if resultats:
-                df_inventaire = pd.DataFrame(resultats)
-                
-                # --- AFFICHAGE DU RÉCAPITULATIF EXTRAIT ---
-                st.success(f"🎯 Analyse réussie ! {len(df_inventaire)} matériaux identifiés.")
-                
-                # Calculs globaux pour le tableau de bord
-                valeur_totale_stock = df_inventaire["Valeur Totale (€)"].sum()
-                
-                c_inv1, c_inv2 = st.columns(2)
-                with c_inv1:
-                    st.metric("📦 Volume Global Matériaux", f"{df_inventaire['Quantité en Stock'].sum():,} u".replace(",", " "))
-                with c_inv2:
-                    st.metric("💰 Valeur Théorique Marché", f"{valeur_totale_stock:,} €".replace(",", " "))
-                
-                st.markdown("##### 📋 Détail des ressources détectées :")
-                st.dataframe(
-                    df_inventaire, 
-                    use_container_width=True, 
-                    hide_index=True,
-                    column_config={
-                        "Quantité en Stock": st.column_config.NumberColumn("Quantité", format="%d"),
-                        "Prix Actuel (€)": st.column_config.NumberColumn("Prix Unitaire", format="%d €"),
-                        "Valeur Totale (€)": st.column_config.NumberColumn("Valeur Évaluée", format="%d €"),
-                    }
+    if html_brut.strip():
+        resultats = extraire_donnees_html(html_brut)
+        
+        if resultats:
+            df_inventaire = pd.DataFrame(resultats)
+            
+            # --- 📈 INDIFICATEURS CLÉS DE VALEUR ---
+            valeur_totale_marchandises = df_inventaire["Valeur du Stock (€)"].sum()
+            volume_total = df_inventaire["Quantité en Stock"].sum()
+            
+            st.markdown("---")
+            st.markdown("##### 💰 Bilan Actif de la Coopérative")
+            
+            c_val1, c_val2 = st.columns(2)
+            with c_val1:
+                st.metric(
+                    label="🔥 Valeur Estimée des Stocks", 
+                    value=f"{int(valeur_totale_marchandises):,}".replace(",", " ") + " €"
                 )
-                
-                # --- ÉTAPE SUIVANTE : ENREGISTREMENT EN BASE NoSQL ---
-                # Optionnel : Ajoutez ici votre logique `db.sauvegarder_inventaire_coop(nom_coop_active, resultats)`
-                
-            else:
-                st.error("❌ Aucun bloc de matériau Sim-TP valide n'a pu être extrait. Vérifiez que vous avez copié le bon code source.")
+            with c_val2:
+                st.metric(
+                    label="📦 Volume Total Entreposé", 
+                    value=f"{int(volume_total):,}".replace(",", " ") + " unités / tonnes"
+                )
+            
+            # --- 📊 GRAPHIQUE DES VALEURS PAR RESSOURCE ---
+            st.write("")
+            st.markdown("**📊 Répartition financière de l'actif par type de matériau :**")
+            df_graph = df_inventaire[["Matériau", "Valeur du Stock (€)"]].set_index("Matériau")
+            st.bar_chart(df_graph, color="#e8a020")
+            
+            # --- 📋 GRAND LIVRE DE L'INVENTAIRE ---
+            st.markdown("##### 📋 Inventaire Détaillé des Matériaux")
+            st.dataframe(
+                df_inventaire, 
+                use_container_width=True, 
+                hide_index=True,
+                column_config={
+                    "Matériau": st.column_config.TextColumn("🧱 Ressource"),
+                    "Quantité en Stock": st.column_config.NumberColumn("Quantité", format="%d"),
+                    "Unité": st.column_config.TextColumn("📦 Type"),
+                    "Prix Unitaire (€)": st.column_config.NumberColumn("Prix / Unité", format="%d €"),
+                    "Valeur du Stock (€)": st.column_config.NumberColumn("Valeur Évaluée", format="%d €"),
+                }
+            )
+            
         else:
-            st.warning("⚠️ La zone de texte est vide. Veuillez y coller du code HTML avant de valider.")
+            st.error("❌ Impossible de lire les blocs de marchandises Sim-TP. Assurez-vous d'avoir copié le code de la page 'Ma coopérative'.")
