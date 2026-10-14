@@ -67,6 +67,7 @@ def identifier_cle_unique(texte):
     
     return texte_nettoye
 
+
 def analyser_consommation_periode(liste_flux_bruts):
     """
     Analyse les volumes vendus sur la période en cours.
