@@ -271,7 +271,7 @@ def afficher_onglet_consulter_modeles():
             if afficher_notification_temps:
                 st.markdown(
                     """
-                    <div style="text-align: center; color: rgba(250, 250, 250, 0.6); font-size: 0.85rem; margin-top: 15px; font-style: italic;">
+                    <div style="text-align: center; color: rgba(250, 250, 250, 0.6); font-size: 1rem; margin-top: 5px; font-style: italic;">
                         ℹ️ Attention : Le gain net journalier et les calculs financiers sont adaptés et indexés sur la durée réelle cumulée des étapes.
                     </div>
                     """, 
