@@ -1,20 +1,102 @@
-# Contenu de : onglets/suivi_interne/tab_parseur.py
 import streamlit as st
 import pandas as pd
 import database as db
+import re
+from datetime import datetime
 from coops.parseur import analyser_historique_brut
+from .tab_stock import identifier_cle_unique  # 🎯 On récupère notre nettoyeur universel
+
+def mettre_a_jour_stock_reappro_firestore(nom_coop_active, materiaux_reappro):
+    """
+    Va chercher le dernier SNAPSHOT_STOCK dans Firestore, lui ajoute les quantités
+    du réapprovisionnement et recrée un nouveau snapshot à jour.
+    """
+    try:
+        col_ref = db.db.collection("cooperatives").document(nom_coop_active).collection("comptabilite_interne")
+        
+        # 1. On cherche le SNAPSHOT_STOCK le plus récent en base
+        query_snapshot = col_ref.where("type", "==", "SNAPSHOT_STOCK")\
+                                .order_by("timestamp_enregistrement", direction="DESCENDING")\
+                                .limit(1).stream()
+                                
+        dernier_snapshot = None
+        for doc in query_snapshot:
+            dernier_snapshot = doc.to_dict()
+            break
+            
+        # Si aucun snapshot n'existe encore, on démarre à zéro
+        if not d_snap := dernier_snapshot:
+            details_quantites = {}
+            details_prix = {}
+        else:
+            details_quantites = d_snap.get("details_quantites", {})
+            details_prix = d_snap.get("details_prix", {})
+            
+        # 2. On ajoute les nouvelles quantités réapprovisionnées au stock existant
+        for mat_nom, qte in materiaux_reappro.items():
+            cle_technique = identifier_cle_unique(mat_nom)
+            cle_stock = f"stock_{cle_technique}"
+            
+            # Cumul de la quantité actuelle avec la nouvelle
+            quantite_actuelle = int(details_quantites.get(cle_stock, 0))
+            details_quantites[cle_stock] = quantite_actuelle + int(qte)
+            
+        # 3. Recalcul des totaux de valeur et de volume
+        volume_total = 0
+        valeur_totale = 0
+        for cle_st, qte_st in details_quantites.items():
+            volume_total += qte_st
+            # On extrait le nom de la ressource pour trouver son prix associé
+            cle_res = cle_st.replace("stock_", "")
+            prix_unitaire = float(details_prix.get(f"prix_{cle_res}", 0.0))
+            valeur_totale += int(qte_st * prix_unitaire)
+            
+        # 4. Enregistrement du nouveau snapshot incrémenté dans Firestore
+        maintenant = datetime.now()
+        id_document = f"snapshot_stock_{maintenant.strftime('%Y%m%d_%H%M%S')}"
+        
+        nouveau_snapshot = {
+            "type": "SNAPSHOT_STOCK",
+            "date_jeu": maintenant.strftime("%d/%m/%Y"),
+            "heure_jeu": maintenant.strftime("%H:%M"),
+            "valeur_totale_stock": valeur_totale,
+            "volume_total_stock": volume_total,
+            "details_quantites": details_quantites,
+            "details_prix": details_prix,
+            "timestamp_enregistrement": maintenant.strftime("%Y-%m-%d %H:%M:%S")
+        }
+        
+        col_ref.document(id_document).set(nouveau_snapshot)
+        st.toast(f"🧱 Stock mis à jour automatiquement en tâche de fond !", icon="📦")
+        
+    except Exception as e:
+        st.caption(f"ℹ️ Note : Impossible de mettre à jour le snapshot de stock dynamique ({e})")
 
 def afficher_tab_parseur(nom_coop_active, membres_inscrits, joueur_actif, liste_flux):
     st.markdown("#### 📥 Alimenter le Système via le Fil des Événements")
     texte_logs = st.text_area("Collez l'historique brut du jeu ici :", height=200, key="area_parseur_coop_final_v5")
+    
     if st.button("🚀 ENREGISTRER L'HISTORIQUE ET FILTRER LES DOUBLONS", type="primary", width="stretch") and texte_logs.strip():
         mouvements = analyser_historique_brut(texte_logs, membres_inscrits, joueur_actif)
+        
+        compteur_reappro = 0
         for mv in mouvements: 
+            # Enregistrement classique dans la base de l'historique brut
             db.enregistrer_ligne_historique_brute(nom_coop_active, mv["date"], mv["heure"], mv["acteur"], mv["type"], mv["materiaux"])
+            
+            # 🎯 Détection du réapprovisionnement pour ajuster le stock réel en direct
+            if str(mv["type"]).strip() == "REAPPROVISIONNEMENT" and mv["materiaux"]:
+                mettre_a_jour_stock_reappro_firestore(nom_coop_active, mv["materiaux"])
+                compteur_reappro += 1
         
         st.cache_data.clear()
         db.charger_flux_coop_cache.clear()
-        st.success("🎯 Synchronisation réussie !")
+        
+        if compteur_reappro > 0:
+            st.success(f"🎯 Synchronisation réussie ! {compteur_reappro} réapprovisionnement(s) intégré(s) directement dans vos stocks.")
+        else:
+            st.success("🎯 Synchronisation réussie !")
+            
         st.rerun()
 
     st.markdown("---")
