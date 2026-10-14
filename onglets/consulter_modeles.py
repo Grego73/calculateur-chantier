@@ -260,5 +260,7 @@ def afficher_onglet_consulter_modeles():
                     
                 else:  # temps_etapes > temps_chantier
                     st.error(f"🔴 **Alerte Temps :** Le cumul des étapes ({temps_etapes:.1f} j) est **supérieur** au temps global ({temps_chantier:.1f} j).")
-        
+            
+            st.caption("ℹ️ *Attention : Le gain net journalier et les calculs financiers sont indexés sur la durée réelle cumulée des étapes techniques.*")
+
         st.markdown("<div style='border-bottom: 2px solid #31333F; margin-top: 15px; margin-bottom: 15px;'></div>", unsafe_allow_html=True)
