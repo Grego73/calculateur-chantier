@@ -152,7 +152,7 @@ def afficher_onglet_historique():
     st.markdown(f"### 📋 Liste des chantiers filtrés ({len(df_affichage)} affiché(s))")
     
     st.dataframe(
-        df_affichage, hide_index=True, width="stretch",
+        df_affichage, hide_index=True, use_container_width=True,
         column_config={
             "Nom du Chantier": st.column_config.TextColumn("Nom du Chantier"), 
             "Revenus (€)": st.column_config.NumberColumn("Revenus", format="%.0f €"), 
@@ -177,5 +177,5 @@ def afficher_onglet_historique():
         data=csv, 
         file_name="historique_chantiers_filtres.csv", 
         mime="text/csv",
-        width="stretch"
+        use_container_width=True
     )
