@@ -6,16 +6,13 @@ import streamlit as st
 import database as db
 from styles import appliquer_theme_moderne, afficher_entete_page
 
-# Importations des modules applicatifs
 from onglets.direction_admin import afficher_onglet_direction
 from onglets.suivi_interne import afficher_onglet_suivi_interne
-from onglets.ajouter_chantier import afficher_onglet_ajouter
-from onglets.historique import afficher_onglet_historique
 from onglets.suivi_contrats import afficher_onglet_suivi_contrats
 from onglets.marche_actuel import afficher_onglet_marche_actuel
-from onglets.consulter_modeles import afficher_onglet_consulter_modeles
+from onglets.rentabilite_chantiers import afficher_onglet_rentabilite_chantiers
+from onglets.groupements import afficher_onglet_groupements
 
-# Configuration générale de la page
 st.set_page_config(
     page_title="Sim-TP | Gestion & Rentabilité",
     page_icon="🏗️",
@@ -25,11 +22,9 @@ st.set_page_config(
 
 appliquer_theme_moderne()
 
-# Chargement des configurations globales (en cache rapide)
 config_salaires = db.charger_salaires_config()
 config_materiaux = db.charger_materiaux_config()
 catalogue_engins = db.charger_catalogue_engins()
-types_engins = db.charger_types_engins_bruts()
 
 # ==============================================================================
 # --- BARRE LATÉRALE DE NAVIGATION ---
@@ -43,8 +38,7 @@ with st.sidebar:
         "Navigation :",
         [
             "📋 Contrats & Logistique",
-            "🧮 Simulateur & Modèles",
-            "📊 Historique & Rentabilité",
+            "📊 Rentabilité des Chantiers",
             "🤝 Groupements (GPE)",
             "👥 Espace Coopérative",
             "🌍 Marché des Coopératives",
@@ -69,34 +63,19 @@ if navigation == "📋 Contrats & Logistique":
     )
     afficher_onglet_suivi_contrats()
 
-elif navigation == "🧮 Simulateur & Modèles":
+elif navigation == "📊 Rentabilité des Chantiers":
     afficher_entete_page(
-        "🧮 Simulateur de Chantiers & Modèles NoSQL",
-        "Consultez la rentabilité des ouvrages pré-configurés ou réalisez une simulation sur-mesure."
+        "📊 Rentabilité & Classement des Chantiers",
+        "Comparez tous vos chantiers enregistrés selon vos contrats employés (CDI/CDD) et votre flotte d'engins."
     )
-    tab_sim, tab_mod = st.tabs(["➕ Calculateur de Rentabilité", "🗂️ Catalogue des Modèles"])
-    with tab_sim:
-        afficher_onglet_ajouter(config_salaires, config_materiaux, catalogue_engins, types_engins)
-    with tab_mod:
-        afficher_onglet_consulter_modeles()
-
-elif navigation == "📊 Historique & Rentabilité":
-    afficher_entete_page(
-        "📊 Historique & Classement des Chantiers",
-        "Suivez vos performances globales, votre ROI moyen par jour et vos meilleurs projets."
-    )
-    afficher_onglet_historique()
+    afficher_onglet_rentabilite_chantiers()
 
 elif navigation == "🤝 Groupements (GPE)":
     afficher_entete_page(
         "🤝 Groupements d'Entreprises (GPE)",
         "Analysez les contrats de groupement, la rentabilité par phase et répartissez les lots entre associés."
     )
-    try:
-        from onglets.groupements import afficher_onglet_groupements
-        afficher_onglet_groupements()
-    except ImportError:
-        st.info("🚧 Le module Groupements d'Entreprises (GPE) sera activé à l'étape suivante !")
+    afficher_onglet_groupements()
 
 elif navigation == "👥 Espace Coopérative":
     afficher_entete_page(
