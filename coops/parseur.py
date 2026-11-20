@@ -23,19 +23,29 @@ def normaliser_texte(texte):
 
 
 def _extraire_texte_depuis_html_coop(html_brut):
-    """Extrait proprement les lignes du fil des événements si l'utilisateur colle le code HTML."""
+    """Extrait proprement les lignes du fil des événements depuis le HTML (ancien ou nouveau)."""
     soup = BeautifulSoup(html_brut, "html.parser")
-    lignes_extraites = []
+    lignes_extraites = list()
 
     for li in soup.select("ul.collection li.collection-item"):
         spans = li.find_all("span")
         if len(spans) >= 2:
             it_spans = iter(spans)
-            date_txt = next(it_spans).get_text(strip=True)
-            action_txt = next(it_spans).get_text(strip=True)
+            date_txt = next(it_spans).get_text(" ", strip=True)
+            action_txt = next(it_spans).get_text(" ", strip=True)
             if date_txt.lower().startswith("le ") and " à " in date_txt.lower():
                 lignes_extraites.append(date_txt)
                 lignes_extraites.append(action_txt)
+
+    if lignes_extraites:
+        return "\n".join(lignes_extraites)
+
+    blocs = soup.find_all(["li", "p", "div", "h5", "h6", "span"])
+    for bloc in blocs:
+        if not bloc.find(["li", "div", "p"]):
+            txt = bloc.get_text(" ", strip=True)
+            if txt:
+                lignes_extraites.append(txt)
 
     if lignes_extraites:
         return "\n".join(lignes_extraites)
@@ -86,18 +96,20 @@ def analyser_historique_brut(texte_brut, membres_inscrits, joueur_actif):
     date_aujourdhui_str = maintenant_paris.strftime("%d/%m/%Y")
     date_hier_str = (maintenant_paris - timedelta(days=1)).strftime("%d/%m/%Y")
 
-    regex_ancien_format = re.compile(r"^le\s*(\d{2}/\d{2}/\d{4})\s*a\s*(\d{2}:\d{2})$", re.IGNORECASE)
+    regex_ancien_format = re.compile(r"le\s*(\d{2}/\d{2}/\d{4})\s*a\s*(\d{2}:\d{2})", re.IGNORECASE)
     regex_date_seule = re.compile(r"^(\d{2}/\d{2}/\d{4})$")
     regex_heure_seule = re.compile(r"^(\d{2}:\d{2})$")
+    regex_heure_debut_ligne = re.compile(r"^(\d{2}:\d{2})\s+(.+)$")
     regex_compteur_evts = re.compile(r"^\d+\s*evenements?$", re.IGNORECASE)
 
-    date_courante = None
+    # Par défaut, on prend la date du jour au cas où l'utilisateur n'a pas sélectionné la ligne "Aujourd'hui"
+    date_courante = date_aujourdhui_str
     heure_courante = None
     actions_detectees = list()
     compteur_occurrences = dict()
 
     for lg in lignes_brutes:
-        l_brute_clean = lg.strip()
+        l_brute_clean = " ".join(lg.split()).strip()
         if not l_brute_clean:
             continue
 
@@ -106,7 +118,7 @@ def analyser_historique_brut(texte_brut, membres_inscrits, joueur_actif):
         if "fil des" in l_normalisee or regex_compteur_evts.match(l_normalisee):
             continue
 
-        match_ancien = regex_ancien_format.match(l_normalisee)
+        match_ancien = regex_ancien_format.search(l_normalisee)
         if match_ancien:
             date_courante = match_ancien.group(1)
             heure_courante = match_ancien.group(2)
@@ -132,6 +144,12 @@ def analyser_historique_brut(texte_brut, membres_inscrits, joueur_actif):
         if match_heure:
             heure_courante = match_heure.group(1)
             continue
+
+        match_heure_action = regex_heure_debut_ligne.match(l_brute_clean)
+        if match_heure_action:
+            heure_courante = match_heure_action.group(1)
+            l_brute_clean = match_heure_action.group(2).strip()
+            l_normalisee = normaliser_texte(l_brute_clean)
 
         if date_courante and heure_courante:
             mat_cle = _detecter_materiau(l_normalisee)
