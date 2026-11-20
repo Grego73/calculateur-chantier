@@ -74,29 +74,43 @@ def mettre_a_jour_stock_reappro_firestore(nom_coop_active, materiaux_reappro):
 def afficher_tab_parseur(nom_coop_active, membres_inscrits, joueur_actif, liste_flux):
     st.markdown("#### 📥 Alimenter le Système via le Fil des Événements")
     texte_logs = st.text_area("Collez l'historique brut du jeu ici :", height=200, key="area_parseur_coop_final_v5")
-    
-    if st.button("🚀 ENREGISTRER L'HISTORIQUE ET FILTRER LES DOUBLONS", type="primary", width="stretch") and texte_logs.strip():
-        mouvements = analyser_historique_brut(texte_logs, membres_inscrits, joueur_actif)
-        
-        compteur_reappro = 0
-        for mv in mouvements: 
-            # Enregistrement classique dans la base de l'historique brut
-            db.enregistrer_ligne_historique_brute(nom_coop_active, mv["date"], mv["heure"], mv["acteur"], mv["type"], mv["materiaux"], occurrence=mv.get("occurrence", 1)
-            
-            # Détection du réapprovisionnement pour ajuster le stock réel en direct
-            if str(mv["type"]).strip() == "REAPPROVISIONNEMENT" and mv["materiaux"]:
-                mettre_a_jour_stock_reappro_firestore(nom_coop_active, mv["materiaux"])
-                compteur_reappro += 1
-        
-        st.cache_data.clear()
-        db.charger_flux_coop_cache.clear()
-        
-        if compteur_reappro > 0:
-            st.success(f"🎯 Synchronisation réussie ! {compteur_reappro} réapprovisionnement(s) intégré(s) directement dans vos stocks.")
+
+    if st.button("🚀 ENREGISTRER L'HISTORIQUE ET FILTRER LES DOUBLONS", type="primary", width="stretch"):
+        if not texte_logs.strip():
+            st.warning("⚠️ La zone de texte est vide.")
         else:
-            st.success("🎯 Synchronisation réussie !")
-            
-        st.rerun()
+            mouvements = analyser_historique_brut(texte_logs, membres_inscrits, joueur_actif)
+
+            if not mouvements:
+                st.error("❌ Aucun événement reconnu dans le texte collé. Vérifiez que vous avez bien copié depuis la ligne 'Aujourd'hui' ou la date (ex: 18/11/2026).")
+            else:
+                compteur_reappro = 0
+                with st.spinner(f"Enregistrement de {len(mouvements)} événement(s) sur Firestore..."):
+                    for mv in mouvements:
+                        db.enregistrer_ligne_historique_brute(
+                            nom_coop_active,
+                            mv["date"],
+                            mv["heure"],
+                            mv["acteur"],
+                            mv["type"],
+                            mv["materiaux"],
+                            occurrence=mv.get("occurrence", 1),
+                        )
+
+                        if str(mv["type"]).strip() == "REAPPROVISIONNEMENT" and mv["materiaux"]:
+                            mettre_a_jour_stock_reappro_firestore(nom_coop_active, mv["materiaux"])
+                            compteur_reappro += 1
+
+                st.cache_data.clear()
+                db.charger_flux_coop_cache.clear()
+                st.session_state["msg_succes_parseur"] = (
+                    f"🎯 {len(mouvements)} événement(s) synchronisé(s) (dont {compteur_reappro} réapprovisionnement(s)) !"
+                )
+                st.rerun()
+
+    if "msg_succes_parseur" in st.session_state:
+        st.success(st.session_state.pop("msg_succes_parseur"))
+
 
     st.markdown("---")
     st.markdown("##### ⏱️ Les 5 dernières entrées de l'historique du jeu (Flux Matériaux)")
