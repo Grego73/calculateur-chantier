@@ -30,8 +30,9 @@ def _extraire_texte_depuis_html_coop(html_brut):
     for li in soup.select("ul.collection li.collection-item"):
         spans = li.find_all("span")
         if len(spans) >= 2:
-            date_txt = spans[0].get_text(strip=True)
-            action_txt = spans[1].get_text(strip=True)
+            it_spans = iter(spans)
+            date_txt = next(it_spans).get_text(strip=True)
+            action_txt = next(it_spans).get_text(strip=True)
             if date_txt.lower().startswith("le ") and " à " in date_txt.lower():
                 lignes_extraites.append(date_txt)
                 lignes_extraites.append(action_txt)
@@ -44,7 +45,7 @@ def _extraire_texte_depuis_html_coop(html_brut):
 
 def _detecter_materiau(ligne_normalisee):
     """Identifie la clé standardisée du matériau dans une ligne normalisée."""
-    correspondances = [
+    correspondances = (
         ("canalisation", "canalisations"),
         ("armature", "armature"),
         ("enrob", "enrobe"),
@@ -55,7 +56,7 @@ def _detecter_materiau(ligne_normalisee):
         ("panneau", "panneaux"),
         ("tuyau", "tuyaux"),
         ("poutre", "poutres"),
-    ]
+    )
     for mot_cle, cle_officielle in correspondances:
         if mot_cle in ligne_normalisee:
             return cle_officielle
@@ -68,7 +69,7 @@ def analyser_historique_brut(texte_brut, membres_inscrits, joueur_actif):
     l'ancien format ('Le JJ/MM/AAAA à HH:MM') ainsi que le code HTML collé.
     """
     if not texte_brut or not texte_brut.strip():
-        return []
+        return list()
 
     if (
         "<html" in texte_brut.lower()
@@ -79,7 +80,7 @@ def analyser_historique_brut(texte_brut, membres_inscrits, joueur_actif):
         texte_brut = _extraire_texte_depuis_html_coop(texte_brut)
 
     lignes_brutes = texte_brut.split("\n")
-    membres_lower = {m.lower().strip() for m in (membres_inscrits or [])}
+    membres_lower = {m.lower().strip() for m in (membres_inscrits or list())}
 
     maintenant_paris = datetime.now(TZ_PARIS)
     date_aujourdhui_str = maintenant_paris.strftime("%d/%m/%Y")
@@ -92,8 +93,8 @@ def analyser_historique_brut(texte_brut, membres_inscrits, joueur_actif):
 
     date_courante = None
     heure_courante = None
-    actions_detectees = []
-    compteur_occurrences = {}
+    actions_detectees = list()
+    compteur_occurrences = dict()
 
     for lg in lignes_brutes:
         l_brute_clean = lg.strip()
@@ -111,7 +112,7 @@ def analyser_historique_brut(texte_brut, membres_inscrits, joueur_actif):
             heure_courante = match_ancien.group(2)
             continue
 
-        if l_normalisee in ["aujourd'hui", "aujourdhui"]:
+        if l_normalisee in ("aujourd'hui", "aujourdhui"):
             date_courante = date_aujourdhui_str
             heure_courante = None
             continue
@@ -145,22 +146,20 @@ def analyser_historique_brut(texte_brut, membres_inscrits, joueur_actif):
                 type_mouv_final = "REAPPROVISIONNEMENT"
                 match_split = re.split(r"r[ée]approvisionne\s+de", l_brute_clean, maxsplit=1, flags=re.IGNORECASE)
                 if len(match_split) == 2:
-                    gauche = match_split[0].strip()
-                    droite = match_split[1].strip()
-                    acteur_candidat = re.sub(r"^le\s+", "", gauche, flags=re.IGNORECASE).strip()
+                    gauche, droite = match_split
+                    acteur_candidat = re.sub(r"^le\s+", "", gauche.strip(), flags=re.IGNORECASE).strip()
                     acteur_final = acteur_candidat if acteur_candidat else "Réapprovisionnement Global"
-                    partie_droite_quantite = droite
+                    partie_droite_quantite = droite.strip()
                 else:
                     acteur_final = "Réapprovisionnement Global"
 
             elif "a achete" in l_normalisee:
                 match_split = re.split(r"a\s+achet[ée]", l_brute_clean, maxsplit=1, flags=re.IGNORECASE)
                 if len(match_split) == 2:
-                    gauche = match_split[0].strip()
-                    droite = match_split[1].strip()
-                    acteur_candidat = re.sub(r"^le\s+", "", gauche, flags=re.IGNORECASE).strip()
+                    gauche, droite = match_split
+                    acteur_candidat = re.sub(r"^le\s+", "", gauche.strip(), flags=re.IGNORECASE).strip()
                     acteur_final = acteur_candidat if acteur_candidat else joueur_actif
-                    partie_droite_quantite = droite
+                    partie_droite_quantite = droite.strip()
                 else:
                     acteur_final = joueur_actif
 
@@ -172,8 +171,8 @@ def analyser_historique_brut(texte_brut, membres_inscrits, joueur_actif):
             else:
                 continue
 
-            chiffres = re.findall(r"\d[\d\s]*", partie_droite_quantite)
-            qte_val = float(chiffres[0].replace(" ", "")) if chiffres else 1.0
+            match_qte = re.search(r"(\d[\d\s]*)", partie_droite_quantite)
+            qte_val = float(match_qte.group(1).replace(" ", "")) if match_qte else 1.0
 
             cle_signature = (
                 date_courante,
@@ -184,7 +183,7 @@ def analyser_historique_brut(texte_brut, membres_inscrits, joueur_actif):
                 int(qte_val),
             )
             compteur_occurrences[cle_signature] = compteur_occurrences.get(cle_signature, 0) + 1
-            num_occurrence = compteur_occurrences[cle_signature]
+            num_occurrence = compteur_occurrences.get(cle_signature, 1)
 
             actions_detectees.append({
                 "date": date_courante,
