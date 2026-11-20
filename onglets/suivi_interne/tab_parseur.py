@@ -81,7 +81,7 @@ def afficher_tab_parseur(nom_coop_active, membres_inscrits, joueur_actif, liste_
         compteur_reappro = 0
         for mv in mouvements: 
             # Enregistrement classique dans la base de l'historique brut
-            db.enregistrer_ligne_historique_brute(nom_coop_active, mv["date"], mv["heure"], mv["acteur"], mv["type"], mv["materiaux"])
+            db.enregistrer_ligne_historique_brute(nom_coop_active, mv["date"], mv["heure"], mv["acteur"], mv["type"], mv["materiaux"], occurrence=mv.get("occurrence", 1)
             
             # Détection du réapprovisionnement pour ajuster le stock réel en direct
             if str(mv["type"]).strip() == "REAPPROVISIONNEMENT" and mv["materiaux"]:
