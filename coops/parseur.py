@@ -66,7 +66,6 @@ def analyser_historique_brut(texte_brut, membres_inscrits, joueur_actif):
     """
     Analyse le nouveau format (Aujourd'hui / Hier / JJ/MM/AAAA + HH:MM + Action),
     l'ancien format ('Le JJ/MM/AAAA à HH:MM') ainsi que le code HTML collé.
-    Gère les doublons exacts dans la même minute via un compteur déterministe.
     """
     if not texte_brut or not texte_brut.strip():
         return []
@@ -172,7 +171,6 @@ def analyser_historique_brut(texte_brut, membres_inscrits, joueur_actif):
             chiffres = re.findall(r"\d[\d\s]*", partie_droite_quantite)
             qte_val = float(chiffres[0].replace(" ", "")) if chiffres else 1.0
 
-            # Clé de signature pour distinguer 2 actions identiques dans la même minute
             cle_signature = (
                 date_courante,
                 heure_courante,
