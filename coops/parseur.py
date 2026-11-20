@@ -145,18 +145,22 @@ def analyser_historique_brut(texte_brut, membres_inscrits, joueur_actif):
                 type_mouv_final = "REAPPROVISIONNEMENT"
                 match_split = re.split(r"r[ée]approvisionne\s+de", l_brute_clean, maxsplit=1, flags=re.IGNORECASE)
                 if len(match_split) == 2:
-                    acteur_candidat = re.sub(r"^le\s+", "", match_split[0].strip(), flags=re.IGNORECASE).strip()
+                    gauche = match_split[0].strip()
+                    droite = match_split[1].strip()
+                    acteur_candidat = re.sub(r"^le\s+", "", gauche, flags=re.IGNORECASE).strip()
                     acteur_final = acteur_candidat if acteur_candidat else "Réapprovisionnement Global"
-                    partie_droite_quantite = match_split[1]
+                    partie_droite_quantite = droite
                 else:
                     acteur_final = "Réapprovisionnement Global"
 
             elif "a achete" in l_normalisee:
                 match_split = re.split(r"a\s+achet[ée]", l_brute_clean, maxsplit=1, flags=re.IGNORECASE)
                 if len(match_split) == 2:
-                    acteur_candidat = re.sub(r"^le\s+", "", match_split[0].strip(), flags=re.IGNORECASE).strip()
+                    gauche = match_split[0].strip()
+                    droite = match_split[1].strip()
+                    acteur_candidat = re.sub(r"^le\s+", "", gauche, flags=re.IGNORECASE).strip()
                     acteur_final = acteur_candidat if acteur_candidat else joueur_actif
-                    partie_droite_quantite = match_split[1]
+                    partie_droite_quantite = droite
                 else:
                     acteur_final = joueur_actif
 
