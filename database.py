@@ -298,14 +298,18 @@ def ajouter_reinvestissement_membre(nom_coop, pseudo_joueur, montant_cash):
     except Exception:
         return False
 
-def enregistrer_ligne_historique_brute(nom_coop, date_txt, heure_txt, actor_txt, type_mouv, materiaux_dict):
+def enregistrer_ligne_historique_brute(nom_coop, date_txt, heure_txt, actor_txt, type_mouv, materiaux_dict, occurrence=1):
     if not materiaux_dict:
         return
     try:
         date_cle = "".join(reversed(date_txt.split("/")))
         heure_cle = heure_txt.replace(":", "")
-        mat_nom = "_".join(list(materiaux_dict.keys())).lower().strip()
-        document_id = f"log_{date_cle}_{heure_cle}_{actor_txt.lower().strip()}_{mat_nom}"
+        type_cle = str(type_mouv).lower().strip()
+        acteur_cle = str(actor_txt).lower().strip().replace(" ", "_")
+        mat_cle = "_".join(
+            f"{k.lower().strip()}_{int(v)}" for k, v in sorted(materiaux_dict.items())
+        )
+        document_id = f"log_{date_cle}_{heure_cle}_{acteur_cle}_{type_cle}_{mat_cle}_n{int(occurrence)}"
 
         db.collection("cooperatives").document(nom_coop).collection("comptabilite_interne").document(document_id).set({
             "joueur": str(actor_txt),
@@ -318,6 +322,7 @@ def enregistrer_ligne_historique_brute(nom_coop, date_txt, heure_txt, actor_txt,
         })
     except Exception:
         pass
+
 
 @st.cache_data(ttl=60)
 def charger_flux_coop_cache(nom_coop):
